@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.6;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/interfaces/IERC1155Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./Base64.sol";
 
 /// @notice Error library for centralised error messaging
@@ -28,60 +30,53 @@ contract DeMineNFT is
     // Events
     event LogEthDeposit(address);
     event TokenRoyaltySet(address, uint256);
-    event MaxPeriodSet(uint256);
+    event MaxCyclesAllowedSet(uint256);
+    event CostCoinAddressSet(address);
+    event RewardCoinAddressSet(address);
 
-    event NewRound(uint256, string, uint256, uint256, uint256);
-    event Reward(uint256, uint256, uint256);
-    event Locked(uint256, uint256);
-    event Unlocked(uint256, uint256);
+    event NewRound(uint128, string, uint256, uint256, uint128, uint128);
+    event Reward(uint128, uint256, uint256);
+    event Locked(uint128, uint128);
+    event Unlocked(uint128, uint256);
     event Withdraw(uint256, uint256);
 
     address private _rewardCoinAddress;
     address private _costCoinAddress;
-    uint256 private _nextCycle;
-    uint256 private _nextRound;
-    uint256 private _maxPeriod; // 36 cycles
+    uint128 private _nextCycle;
+    uint128 private _nextRound;
+    uint128 private _maxCyclesAllowed;
 
     // EIP2981
-    struct TokenRoyalty {
-        address recipient;
-        uint16 bps;
-    }
-    TokenRoyalty private _tokenRoyalty;
+    address private _royaltyRecipient;
+    uint16 private _royaltyBps;
+
+    // lock for billing
+    bool private locked;
+    uint128 private lastBillingCycle;
+    uint128 private currentBillingCycle;
 
     struct Cycle {
         uint256 supply;
-        uint256 expectedReward;
-        uint256 expectedCost
+        uint256 rewardPerToken;
+        uint256 costPerToken;
     }
-    map(uint256 => Cycle) private _cycles; // cycle id to Cycles
-    map(uint256 => uint256) private _roundToTokenCost; // round to cost per token in usd
-    map(uint256 => uint256) private _adjustments; // token_id to override ratio
-    uint256 private _adjustmentDecimals;
-
-    struct Lock {
-        bool locked,
-        uint256 lastBillingCycle,
-        uint256 billingCycle
-    }
-    Lock public lock;
+    mapping(uint128 => Cycle) private _cycles;
+    mapping(uint128 => uint256) private _roundToTokenCost; // in usd
+    mapping(uint256 => uint256) private _adjustments; // token_id to adjustment
 
     function initialize(
         address rewardCoinAddress,
         address costCoinAddress,
-        address _royaltyRecipient,
-        uint16 _royaltyBPS,
-        uint256 maxPeroid,
-        uint256 adjustmentDecimals,
+        uint128 maxCyclesAllowed,
+        address royaltyRecipient,
+        uint16 royaltyBps
     ) public initializer {
-        __Ownable_init__();
-        ____ERC1155_init__("");
         __ReentrancyGuard_init();
         _rewardCoinAddress = rewardCoinAddress;
         _costCoinAddress = costCoinAddress;
-        _maxPeriod = maxPeriod;
-        _adjustmentDecimals = adjustmentDecimals;
-        tokenRoyalty = TokenRoyalty(_royaltyRecipient, _royaltyBPS);
+        _maxCyclesAllowed = maxCyclesAllowed;
+        _royaltyRecipient = royaltyRecipient;
+        _royaltyBps = royaltyBps;
     }
 
     constructor() initializer {}
@@ -97,107 +92,98 @@ contract DeMineNFT is
     }
 
     function newRound(
-        string infoHash,
-        uint256 startCycle,
-        uint256 numCycles,
+        string calldata infoHash,
         uint256 supplyPerCycle,
-        uint256 costPerCycle
+        uint256 costPerCycle,
+        uint128 startCycle,
+        uint128 numCycles
     ) external onlyOwner {
-        require(numCycles < _maxPeriod, "exceeding max period allowed");
-        for (uint256 i = startCycle; i < startCycle + numCycles; i++) {
+        require(numCycles < _maxCyclesAllowed, "exceeding max period allowed");
+        for (uint128 i = startCycle; i < startCycle + numCycles; i++) {
+            uint256 existingCost = _cycles[i].costPerToken * _cycles[i].supply;
             _cycles[i].supply += supplyPerCycle;
-            _cycles[i].expectedCost += costPerCycle;
-            _mint(owner(), tokenId(_nextRound, i), supplyPerCycle, "");
+            _cycles[i].costPerToken = (existingCost + costPerCycle) / _cycles[i].supply;
+            _mint(owner(), getTokenId(_nextRound, i), supplyPerCycle, "");
         }
         _roundToTokenCost[_nextRound] = costPerCycle / supplyPerCycle;
         emit NewRound(
             _nextRound,
-            startCycle,
-            numCycles,
             infoHash,
             supplyPerCycle,
-            costPerToken,
+            costPerCycle,
+            startCycle,
+            numCycles
         );
         _nextRound += 1;
     }
 
-    function lockBilling(uint256 billingCycle) external {
+    function lockBilling(uint128 billingCycle) external {
         require(
-            !lock.locked && billingCycle > lock.lastBillingCycle,
+            !locked && billingCycle > lastBillingCycle,
             "already locked or wrong billing cycle"
         );
-        lock.locked = true;
-        lock.lastBillingCycle = lock.billingCycle;
-        lock.billingCycle = billingCycle;
-        emit Locked(lock.lastBillingCycle, lock.billingCycle);
+        locked = true;
+        lastBillingCycle = currentBillingCycle;
+        currentBillingCycle = billingCycle;
+        emit Locked(lastBillingCycle, currentBillingCycle);
     }
 
     function unlockBilling(uint256 soldPrice) external {
-        require(lock.locked, "not locked");
-        for (uint256 i = lock.lastBillingCycle + 1; i <= billingCycle; i++) {
-            sold = _cycles[i].expectedCost / soldPrice;
-            _cycles[i].expectedReward -= sold;
-            _cycles[i].expectedCost = 0;
+        require(locked, "not locked");
+        for (uint128 i = lastBillingCycle + 1; i <= currentBillingCycle; i++) {
+            _cycles[i].rewardPerToken -= _cycles[i].costPerToken / soldPrice;
+            _cycles[i].costPerToken = 0;
         }
-        locked.locked = false;
-        emit Unlocked(lock.billingCycle, soldPrice);
+        locked = false;
+        emit Unlocked(currentBillingCycle, soldPrice);
     }
 
     function reward(
-        uint256 reward,
-        uint256 expectedReward,
-        uint256[] calldata tokenIds,
-        uint256[] calldata overrides
+        uint256 rewardPaid,
+        uint256 expectedReward
     ) external onlyOwner nonReentrant {
-        _cycles[_nextCycle].expectedReward = expectedReward;
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            _token_overrides[tokenIds[i]] = overrides[i];
-        }
+        require(rewardPaid <= expectedReward, "paid too much reward");
+        _cycles[_nextCycle].rewardPerToken =
+            expectedReward / _cycles[_nextCycle].supply;
         ERC20(
             _rewardCoinAddress
         ).transferFrom(
             owner(),
             address(this),
-            reward
+            rewardPaid
         );
-        emit Reward(_nextCycle, expectedReward, reward);
+        emit Reward(_nextCycle, rewardPaid, expectedReward);
         _nextCycle += 1;
     }
 
     function withdraw(
-        uint256[] calldata tokenIds;
+        uint256[] calldata tokenIds,
         uint256[] calldata amounts
     ) external nonReentrant {
         require(tokenIds.length == amounts.length, "invalid input");
         uint256 totalCost;
         uint256 totalReward;
-        for (int i = 0; i < tokenIds.length; i++) {
-            cycle_id = cycleId(tokenIds[i]);
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint128 cycleId = getCycleId(tokenIds[i]);
             require(
-                !lock.locked ||
-                cycle_id <= lock.lastBillingCycle ||
-                cycle_id > lock.billingCycle,
+                !locked ||
+                cycleId <= lastBillingCycle ||
+                cycleId > currentBillingCycle,
                 "tokens locked"
-            ),
+            );
             // burn token
             _safeTransferFrom(
-                msg.sender(),
+                msg.sender,
                 address(0x0),
-                nft_ids[i],
+                tokenIds[i],
                 amounts[i],
                 ""
             );
 
-            cycle = _cycles[cycle_id];
-            expectedReward = amounts[i] * cycle.expectedReward / cycle.supply;
-            expectedCost = amounts[i] * _roundToTokenCost[round(tokenIds[i])];
-            cycle.supply = sub(cycle.supply - amounts[i]);
-            cycle.expectedReward -= expectedReward;
-            cycle.expectedCost -= expectedCost;
-
-            uint256 base = 10**_adjustmentDecimals;
-            totalReward += expectedReward * (base - _adjustments[i]) / base;
-            totalCost += expectedCost * (base - _adjustments[i]) / base;
+            uint256 expectedCost = amounts[i] * _roundToTokenCost[getRound(tokenIds[i])];
+            uint256 expectedReward = amounts[i] * _cycles[cycleId].rewardPerToken;
+            totalReward += adjust(expectedReward, _adjustments[i]);
+            totalCost += adjust(expectedCost, _adjustments[i]);
         }
         // pay cost
         ERC20(_costCoinAddress).transferFrom(
@@ -211,67 +197,144 @@ contract DeMineNFT is
             msg.sender,
             totalReward
         );
-        emit WithDraw(totalReward, totalCost);
+        emit Withdraw(totalReward, totalCost);
     }
 
     // set functions
-    function setTokenRoyalty(address recipient, uint16 bps) external onlyOwner {
-        _tokenRoyalty = TokenRoyalty(recipient, bps);
+    function setTokenRoyalty(
+        address recipient,
+        uint16 bps
+    ) external onlyOwner {
+        _royaltyRecipient = recipient;
+        _royaltyBps = bps;
         emit TokenRoyaltySet(recipient, bps);
     }
 
-    function setMaxPeriod(uint256 maxPeriod) external onlyOwner {
-        _maxPeriod = maxPeriod;
-        emit MaxPeriodSet(maxPeriod);
+    function setMaxCyclesAllowed(
+        uint128 maxCyclesAllowed
+    ) external onlyOwner {
+        _maxCyclesAllowed = maxCyclesAllowed;
+        emit MaxCyclesAllowedSet(maxCyclesAllowed);
+    }
+
+    function setAdjustments(
+        uint256[] calldata tokenIds,
+        uint256[] calldata adjustments
+    ) external onlyOwner {
+        require(
+            tokenIds.length == adjustments.length,
+            "invalid adjustment arrary"
+        );
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            require(adjustments[i] < 1000000, "invalid adjustment value");
+            _adjustments[tokenIds[i]] = adjustments[i];
+        }
+    }
+
+    function setCostCoinAddress(address costCoinAddress) external onlyOwner {
+        _costCoinAddress = costCoinAddress;
+        emit CostCoinAddressSet(costCoinAddress);
+    }
+
+    function setRewardCoinAddress(
+        address rewardCoinAddress
+    ) external onlyOwner {
+        _rewardCoinAddress = rewardCoinAddress;
+        emit RewardCoinAddressSet(rewardCoinAddress);
     }
 
     // pure functions
-    function tokenId(uint256 round, uint256 cycleId) pure returns uint256 {
-        return round * 100000000000 + cycleId;
+    function getTokenId(
+        uint128 round,
+        uint128 cycleId
+    ) public pure returns (uint256) {
+        return uint256(round) << 32 + cycleId;
     }
 
-    function round(uint256 tokenId) pure returns uint256 {
-        return tokenId / 100000000000;
+    function getRound(
+        uint256 tokenId
+    ) public pure returns (uint128) {
+        return uint128(tokenId >> 32);
     }
 
-    function cycleId(uint256 tokenId) pure returns uint256 {
-        return tokenId % 100000000000;
+    function getCycleId(
+        uint256 tokenId
+    ) public pure returns (uint128) {
+        return uint128(tokenId);
+    }
+
+    function adjust(
+        uint256 value,
+        uint256 adjustment
+    ) internal pure returns (uint256) {
+        return value * (1000000 - adjustment) / 1000000;
     }
 
     // view functions to query state
-    function getNextCycle() external view {
+    function getNextCycle()
+        external
+        view
+        returns (uint128)
+    {
         return _nextCycle;
     }
 
-    function getNextRound() external view {
+    function getNextRound()
+        external
+        view
+        returns (uint128)
+    {
         return _nextRound;
     }
 
-    function getMaxPeriod() external view {
-        return _maxPeriod;
+    function getMaxCyclesAllowed()
+        external
+        view
+        returns (uint128)
+    {
+        return _maxCyclesAllowed;
     }
 
-    function getAdjustmentDecimals() external view {
-        return _adjustmentDecimals;
+    function isLocked()
+        external
+        view
+        returns (bool)
+    {
+        return locked;
     }
 
-    function getTokenCost(uint256 tokenId) external view {
-        round = round(tokenId),
-        cycle = _cycles[cycleId(tokenId)]
-        expected_reward = cycle.expected_reward / cycle.supply;
-        expected_cost = _roundToTokenCost[round],
-        adjustment = _adjustments[tokenId],
-        return (expected_reward, expected_cost, adjustment);
+    function getTokenCost(uint256 tokenId)
+        external
+        view
+        returns (uint256)
+    {
+        return _roundToTokenCost[getRound(tokenId)];
     }
 
-    function getCycle(uint256 cycleId) external view {
-        return _cycles[cycleId];
+    function getTokenAdjustment(uint256 tokenId)
+        external
+        view
+        returns (uint256)
+    {
+        return _adjustments[tokenId];
+    }
+
+    function getCycle(uint128 cycleId)
+        external
+        view
+        returns (uint256, uint256, uint256)
+    {
+        return (
+            _cycles[cycleId].supply,
+            _cycles[cycleId].rewardPerToken,
+            _cycles[cycleId].costPerToken
+        );
     }
 
     /// @notice returns the uri metadata. Used by marketplaces and wallets to show the NFT
     function uri(uint256 tokenId)
         public
-        view
+        pure
         override
         returns (string memory)
     {
@@ -279,16 +342,14 @@ contract DeMineNFT is
             bytes(
                 string(
                     abi.encodePacked(
-                        '{ "name": "',
-                        DeMine Redemption Token,
-                        '", ',
+                        '{ "name": "DeMine Redemption Token",',
                         '"description" : ',
                         '"Token to redeem your mined coins for round "',
-                        round(tokenId),
+                        getRound(tokenId),
                         '" at cycle "',
-                        cycleId(tokenId),
-                        '", ',
-                        '"image": "ipfs://QmQWipu2KsBJ1pA3Q9vQBj77bgVSz86KrmavaCr7Y2p8s3" }',
+                        getCycleId(tokenId),
+                        '", "',
+                        '"image": "ipfs://QmQWipu2KsBJ1pA3Q9vQBj77bgVSz86KrmavaCr7Y2p8s3" }'
                     )
                 )
             )
@@ -296,16 +357,16 @@ contract DeMineNFT is
         return string(abi.encodePacked("data:application/json;base64,", json));
     }
 
-    function royaltyInfo(uint256 _tokenId, uint256 value)
-        public
+    function royaltyInfo(uint256, uint256 value)
+        external
         view
         override
         returns (address, uint256)
     {
-        if (_tokenRoyalty.recipient != address(0) && _tokenRoyalty.bps != 0) {
+        if (_royaltyRecipient != address(0) && _royaltyBps != 0) {
             return (
-                _tokenRoyalty.recipient,
-                (value * _tokenRoyalty.bps) / 10000
+                _royaltyRecipient,
+                (value * _royaltyBps) / 10000
             );
         }
         return (address(0), 0);
@@ -315,7 +376,7 @@ contract DeMineNFT is
         public
         view
         virtual
-        override(ERC1155)
+        override(ERC1155Upgradeable, IERC165Upgradeable)
         returns (bool)
     {
         return
@@ -323,4 +384,4 @@ contract DeMineNFT is
             interfaceId == type(IERC1155Upgradeable).interfaceId ||
             super.supportsInterface(interfaceId);
     }
-};
+}
