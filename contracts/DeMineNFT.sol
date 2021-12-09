@@ -30,14 +30,14 @@ contract DeMineNFT is
     // Events
     event LogEthDeposit(address);
     event TokenRoyaltySet(address, uint256);
-    event MaxCyclesAllowedSet(uint256);
     event CostCoinAddressSet(address);
     event RewardCoinAddressSet(address);
 
     event NewRound(uint128, string, uint256, uint256, uint128, uint128);
-    event Reward(uint128, uint256, uint256);
+    event Reward(uint128, address, uint256, uint256);
+    event RewardExtracted(uint256, address);
     event Locked(uint128, uint128);
-    event Unlocked(uint128, uint256);
+    event Unlocked(uint128);
     event Withdraw(uint256, uint256);
 
     address private _rewardCoinAddress;
@@ -55,26 +55,19 @@ contract DeMineNFT is
     uint128 private lastBillingCycle;
     uint128 private currentBillingCycle;
 
-    struct Cycle {
-        uint256 supply;
-        uint256 rewardPerToken;
-        uint256 costPerToken;
-    }
-    mapping(uint128 => Cycle) private _cycles;
-    mapping(uint128 => uint256) private _roundToTokenCost; // in usd
+    mapping(uint128 => uint256) private _cycleToTokenReward;
+    mapping(uint128 => uint256) private _roundToTokenCost;
     mapping(uint256 => uint256) private _adjustments; // token_id to adjustment
 
     function initialize(
         address rewardCoinAddress,
         address costCoinAddress,
-        uint128 maxCyclesAllowed,
         address royaltyRecipient,
         uint16 royaltyBps
     ) public initializer {
         __ReentrancyGuard_init();
         _rewardCoinAddress = rewardCoinAddress;
         _costCoinAddress = costCoinAddress;
-        _maxCyclesAllowed = maxCyclesAllowed;
         _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
     }
@@ -98,11 +91,8 @@ contract DeMineNFT is
         uint128 startCycle,
         uint128 numCycles
     ) external onlyOwner {
-        require(numCycles < _maxCyclesAllowed, "exceeding max period allowed");
+        require(numCycles < 1500, "exceeding max period allowed");
         for (uint128 i = startCycle; i < startCycle + numCycles; i++) {
-            uint256 existingCost = _cycles[i].costPerToken * _cycles[i].supply;
-            _cycles[i].supply += supplyPerCycle;
-            _cycles[i].costPerToken = (existingCost + costPerCycle) / _cycles[i].supply;
             _mint(owner(), getTokenId(_nextRound, i), supplyPerCycle, "");
         }
         _roundToTokenCost[_nextRound] = costPerCycle / supplyPerCycle;
@@ -123,37 +113,56 @@ contract DeMineNFT is
             "already locked or wrong billing cycle"
         );
         locked = true;
-        lastBillingCycle = currentBillingCycle;
         currentBillingCycle = billingCycle;
         emit Locked(lastBillingCycle, currentBillingCycle);
     }
 
-    function unlockBilling(uint256 soldPrice) external {
-        require(locked, "not locked");
-        for (uint128 i = lastBillingCycle + 1; i <= currentBillingCycle; i++) {
-            _cycles[i].rewardPerToken -= _cycles[i].costPerToken / soldPrice;
-            _cycles[i].costPerToken = 0;
+    function unlockBilling(
+        uint256[] calldata rewardTokenSold
+    ) external {
+        require(locked, "not locked or invalid array length");
+        for (uint128 i = 0; i <= rewardTokenSold.length; i++) {
+            _cycleToTokenReward[lastBillingCycle + 1 + i] -= rewardTokenSold[i];
         }
         locked = false;
-        emit Unlocked(currentBillingCycle, soldPrice);
+        lastBillingCycle = currentBillingCycle;
+        emit Unlocked(currentBillingCycle);
     }
 
     function reward(
-        uint256 rewardPaid,
-        uint256 expectedReward
+        address payer,
+        uint256 totalRewardPaid,
+        uint256 rewardPerToken
     ) external onlyOwner nonReentrant {
-        require(rewardPaid <= expectedReward, "paid too much reward");
-        _cycles[_nextCycle].rewardPerToken =
-            expectedReward / _cycles[_nextCycle].supply;
+        _cycleToTokenReward[_nextCycle] = rewardPerToken;
         ERC20(
             _rewardCoinAddress
         ).transferFrom(
-            owner(),
+            payer,
             address(this),
-            rewardPaid
+            totalRewardPaid
         );
-        emit Reward(_nextCycle, rewardPaid, expectedReward);
+        emit Reward(
+            _nextCycle,
+            payer,
+            totalRewardPaid,
+            rewardPerToken
+        );
         _nextCycle += 1;
+    }
+
+    function extractReward(
+        uint256 rewards,
+        address receipt
+    ) external onlyOwner {
+        ERC20(
+            _rewardCoinAddress
+        ).transferFrom(
+            address(this),
+            receipt,
+            rewards
+        );
+        emit RewardExtracted(rewards, receipt);
     }
 
     function withdraw(
@@ -164,7 +173,7 @@ contract DeMineNFT is
         uint256 totalCost;
         uint256 totalReward;
         for (uint256 i = 0; i < tokenIds.length; i++) {
-            uint128 cycleId = getCycleId(tokenIds[i]);
+            uint128 cycleId = getCycle(tokenIds[i]);
             require(
                 !locked ||
                 cycleId <= lastBillingCycle ||
@@ -180,10 +189,16 @@ contract DeMineNFT is
                 ""
             );
 
-            uint256 expectedCost = amounts[i] * _roundToTokenCost[getRound(tokenIds[i])];
-            uint256 expectedReward = amounts[i] * _cycles[cycleId].rewardPerToken;
-            totalReward += adjust(expectedReward, _adjustments[i]);
-            totalCost += adjust(expectedCost, _adjustments[i]);
+            totalReward += adjust(
+                amounts[i] * _cycleToTokenReward[cycleId],
+                _adjustments[i]
+            );
+            if (cycleId > lastBillingCycle) {
+                totalCost += adjust(
+                    amounts[i] * _roundToTokenCost[getRound(tokenIds[i])],
+                    _adjustments[i]
+                );
+            }
         }
         // pay cost
         ERC20(_costCoinAddress).transferFrom(
@@ -210,13 +225,6 @@ contract DeMineNFT is
         emit TokenRoyaltySet(recipient, bps);
     }
 
-    function setMaxCyclesAllowed(
-        uint128 maxCyclesAllowed
-    ) external onlyOwner {
-        _maxCyclesAllowed = maxCyclesAllowed;
-        emit MaxCyclesAllowedSet(maxCyclesAllowed);
-    }
-
     function setAdjustments(
         uint256[] calldata tokenIds,
         uint256[] calldata adjustments
@@ -228,6 +236,16 @@ contract DeMineNFT is
         for (uint256 i = 0; i < tokenIds.length; i++) {
             require(adjustments[i] < 1000000, "invalid adjustment value");
             _adjustments[tokenIds[i]] = adjustments[i];
+        }
+    }
+
+    function resetTokenCost(
+        uint128[] calldata round,
+        uint256[] calldata cost
+    ) external onlyOwner {
+        require(round.length == cost.length, "invalid array length");
+        for (uint256 i = 0; i < round.length; i++) {
+            _roundToTokenCost[round[i]] = cost[i];
         }
     }
 
@@ -257,7 +275,7 @@ contract DeMineNFT is
         return uint128(tokenId >> 32);
     }
 
-    function getCycleId(
+    function getCycle(
         uint256 tokenId
     ) public pure returns (uint128) {
         return uint128(tokenId);
@@ -287,14 +305,6 @@ contract DeMineNFT is
         return _nextRound;
     }
 
-    function getMaxCyclesAllowed()
-        external
-        view
-        returns (uint128)
-    {
-        return _maxCyclesAllowed;
-    }
-
     function isLocked()
         external
         view
@@ -303,31 +313,15 @@ contract DeMineNFT is
         return locked;
     }
 
-    function getTokenCost(uint256 tokenId)
-        external
-        view
-        returns (uint256)
-    {
-        return _roundToTokenCost[getRound(tokenId)];
-    }
-
-    function getTokenAdjustment(uint256 tokenId)
-        external
-        view
-        returns (uint256)
-    {
-        return _adjustments[tokenId];
-    }
-
-    function getCycle(uint128 cycleId)
+    function getTokenStats(uint256 tokenId)
         external
         view
         returns (uint256, uint256, uint256)
     {
         return (
-            _cycles[cycleId].supply,
-            _cycles[cycleId].rewardPerToken,
-            _cycles[cycleId].costPerToken
+            _cycleToTokenReward[getCycle(tokenId)],
+            _roundToTokenCost[getRound(tokenId)],
+            _adjustments[tokenId]
         );
     }
 
@@ -347,7 +341,7 @@ contract DeMineNFT is
                         '"Token to redeem your mined coins for round "',
                         getRound(tokenId),
                         '" at cycle "',
-                        getCycleId(tokenId),
+                        getCycle(tokenId),
                         '", "',
                         '"image": "ipfs://QmQWipu2KsBJ1pA3Q9vQBj77bgVSz86KrmavaCr7Y2p8s3" }'
                     )
