@@ -72,8 +72,8 @@ contract DeMineNFT is
         uint256 costPerCycle,
         uint128 startCycle,
         uint128 numCycles
-    ) external onlyOwner {
-        require(numCycles < 1500, "exceeding max period allowed");
+    ) external onlyOwner whenNotPaused {
+        require(numCycles < 10000, "exceeding max period allowed");
         for (uint128 i = startCycle; i < startCycle + numCycles; i++) {
             _mint(owner(), encode(_nextRound, i), supplyPerCycle, "");
         }
@@ -95,9 +95,7 @@ contract DeMineNFT is
         uint256 rewardPerToken
     ) external onlyOwner nonReentrant {
         _cycleToTokenReward[_nextCycle] = rewardPerToken;
-        ERC20(
-            _rewardToken
-        ).transferFrom(
+        ERC20(_rewardToken).transferFrom(
             payer,
             address(this),
             totalRewardPaid
@@ -114,10 +112,8 @@ contract DeMineNFT is
     function extractReward(
         uint256 rewards,
         address receipt
-    ) external onlyOwner {
-        ERC20(
-            _rewardToken
-        ).transferFrom(
+    ) external onlyOwner whenPaused {
+        ERC20(_rewardToken).transferFrom(
             address(this),
             receipt,
             rewards
@@ -128,7 +124,7 @@ contract DeMineNFT is
     function withdraw(
         uint256[] calldata tokenIds,
         uint256[] calldata amounts
-    ) external nonReentrant {
+    ) external nonReentrant whenNotPaused {
         require(
             tokenIds.length == amounts.length,
             "array length mismatch"
@@ -186,7 +182,7 @@ contract DeMineNFT is
         uint128[] calldata round,
         uint256[] calldata cost
     ) external onlyOwner {
-        require(round.length == cost.length, "invalid array length");
+        require(round.length == cost.length, "array length not match");
         for (uint256 i = 0; i < round.length; i++) {
             _roundToTokenCost[round[i]] = cost[i];
         }
@@ -198,7 +194,7 @@ contract DeMineNFT is
     ) external onlyOwner {
         require(
             tokenIds.length == adjustments.length,
-            "invalid adjustment arrary"
+            "array length not match"
         );
         for (uint256 i = 0; i < tokenIds.length; i++) {
             require(adjustments[i] < 1000000, "invalid adjustment value");
@@ -218,7 +214,14 @@ contract DeMineNFT is
         emit RewardTokenAddressSet(rewardToken);
     }
 
-    function setLastBillingCyCle(uint128 billingCycle) external onlyOwner {
+    function lock() external onlyOwner whenNotPaused {
+        _pause();
+    }
+
+    function unlock(
+        uint128 billingCycle
+    ) external onlyOwner whenPaused {
+        _unpause();
         _lastBillingCycle = billingCycle;
         emit LastBillingCycleSet(billingCycle);
     }
