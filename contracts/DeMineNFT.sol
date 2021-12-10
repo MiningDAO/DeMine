@@ -27,7 +27,7 @@ contract DeMineNFT is
     event LastBillingCycleSet(uint256);
 
     event NewSupply(uint128, string, uint256, address);
-    event Reward(uint128, address, uint256, uint256);
+    event Reward(uint128, address, uint256, uint256, uint128[], uint256[]);
     event Locked();
     event Unlocked(uint256);
     event Withdraw(uint256, uint256);
@@ -90,7 +90,7 @@ contract DeMineNFT is
     }
 
     function reward(
-        address payer,
+        address coffer,
         uint256 totalRewardPaid,
         uint256 rewardPerToken,
         uint128[] calldata rounds,
@@ -106,16 +106,18 @@ contract DeMineNFT is
         }
         _cycleToTokenReward[_nextCycle] = rewardPerToken;
         bool success = ERC20(_rewardToken).transferFrom(
-            payer,
+            coffer,
             address(this),
             totalRewardPaid
         );
         require(success, "failed to transfer reward");
         emit Reward(
             _nextCycle,
-            payer,
+            coffer,
             totalRewardPaid,
-            rewardPerToken
+            rewardPerToken,
+            rounds,
+            adjustments
         );
         _nextCycle += 1;
     }
@@ -139,23 +141,18 @@ contract DeMineNFT is
         uint256[] calldata tokenIds,
         uint256[] calldata amounts
     ) external nonReentrant whenNotPaused {
-        require(
-            tokenIds.length == amounts.length,
-            "array length mismatch"
+        _safeBatchTransferFrom(
+            _msgSender(),
+            address(0x0),
+            tokenIds,
+            amounts,
+            ""
         );
         uint256 totalCost;
         uint256 totalReward;
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint128 cycle = uint128(tokenIds[i]);
             // burn token
-            _safeTransferFrom(
-                msg.sender,
-                address(0x0),
-                tokenIds[i],
-                amounts[i],
-                ""
-            );
-
             totalReward += adjust(
                 amounts[i] * _cycleToTokenReward[cycle],
                 _adjustments[i]
@@ -169,7 +166,7 @@ contract DeMineNFT is
         }
         // pay cost
         bool success = ERC20(_costToken).transferFrom(
-            msg.sender,
+            _msgSender(),
             address(this),
             totalCost
         );
@@ -177,7 +174,7 @@ contract DeMineNFT is
         // withdraw reward coin
         success = ERC20(_rewardToken).transferFrom(
             address(this),
-            msg.sender,
+            _msgSender(),
             totalReward
         );
         require(success, "failed to get reward");
