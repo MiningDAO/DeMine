@@ -27,15 +27,13 @@ contract DeMineNFT is
     event LastBillingCycleSet(uint256);
 
     event NewSupply(uint128, string, uint256, address);
-    event Reward(uint128, address, uint256, uint256);
+    event Reward(uint128, uint256, uint128[], uint256[]);
     event Locked();
     event Unlocked(uint256);
     event Withdraw(uint256, uint256);
 
     address private _rewardToken;
     address private _costToken;
-    uint128 private _nextCycle;
-    uint128 private _nextRound;
     uint128 private _lastBillingCycle;
 
     // EIP2981
@@ -43,7 +41,7 @@ contract DeMineNFT is
     uint16 private _royaltyBps;
 
     mapping(uint128 => uint256) private _cycleToTokenReward;
-    mapping(uint128 => uint256) private _roundToTokenCost;
+    mapping(uint128 => uint256) private _poolToTokenCost;
     mapping(uint256 => uint256) private _adjustments; // token_id to adjustment
 
     constructor (
@@ -68,56 +66,39 @@ contract DeMineNFT is
     }
 
     function newSupply(
+        string calldata infoHash,
         uint256[] calldata tokenIds,
         uint256[] calldata supplys,
-        string calldata infoHash,
+        uint128 pool,
         uint256 costPerToken,
         address recipient
     ) external onlyOwner whenNotPaused {
-        require(
-            tokenIds.length == supplys.length,
-            "array length mismatch"
-        );
         _mintBatch(recipient, tokenIds, supplys, "");
-        _roundToTokenCost[_nextRound] = costPerToken;
+        _poolToTokenCost[pool] = costPerToken;
         emit NewSupply(
-            _nextRound,
+            pool,
             infoHash,
             costPerToken,
             recipient
         );
-        _nextRound += 1;
     }
 
     function reward(
-        address payer,
-        uint256 totalRewardPaid,
+        uint128 nextCycle,
         uint256 rewardPerToken,
-        uint128[] calldata rounds,
+        uint128[] calldata pools,
         uint256[] calldata adjustments
     ) external onlyOwner nonReentrant {
-        require(
-            rounds.length == adjustments.length,
-            "array length mismatch"
-        );
-        for (uint128 i = 0; i < rounds.length; i++) {
-            require(adjustments[i] < 1000000, "invalid adjustment value");
-            _adjustments[uint256(rounds[i]) << 128 + _nextCycle] = adjustments[i];
+        for (uint128 i = 0; i < pools.length; i++) {
+            _adjustments[uint256(pools[i]) << 128 + nextCycle] = adjustments[i];
         }
-        _cycleToTokenReward[_nextCycle] = rewardPerToken;
-        bool success = ERC20(_rewardToken).transferFrom(
-            payer,
-            address(this),
-            totalRewardPaid
-        );
-        require(success, "failed to transfer reward");
+        _cycleToTokenReward[nextCycle] = rewardPerToken;
         emit Reward(
-            _nextCycle,
-            payer,
-            totalRewardPaid,
-            rewardPerToken
+            nextCycle,
+            rewardPerToken,
+            pools,
+            adjustments
         );
-        _nextCycle += 1;
     }
 
     function lock() external onlyOwner whenNotPaused {
@@ -139,37 +120,32 @@ contract DeMineNFT is
         uint256[] calldata tokenIds,
         uint256[] calldata amounts
     ) external nonReentrant whenNotPaused {
-        require(
-            tokenIds.length == amounts.length,
-            "array length mismatch"
+        _safeBatchTransferFrom(
+            _msgSender(),
+            address(0x0),
+            tokenIds,
+            amounts,
+            ""
         );
         uint256 totalCost;
         uint256 totalReward;
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint128 cycle = uint128(tokenIds[i]);
             // burn token
-            _safeTransferFrom(
-                msg.sender,
-                address(0x0),
-                tokenIds[i],
-                amounts[i],
-                ""
-            );
-
             totalReward += adjust(
                 amounts[i] * _cycleToTokenReward[cycle],
                 _adjustments[i]
             );
             if (cycle > _lastBillingCycle) {
                 totalCost += adjust(
-                    amounts[i] * _roundToTokenCost[uint128(tokenIds[i] >> 128)],
+                    amounts[i] * _poolToTokenCost[uint128(tokenIds[i] >> 128)],
                     _adjustments[i]
                 );
             }
         }
         // pay cost
         bool success = ERC20(_costToken).transferFrom(
-            msg.sender,
+            _msgSender(),
             address(this),
             totalCost
         );
@@ -177,7 +153,7 @@ contract DeMineNFT is
         // withdraw reward coin
         success = ERC20(_rewardToken).transferFrom(
             address(this),
-            msg.sender,
+            _msgSender(),
             totalReward
         );
         require(success, "failed to get reward");
@@ -195,12 +171,12 @@ contract DeMineNFT is
     }
 
     function resetTokenCost(
-        uint128[] calldata round,
+        uint128[] calldata pool,
         uint256[] calldata cost
     ) external onlyOwner {
-        require(round.length == cost.length, "array length not match");
-        for (uint256 i = 0; i < round.length; i++) {
-            _roundToTokenCost[round[i]] = cost[i];
+        require(pool.length == cost.length, "array length not match");
+        for (uint256 i = 0; i < pool.length; i++) {
+            _poolToTokenCost[pool[i]] = cost[i];
         }
     }
 
@@ -226,7 +202,7 @@ contract DeMineNFT is
     {
         return (
             _cycleToTokenReward[uint128(tokenId)],
-            _roundToTokenCost[uint128(tokenId >> 128)],
+            _poolToTokenCost[uint128(tokenId >> 128)],
             _adjustments[tokenId]
         );
     }
