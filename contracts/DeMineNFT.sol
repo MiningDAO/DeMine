@@ -65,6 +65,16 @@ contract DeMineNFT is
         emit LogEthDeposit(_msgSender());
     }
 
+    // @notice no one should send ether to this contract,
+    // but if anyone does, we should take the money to
+    // save these ethers
+    function raidTheCoffers() external onlyOwner {
+        uint256 amount = address(this).balance;
+        (bool success, ) = owner().call{value: amount}("");
+        require(success, "maybe it's not your money");
+    }
+
+    // @notice start a new pool
     function newSupply(
         uint128 pool,
         string calldata infoHash,
@@ -81,8 +91,9 @@ contract DeMineNFT is
         );
     }
 
+    // @notice set reward and adjustment for cycle
     function reward(
-        uint128 nextCycle,
+        uint128 cycle,
         uint256 rewardPerToken,
         uint256[] calldata tokenIds,
         uint256[] calldata adjustments
@@ -90,15 +101,17 @@ contract DeMineNFT is
         for (uint256 i = 0; i < tokenIds.length; i++) {
             _adjustments[tokenIds[i]] = adjustments[i];
         }
-        _cycleToTokenReward[nextCycle] = rewardPerToken;
+        _cycleToTokenReward[cycle] = rewardPerToken;
         emit Reward(
-            nextCycle,
+            cycle,
             rewardPerToken,
             tokenIds,
             adjustments
         );
     }
 
+    // @notice lock for billing, withdraw function will
+    // be disabled
     function lock() external onlyOwner whenNotPaused {
         _pause();
         bool success = ERC20(_rewardToken).approve(owner(), 2 ** 256 - 1);
@@ -106,6 +119,8 @@ contract DeMineNFT is
         emit Locked();
     }
 
+    // @notice unlock the billing cycle, no cost for tokens before
+    // billing cycle
     function unlock(uint128 billingCycle) external onlyOwner whenPaused {
         bool success = ERC20(_rewardToken).approve(owner(), 0);
         require(success, "failed to revoke approve");
@@ -114,6 +129,8 @@ contract DeMineNFT is
         emit Unlocked(billingCycle);
     }
 
+    // @notice pay cost to withdraw the reward, tokens will
+    // be burned after withdraw
     function withdraw(
         uint256[] calldata tokenIds,
         uint256[] calldata amounts
@@ -141,7 +158,7 @@ contract DeMineNFT is
                 );
             }
         }
-        // pay cost
+        // pay cost, user need to approve to pay first
         bool success = ERC20(_costToken).transferFrom(
             _msgSender(),
             address(this),
@@ -154,7 +171,7 @@ contract DeMineNFT is
             _msgSender(),
             totalReward
         );
-        require(success, "failed to get reward");
+        require(success, "failed to withdraw reward");
         emit Withdraw(totalReward, totalCost);
     }
 
@@ -169,12 +186,11 @@ contract DeMineNFT is
     }
 
     function resetTokenCost(
-        uint128[] calldata pool,
-        uint256[] calldata cost
+        uint128[] calldata pools,
+        uint256[] calldata costs
     ) external onlyOwner {
-        require(pool.length == cost.length, "array length not match");
-        for (uint256 i = 0; i < pool.length; i++) {
-            _poolToTokenCost[pool[i]] = cost[i];
+        for (uint256 i = 0; i < pools.length; i++) {
+            _poolToTokenCost[pools[i]] = costs[i];
         }
     }
 
@@ -192,7 +208,7 @@ contract DeMineNFT is
     }
 
     // view functions
-    function rewardCostToken()
+    function treasureSource()
         external
         view
         returns (address, address)
