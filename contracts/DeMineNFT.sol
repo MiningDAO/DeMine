@@ -27,7 +27,7 @@ contract DeMineNFT is
     event LastBillingCycleSet(uint256);
 
     event NewSupply(uint128, string, uint256, address);
-    event Reward(uint128, uint256, uint128[], uint256[]);
+    event Reward(uint128, uint256, uint256[], uint256[]);
     event Locked();
     event Unlocked(uint256);
     event Withdraw(uint256, uint256);
@@ -86,17 +86,17 @@ contract DeMineNFT is
     function reward(
         uint128 nextCycle,
         uint256 rewardPerToken,
-        uint128[] calldata pools,
+        uint256[] calldata tokenIds,
         uint256[] calldata adjustments
     ) external onlyOwner nonReentrant {
-        for (uint128 i = 0; i < pools.length; i++) {
-            _adjustments[uint256(pools[i]) << 128 + nextCycle] = adjustments[i];
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            _adjustments[tokenIds[i]] = adjustments[i];
         }
         _cycleToTokenReward[nextCycle] = rewardPerToken;
         emit Reward(
             nextCycle,
             rewardPerToken,
-            pools,
+            tokenIds,
             adjustments
         );
     }
