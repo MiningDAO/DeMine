@@ -26,7 +26,7 @@ contract DeMineNFT is
     event RewardTokenAddressSet(address);
     event LastBillingCycleSet(uint256);
 
-    event NewSupply(uint128, string, uint256, address);
+    event NewSupply(uint128, string, uint256);
     event Reward(uint128, uint256, uint256[], uint256[]);
     event Locked();
     event Unlocked(uint256);
@@ -66,20 +66,18 @@ contract DeMineNFT is
     }
 
     function newSupply(
+        uint128 pool,
         string calldata infoHash,
         uint256[] calldata tokenIds,
         uint256[] calldata supplys,
-        uint128 pool,
-        uint256 costPerToken,
-        address recipient
+        uint256 costPerToken
     ) external onlyOwner whenNotPaused {
-        _mintBatch(recipient, tokenIds, supplys, "");
+        _mintBatch(owner(), tokenIds, supplys, "");
         _poolToTokenCost[pool] = costPerToken;
         emit NewSupply(
             pool,
             infoHash,
-            costPerToken,
-            recipient
+            costPerToken
         );
     }
 
@@ -150,7 +148,7 @@ contract DeMineNFT is
             totalCost
         );
         require(success, "failed to pay cost");
-        // withdraw reward coin
+        // withdraw reward
         success = ERC20(_rewardToken).transferFrom(
             address(this),
             _msgSender(),
@@ -194,8 +192,15 @@ contract DeMineNFT is
     }
 
     // view functions
+    function rewardCostToken()
+        external
+        view
+        returns (address, address)
+    {
+        return (_rewardToken, _costToken);
+    }
 
-    function getTokenStats(uint256 tokenId)
+    function tokenStats(uint256 tokenId)
         external
         view
         returns (uint256, uint256, uint256)
