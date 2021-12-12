@@ -34,6 +34,7 @@ contract DeMineNFT is
 
     address private _rewardToken;
     address private _costToken;
+    address private _costTokenRecipient;
     uint128 private _lastBillingCycle;
 
     // EIP2981
@@ -48,11 +49,13 @@ contract DeMineNFT is
         string memory uri,
         address rewardToken,
         address costToken,
+        address costTokenRecipient,
         address royaltyRecipient,
         uint16 royaltyBps
     ) Ownable() ERC1155(uri) {
         _rewardToken = rewardToken;
         _costToken = costToken;
+        _costTokenRecipient = costTokenRecipient;
         _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
     }
@@ -66,8 +69,7 @@ contract DeMineNFT is
     }
 
     // @notice no one should send ether to this contract,
-    // but if anyone does, we should take the money to
-    // save these ethers
+    // but if anyone does, we should save them
     function raidTheCoffers() external onlyOwner {
         uint256 amount = address(this).balance;
         (bool success, ) = owner().call{value: amount}("");
@@ -81,7 +83,7 @@ contract DeMineNFT is
         uint256[] calldata tokenIds,
         uint256[] calldata supplys,
         uint256 costPerToken
-    ) external onlyOwner whenNotPaused {
+    ) external onlyOwner {
         _mintBatch(owner(), tokenIds, supplys, "");
         _poolToTokenCost[pool] = costPerToken;
         emit NewSupply(
@@ -110,9 +112,8 @@ contract DeMineNFT is
         );
     }
 
-    // @notice lock for billing, withdraw function will
-    // be disabled
-    function lock() external onlyOwner whenNotPaused {
+    // @notice lock for billing, withdraw will be disabled
+    function lock() external onlyOwner {
         _pause();
         bool success = ERC20(_rewardToken).approve(owner(), 2 ** 256 - 1);
         require(success, "failed to approve");
@@ -135,18 +136,12 @@ contract DeMineNFT is
         uint256[] calldata tokenIds,
         uint256[] calldata amounts
     ) external nonReentrant whenNotPaused {
-        _safeBatchTransferFrom(
-            _msgSender(),
-            address(0x0),
-            tokenIds,
-            amounts,
-            ""
-        );
+        // burn token
+        _burnBatch(_msgSender(), tokenIds, amounts);
         uint256 totalCost;
         uint256 totalReward;
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint128 cycle = uint128(tokenIds[i]);
-            // burn token
             totalReward += adjust(
                 amounts[i] * _cycleToTokenReward[cycle],
                 _adjustments[i]
@@ -161,7 +156,7 @@ contract DeMineNFT is
         // pay cost, user need to approve to pay first
         bool success = ERC20(_costToken).transferFrom(
             _msgSender(),
-            address(this),
+            _costTokenRecipient,
             totalCost
         );
         require(success, "failed to pay cost");
