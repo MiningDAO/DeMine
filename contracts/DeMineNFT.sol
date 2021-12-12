@@ -2,22 +2,23 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/interfaces/IERC1155.sol";
-import "@openzeppelin/contracts/interfaces/IERC2981.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/interfaces/IERC1155Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /// @title DeMineNFT
 /// @author Shu Dong
 /// This smart contract enables DeMine DAO to issue new NFTs and manage value of them.
 contract DeMineNFT is
-    ERC1155,
-    Ownable,
-    ReentrancyGuard,
-    Pausable,
-    IERC2981
+    Initializable,
+    ERC1155Upgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    IERC2981Upgradeable
 {
     // Events
     event LogEthDeposit(address);
@@ -41,16 +42,21 @@ contract DeMineNFT is
     mapping(uint128 => uint256) private _poolToTokenCost;
     mapping(uint256 => uint256) private _adjustments; // token_id to adjustment
 
-    constructor (
+    function initialize(
         string memory uri,
         address rewardToken,
         address costToken,
         uint16 royaltyBps
-    ) Ownable() ERC1155(uri) {
+    ) public initializer {
+        __Ownable_init();
+        __Pausable_init();
+        __ERC1155_init(uri);
         _rewardToken = rewardToken;
         _costToken = costToken;
         _royaltyBps = royaltyBps;
     }
+
+    constructor() initializer {}
 
     // @notice start a new pool
     function newSupply(
@@ -76,7 +82,7 @@ contract DeMineNFT is
         uint256 rewardPerToken,
         uint256[] calldata tokenIds,
         uint256[] calldata adjustments
-    ) external onlyOwner nonReentrant {
+    ) external onlyOwner {
         for (uint256 i = 0; i < tokenIds.length; i++) {
             _adjustments[tokenIds[i]] = adjustments[i];
         }
@@ -112,7 +118,7 @@ contract DeMineNFT is
     function withdraw(
         uint256[] calldata tokenIds,
         uint256[] calldata amounts
-    ) external nonReentrant whenNotPaused {
+    ) external whenNotPaused {
         // burn token
         _burnBatch(_msgSender(), tokenIds, amounts);
         uint256 totalCost;
