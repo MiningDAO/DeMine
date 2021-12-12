@@ -6,15 +6,33 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
+contract DeMineNFTCloneFactory {
+    address immutable implementation;
+
+    constructor() {
+        implementation = address(new DeMineNFT());
+    }
+
+    function create(
+        string memory uri,
+        address rewardToken,
+        address costToken,
+        uint16 royaltyBps
+    ) external returns(address) {
+        address clone = ClonesUpgradeable.clone(implementation);
+        DeMineNFT(clone).initialize(uri, rewardToken, costToken, royaltyBps);
+        return clone;
+    }
+}
 
 /// @title DeMineNFT
 /// @author Shu Dong
 /// This smart contract enables DeMine DAO to issue new NFTs and manage value of them.
 contract DeMineNFT is
-    Initializable,
     ERC1155Upgradeable,
     OwnableUpgradeable,
     PausableUpgradeable,

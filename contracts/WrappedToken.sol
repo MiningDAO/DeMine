@@ -3,15 +3,31 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+
+contract WrappedTokenCloneFactory {
+    address immutable implementation;
+
+    constructor() {
+        implementation = address(new WrappedToken());
+    }
+
+    function create(
+        string memory name,
+        string memory symbol,
+        uint8 decimals
+    ) external returns(address) {
+        address clone = ClonesUpgradeable.clone(implementation);
+        WrappedToken(clone).initialize(name, symbol, decimals);
+        return clone;
+    }
+}
 
 contract WrappedToken is
     ERC20Upgradeable,
     OwnableUpgradeable,
-    PausableUpgradeable,
-    UUPSUpgradeable
+    PausableUpgradeable
 {
     uint8 private _decimals;
 
@@ -22,14 +38,11 @@ contract WrappedToken is
     ) public initializer {
         __Ownable_init();
         __Pausable_init();
-        __UUPSUpgradeable_init();
         __ERC20_init(name, symbol);
         _decimals = decimalsToSet;
     }
 
     constructor() initializer {}
-
-    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function burn(
         address _account,
@@ -53,32 +66,4 @@ contract WrappedToken is
     {
         return _decimals;
     }
-}
-
-contract DWBTC is BeaconProxy {
-    constructor(address beacon)
-        BeaconProxy(
-          beacon,
-          abi.encodeWithSignature(
-              "initialize(string memory, string memory, uint8)",
-              "DeMine Wrapped BTC",
-              "DWBTC",
-              8
-          )
-        )
-    {}
-}
-
-contract DWUSD is BeaconProxy {
-    constructor(address beacon)
-        BeaconProxy(
-          beacon,
-          abi.encodeWithSignature(
-              "initialize(string memory, string memory, uint8)",
-              "DeMine Wrapped USD",
-              "USDD",
-              6
-          )
-        )
-    {}
 }
