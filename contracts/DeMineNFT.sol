@@ -21,7 +21,7 @@ contract DeMineNFT is
 {
     // Events
     event LogEthDeposit(address);
-    event TokenRoyaltySet(address, uint256);
+    event TokenRoyaltySet(uint256);
     event CostTokenAddressSet(address);
     event RewardTokenAddressSet(address);
     event LastBillingCycleSet(uint256);
@@ -34,12 +34,8 @@ contract DeMineNFT is
 
     address private _rewardToken;
     address private _costToken;
-    address private _costTokenRecipient;
     uint128 private _lastBillingCycle;
-
-    // EIP2981
-    address private _royaltyRecipient;
-    uint16 private _royaltyBps;
+    uint16 private _royaltyBps; // EIP2981
 
     mapping(uint128 => uint256) private _cycleToTokenReward;
     mapping(uint128 => uint256) private _poolToTokenCost;
@@ -49,31 +45,11 @@ contract DeMineNFT is
         string memory uri,
         address rewardToken,
         address costToken,
-        address costTokenRecipient,
-        address royaltyRecipient,
         uint16 royaltyBps
     ) Ownable() ERC1155(uri) {
         _rewardToken = rewardToken;
         _costToken = costToken;
-        _costTokenRecipient = costTokenRecipient;
-        _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
-    }
-
-    fallback() external payable {
-        emit LogEthDeposit(_msgSender());
-    }
-
-    receive() external payable {
-        emit LogEthDeposit(_msgSender());
-    }
-
-    // @notice no one should send ether to this contract,
-    // but if anyone does, we should save them
-    function raidTheCoffers() external onlyOwner {
-        uint256 amount = address(this).balance;
-        (bool success, ) = owner().call{value: amount}("");
-        require(success, "maybe it's not your money");
     }
 
     // @notice start a new pool
@@ -82,9 +58,10 @@ contract DeMineNFT is
         string calldata infoHash,
         uint256[] calldata tokenIds,
         uint256[] calldata supplys,
-        uint256 costPerToken
+        uint256 costPerToken,
+        address recipient
     ) external onlyOwner {
-        _mintBatch(owner(), tokenIds, supplys, "");
+        _mintBatch(recipient, tokenIds, supplys, "");
         _poolToTokenCost[pool] = costPerToken;
         emit NewSupply(
             pool,
@@ -156,7 +133,7 @@ contract DeMineNFT is
         // pay cost, user need to approve to pay first
         bool success = ERC20(_costToken).transferFrom(
             _msgSender(),
-            _costTokenRecipient,
+            owner(),
             totalCost
         );
         require(success, "failed to pay cost");
@@ -170,14 +147,18 @@ contract DeMineNFT is
         emit Withdraw(totalReward, totalCost);
     }
 
+    // pure functions
+    function adjust(
+        uint256 value,
+        uint256 adjustment
+    ) internal pure returns (uint256) {
+        return value - value * adjustment / 1000000;
+    }
+
     // set functions
-    function setTokenRoyalty(
-        address recipient,
-        uint16 bps
-    ) external onlyOwner {
-        _royaltyRecipient = recipient;
+    function setTokenRoyaltyBps(uint16 bps) external onlyOwner {
         _royaltyBps = bps;
-        emit TokenRoyaltySet(recipient, bps);
+        emit TokenRoyaltySet(bps);
     }
 
     function resetTokenCost(
@@ -192,14 +173,6 @@ contract DeMineNFT is
     function setCostToken(address costToken) external onlyOwner {
         _costToken = costToken;
         emit CostTokenAddressSet(costToken);
-    }
-
-    // pure functions
-    function adjust(
-        uint256 value,
-        uint256 adjustment
-    ) internal pure returns (uint256) {
-        return value - value * adjustment / 1000000;
     }
 
     // view functions
@@ -229,9 +202,6 @@ contract DeMineNFT is
         override
         returns (address, uint256)
     {
-        return (
-            _royaltyRecipient,
-            (value * _royaltyBps) / 10000
-        );
+        return (owner(), (value * _royaltyBps) / 10000);
     }
 }
