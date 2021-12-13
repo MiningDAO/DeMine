@@ -5,7 +5,6 @@ require("hardhat-contract-sizer");
 // https://hardhat.org/guides/create-task.html
 task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   const accounts = await hre.ethers.getSigners();
-
   for (const account of accounts) {
     console.log(account.address);
   }
@@ -19,6 +18,11 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  */
 module.exports = {
   solidity: "0.8.4",
+  networks: {
+    arbitrum: {
+      url: 'https://rinkeby.arbitrum.io/rpc',
+    },
+  },
   settings: {
     optimizer: {
       enabled: true,
