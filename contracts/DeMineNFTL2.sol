@@ -8,13 +8,13 @@ import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
+import "./ERC1155Upgradeable.sol";
 
 contract DeMineNFTCloneFactoryL2 {
     address immutable implementation;
 
     constructor() {
-        implementation = address(new DeMineNFT());
+        implementation = address(new DeMineNFTL2());
     }
 
     function create(
@@ -24,7 +24,7 @@ contract DeMineNFTCloneFactoryL2 {
         uint16 royaltyBps
     ) external returns(address) {
         address clone = ClonesUpgradeable.clone(implementation);
-        DeMineNFT(clone).initialize(uri, rewardToken, costToken, royaltyBps);
+        DeMineNFTL2(clone).initialize(uri, rewardToken, costToken, royaltyBps);
         return clone;
     }
 }
@@ -44,17 +44,21 @@ contract DeMineNFT is
     event CostTokenAddressSet(address);
     event RewardTokenAddressSet(address);
     event LastBillingCycleSet(uint256);
+    event AdjustmentSet(uint256);
 
-    event NewSupply(uint128, string, uint256);
-    event Reward(uint128, uint256, uint256[], uint256[]);
+    event NewPool(uint128, string, uint256);
+    event Reward(uint128, uint256);
     event Locked();
     event Unlocked(uint256);
     event Withdraw(uint256, uint256);
 
     address private _rewardToken;
     address private _costToken;
-    uint128 private _lastBillingCycle;
     uint16 private _royaltyBps; // EIP2981
+
+    uint128 public nextPool;
+    uint128 public nextCycle;
+    uint128 public lastBillingCycle;
 
     mapping(uint128 => uint256) private _cycleToTokenReward;
     mapping(uint128 => uint256) private _poolToTokenCost;
@@ -64,6 +68,7 @@ contract DeMineNFT is
         string memory uri,
         address rewardToken,
         address costToken,
+        address costTokenRecipient,
         uint16 royaltyBps
     ) public initializer {
         __Ownable_init();
@@ -77,40 +82,30 @@ contract DeMineNFT is
     constructor() initializer {}
 
     // @notice start a new pool
-    function newSupply(
-        uint128 pool,
+    function newPool(
         string calldata infoHash,
-        uint256[] calldata tokenIds,
-        uint256[] calldata supplys,
         uint256 costPerToken,
-        address recipient
+        address recipient,
+        uint256 supplyPerCycle,
+        uint128 startCycle,
+        uint128 numCycles
     ) external onlyOwner {
-        _mintBatch(recipient, tokenIds, supplys, "");
-        _poolToTokenCost[pool] = costPerToken;
-        emit NewSupply(
+        require(startCycle > nextCycle, "invalid start cycle");
+        _mintBatch(recipient, nextPool, startCycle, numCycles, supplyPerCycle);
+        _poolToTokenCost[nextPool] = costPerToken;
+        emit NewPool(
             pool,
             infoHash,
             costPerToken
         );
+        nextPool += 1;
     }
 
-    // @notice set reward and adjustment for cycle
-    function reward(
-        uint128 cycle,
-        uint256 rewardPerToken,
-        uint256[] calldata tokenIds,
-        uint256[] calldata adjustments
-    ) external onlyOwner {
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            _adjustments[tokenIds[i]] = adjustments[i];
-        }
-        _cycleToTokenReward[cycle] = rewardPerToken;
-        emit Reward(
-            cycle,
-            rewardPerToken,
-            tokenIds,
-            adjustments
-        );
+    // @notice set reward for next cycle
+    function reward(uint256 rewardPerToken) external onlyOwner {
+        _cycleToTokenReward[nextCycle] = rewardPerToken;
+        emit Reward(nextCycle, rewardPerToken);
+        nextCycle += 1;
     }
 
     // @notice lock for billing, withdraw will be disabled
@@ -126,7 +121,7 @@ contract DeMineNFT is
     function unlock(uint128 billingCycle) external onlyOwner whenPaused {
         bool success = IERC20(_rewardToken).approve(owner(), 0);
         require(success, "failed to revoke approve");
-        _lastBillingCycle = billingCycle;
+        lastBillingCycle = billingCycle;
         _unpause();
         emit Unlocked(billingCycle);
     }
@@ -147,7 +142,7 @@ contract DeMineNFT is
                 amounts[i] * _cycleToTokenReward[cycle],
                 _adjustments[i]
             );
-            if (cycle > _lastBillingCycle) {
+            if (cycle > lastBillingCycle) {
                 totalCost += adjust(
                     amounts[i] * _poolToTokenCost[uint128(tokenIds[i] >> 128)],
                     _adjustments[i]
@@ -185,6 +180,22 @@ contract DeMineNFT is
         emit TokenRoyaltySet(bps);
     }
 
+    function setAdjustment(
+        uint128 cycle,
+        uint128[] calldata pools,
+        uint256[] calldata adjustments
+    ) external onlyOwner {
+        require(
+            poolIds.length == adjustments.length,
+            "array length mismatch"
+        );
+        for (uint256 i = 0; i < pools.length; i++) {
+            uint256 tokenId = uint256(poolIds[i]) << 128 + cycle;
+            _adjustments[tokenId] = adjustments[i];
+        }
+        emit AdjustmentSet(cycle, pools, adjustments);
+    }
+
     function resetTokenCost(
         uint128[] calldata pools,
         uint256[] calldata costs
@@ -192,11 +203,6 @@ contract DeMineNFT is
         for (uint256 i = 0; i < pools.length; i++) {
             _poolToTokenCost[pools[i]] = costs[i];
         }
-    }
-
-    function setCostToken(address costToken) external onlyOwner {
-        _costToken = costToken;
-        emit CostTokenAddressSet(costToken);
     }
 
     // view functions
