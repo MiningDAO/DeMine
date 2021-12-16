@@ -1,0 +1,202 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+pragma solidity ^0.8.4;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./DeMineNFTL2.sol";
+
+contract DeMineNFTAdmin is Ownable {
+    event NewPool(uint128, string, uint128, uint128, uint256);
+    event CycleFinalized(uint128, uint256);
+    event CycleFinalizedWithAdjustment(uint128, uint256, uint128[], uint256[]);
+    event PoolCostReset(uint128, uint256);
+    event PoolCostResetBatch(uint128[], uint256[]);
+
+    event Locked();
+    event Unlocked(uint128);
+
+    address private _nft;
+    address private _rewardToken,
+    address private _costToken,
+
+    uint128 private nextCycle;
+    uint128 private nextPool;
+    uint128 public lastBillingCycle;
+
+    struct Cycle {
+        uint256 supply,
+        uint256 rewardPerToken,
+        uint256 costToPay
+    }
+
+    mapping(uint128 => Cycle) private _cycles;
+    mapping(uint128 => uint256) private _poolToTokenCost;
+    mapping(uint256 => uint256) private _adjustments; // token_id to adjustment
+
+    constructor(
+        address nft,
+        address rewardToken,
+        address costToken
+    ) Ownable() {
+        _nft = nft;
+        _rewardToken = rewardToken;
+        _costToken = costToken;
+        bool success = IERC20(_costToken).approve(owner(), 2 ** 256 - 1);
+        require(success, "authorization failed");
+    }
+
+    function newPool(
+        string calldata infoHash,
+        uint256 costPerToken,
+        uint128 startCycle,
+        uint128 numCycles,
+        uint256 supplyPerCycle,
+        address recipient
+    ) external {
+        uint256[] memory tokenIds = new uint256[](numCycles);
+        uint256[] memory supplies = new uint256[](numCycles);
+        for (uint128 i = 0; i < numCycles; i++) {
+            tokenIds[i] = uint256(nextPool) << 128 + startCycle + i;
+            supplies[i] = supplyPerCycle;
+            _cycles[startCycle + i].supply += supplyPerCycle;
+            _cycles[startCycle + i].costToPay += costPerToken * supplyPerCycle;
+        }
+        DeMineNFTL2(_nft).mint(recipient, tokenIds, supplies);
+        _poolToTokenCost[nextPool] = costPerToken;
+        emit NewPool(nextPool, infoHash, startCycle, numCycles, supplyPerCycle);
+        nextPool += 1;
+    }
+
+    function finalizeCycle(uint128 rewardPerToken) external onlyOwner {
+        _cycles[nextCycle].rewardPerToken = rewardPerToken;
+        nextCycle += 1;
+        emit CycleFinalized(nextCycle, rewardPerToken);
+    }
+
+    function finalizeCycleWithAdjustment(
+        uint128 rewardPerToken,
+        uint256[] calldata pools,
+        uint256[] calldata adjustments
+    ) external {
+        require(
+            pools.length == adjustments.length,
+            "array length mismatch"
+        );
+        for (uint256 i = 0; i < pools.length; i++) {
+            require(adjustments[i] <= 1000000, "invalid adjustment");
+            _adjustments[uint256(pools[i]) << 128 + nextCycle] = adjustments[i];
+        }
+        _cycles[nextCycle].rewardPerToken = rewardPerToken;
+        emit CycleFinalizedWithAdjustment(nextCycle, rewardPerToken, pools, adjustments);
+        nextCycle += 1;
+    }
+
+    function resetPoolCost(
+        uint128 pool,
+        uint256 cost
+    ) external onlyOwner {
+        _poolToTokenCost[pool] = cost;
+        emit PoolCostReset(pool, cost);
+    }
+
+    function batchResetPoolCost(
+        uint128[] calldata pools,
+        uint256[] calldata costs
+    ) external onlyOwner {
+        require(pools.length == costs.length, "array length mismatch");
+        for (uint256 i = 0; i < pools.length; i++) {
+            _poolToTokenCost[pools[i]] = costs[i];
+        }
+        emit PoolCostResetBatch(pools, costs);
+    }
+
+    function lock() external onlyOwner {
+        DeMineNFTL2(_nft).pause();
+        bool success = IERC20(_rewardToken).approve(owner(), 2 ** 256 - 1);
+        require(success, "failed to approve");
+        emit Locked();
+    }
+
+    function unlock(uint256 billingCycle) external onlyOwner {
+        bool success = IERC20(_rewardToken).approve(owner(), 0);
+        require(success, "failed to revoke approve");
+        lastBillingCycle = billingCycle;
+        DeMineNFTL2(_nft).unpause();
+        emit Unlocked(billingCycle);
+    }
+
+    // view functions
+    function redeem(
+        address sender,
+        uint256[] calldata tokenIds,
+        uint256[] calldata amounts
+    ) external view returns(uint256, uint256) {
+        (uint256 totalReward, uint256 totalCost) = aggregate(tokenIds, amounts);
+        // pay cost, user need to approve to pay first
+        bool success = IERC20(_costToken).transferFrom(
+            sender,
+            address(this),
+            totalCost
+        );
+        require(success, "failed to pay cost");
+        // redeem reward
+        success = IERC20(_rewardToken).transferFrom(
+            address(this),
+            sender,
+            totalReward
+        );
+        require(success, "failed to withdraw reward");
+        return (totalReward, totalCost);
+    }
+
+    function aggregate(
+        uint256[] calldata tokenIds,
+        uint256[] calldata amounts
+    ) public view returns(uint256, uint256) {
+        uint256 totalReward;
+        uint256 totalCost;
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint128 cycle = uint128(tokenIds[i]);
+            totalReward += adjust(
+                amounts[i] * _cycles[cycle].rewardPerToken,
+                _adjustments[i]
+            );
+            if (cycle > lastBillingCycle) {
+                totalCost += adjust(
+                    amounts[i] * _poolToTokenCost[uint128(tokenIds[i] >> 128)],
+                    _adjustments[i]
+                );
+            }
+        }
+        return (totalReward, totalCost);
+    }
+
+    function tokenStats(uint256 tokenId)
+        external
+        view
+        returns (uint256, uint256, uint256)
+    {
+        return (
+            _cycles[uint128(tokenId)].rewardPerToken,
+            _poolToTokenCost[uint128(tokenId >> 128)],
+            _adjustments[tokenId]
+        );
+    }
+
+    function treasureSource()
+        external
+        view
+        returns (address, address)
+    {
+        return (_rewardToken, _costToken);
+    }
+
+    // pure functions
+    function adjust(
+        uint256 value,
+        uint256 adjustment
+    ) internal pure returns (uint256) {
+        return value - value * adjustment / 1000000;
+    }
+}
