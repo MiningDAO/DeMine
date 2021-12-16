@@ -1,105 +1,67 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "./DeMineNFT.sol";
 
-contract DeMineNFTAdminCloneFactory {
-    address immutable implementation;
+contract DeMineNFTAdmin is Ownable {
+  event LogEthDeposit(address);
+  event NewPool(uint128, string, uint128, uint128, uint256);
+  event CycleFinalized(uint128, uint256);
+  event CycleFinalizedWithAdjustment(uint128, uint256, uint128[], uint256[]);
+  event PoolCostReset(uint128, uint256);
+  event PoolCostResetBatch(uint128[], uint256[]);
+  event Locked(uint128);
+  event Unlocked(uint128, uint128);
+  event Redeem(address, uint256, uint256);
 
-    constructor() {
-        implementation = address(new DeMineNFTAdmin());
-    }
+  address private _nft;
+  address private _rewardToken;
+  address private _costToken;
+  address private _costRecipient;
 
-    function clone(
-        string memory uri,
-        uint16 royaltyBps,
-        address nftFactory,
-        address rewardToken,
-        address costToken,
-        address costRecipient,
-        uint128 billingPeriod
-    ) external returns(address) {
-        address payable cloned = payable(
-            ClonesUpgradeable.clone(implementation)
-        );
-        DeMineNFTAdmin(cloned).initialize(
-            uri,
-            royaltyBps,
-            nftFactory,
-            rewardToken,
-            costToken,
-            costRecipient,
-            billingPeriod
-        );
-        DeMineNFTAdmin(cloned).transferOwnership(msg.sender);
-        return cloned;
-    }
-}
+  uint128 private _nextCycle;
+  uint128 private _nextPool;
 
-contract DeMineNFTAdmin is OwnableUpgradeable {
-    event LogEthDeposit(address);
-    event NewPool(uint128, string, uint128, uint128, uint256);
-    event CycleFinalized(uint128, uint256);
-    event CycleFinalizedWithAdjustment(uint128, uint256, uint128[], uint256[]);
-    event PoolCostReset(uint128, uint256);
-    event PoolCostResetBatch(uint128[], uint256[]);
-    event Locked(uint128);
-    event Unlocked(uint128, uint128);
-    event Redeem(address, uint256, uint256, uint256[], uint256[]);
+  bool private _locked;
+  // pay billing every _billingPeriod cycles
+  uint128 public _billingPeriod;
+  uint128 public _latestBillingCycle;
 
-    address public nft;
-    address private _rewardToken;
-    address private _costToken;
-    address private _costRecipient;
+  // billing cycle to reward token sold price to pay bill
+  mapping(uint128 => uint256) private _sellingPrice;
+  // cycle to reward ERC20 token per NFT
+  mapping(uint128 => uint256) private _rewardPerNFT;
+  // pool to cost ERC20 token per NFT
+  mapping(uint128 => uint256) private _costPerNFT;
+  // NFT id to adjustment, base is 1000000
+  mapping(uint256 => uint256) private _adjustments;
 
-    uint128 private _nextCycle;
-    uint128 private _nextPool;
+  constructor(
+    address nft,
+    address rewardToken,
+    address costToken,
+    address costRecipient,
+    uint128 billingPeriod
+  ) Ownable() {
+    _nft = nft;
+    _rewardToken = rewardToken;
+    _costToken = costToken;
+    _costRecipient = costRecipient;
+    _billingPeriod = billingPeriod;
+  }
 
-    bool private _locked;
-    // pay billing every _billingPeriod cycles
-    uint128 public _billingPeriod;
-    uint128 public _latestBillingCycle;
+  fallback() external payable {
+    emit LogEthDeposit(_msgSender());
+  }
 
-    // billing cycle to reward token sold price to pay bill
-    mapping(uint128 => uint256) private _sellingPrice;
-    // cycle to reward ERC20 token per NFT
-    mapping(uint128 => uint256) private _rewardPerNFT;
-    // pool to cost ERC20 token per NFT
-    mapping(uint128 => uint256) private _costPerNFT;
-    // NFT id to adjustment, base is 1000000
-    mapping(uint256 => uint256) private _adjustments;
+  receive() external payable {
+    emit LogEthDeposit(_msgSender());
+  }
 
-    function initialize(
-        string memory uri,
-        uint16 royaltyBps,
-        address nftFactory,
-        address rewardToken,
-        address costToken,
-        address costRecipient,
-        uint128 billingPeriod
-    ) public initializer {
-        __Ownable_init();
-        nft = DeMineNFTCloneFactory(nftFactory).clone(uri, royaltyBps);
-        _rewardToken = rewardToken;
-        _costToken = costToken;
-        _costRecipient = costRecipient;
-        _billingPeriod = billingPeriod;
-    }
-
-    constructor() initializer {}
-
-    fallback() external payable {
-      emit LogEthDeposit(_msgSender());
-    }
-
-    receive() external payable {
-      emit LogEthDeposit(_msgSender());
-    }
-
-    function getRoyalty() external onlyOwner {
+  function getRoyalty() external onlyOwner {
         uint256 amount = address(this).balance;
         (bool success, ) = owner().call{value: amount}("");
         require(success, "failed to extract");
@@ -119,7 +81,7 @@ contract DeMineNFTAdmin is OwnableUpgradeable {
             NFTIds[i] = uint256(_nextPool) << 128 + startCycle + i;
             supplies[i] = supplyPerCycle;
         }
-        DeMineNFT(nft).mint(recipient, NFTIds, supplies);
+        DeMineNFT(_nft).mint(recipient, NFTIds, supplies);
         _costPerNFT[_nextPool] = costPerToken;
         emit NewPool(_nextPool, infoHash, startCycle, numCycles, supplyPerCycle);
         _nextPool += 1;
@@ -155,7 +117,7 @@ contract DeMineNFTAdmin is OwnableUpgradeable {
             "billing too early"
         );
         _locked = true;
-        DeMineNFT(nft).pause();
+        DeMineNFT(_nft).pause();
         bool success = IERC20(_rewardToken).approve(owner(), 2 ** 256 - 1);
         require(success, "failed to approve");
         emit Locked(_latestBillingCycle);
@@ -173,7 +135,7 @@ contract DeMineNFTAdmin is OwnableUpgradeable {
         require(success, "failed to revoke approve");
         _latestBillingCycle += _billingPeriod;
         _sellingPrice[_latestBillingCycle] = rewardTokenPrice;
-        DeMineNFT(nft).unpause();
+        DeMineNFT(_nft).unpause();
         _locked = false;
         emit Unlocked(lastBillingCycle, _latestBillingCycle);
     }
@@ -183,8 +145,7 @@ contract DeMineNFTAdmin is OwnableUpgradeable {
         address sender,
         uint256[] calldata NFTIds,
         uint256[] calldata amounts
-    ) external {
-        require(msg.sender == nft, "disallowed caller");
+    ) external returns(uint256, uint256) {
         uint256 totalReward;
         uint256 totalCost;
         for (uint256 i = 0; i < NFTIds.length; i++) {

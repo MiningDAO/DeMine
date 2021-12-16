@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
@@ -15,16 +14,17 @@ contract DeMineNFTCloneFactory {
     address immutable implementation;
 
     constructor() {
-        implementation = address(new DeMineNFTL2());
+        implementation = address(new DeMineNFT());
     }
 
-    function create(
+    function clone(
         string memory uri,
         uint16 royaltyBps
     ) external returns(address) {
-        address clone = ClonesUpgradeable.clone(implementation);
-        DeMineNFTL2(clone).initialize(uri, royaltyBps);
-        return clone;
+        address cloned = ClonesUpgradeable.clone(implementation);
+        DeMineNFT(cloned).initialize(uri, royaltyBps);
+        DeMineNFT(cloned).transferOwnership(msg.sender);
+        return cloned;
     }
 }
 
@@ -73,18 +73,18 @@ contract DeMineNFT is
         _unpause();
     }
 
-    // @notice pay cost to withdraw the reward, tokens will
-    // be burned after withdraw
+    // @notice redeem and burn the NFT tokens
     function redeem(
         uint256[] calldata tokenIds,
         uint256[] calldata amounts
     ) external whenNotPaused {
         // burn token
         _burnBatch(_msgSender(), tokenIds, amounts);
-        (uint256 totalReward, uint256 totalCost) = DeMineNFTAdmin(
-            payable(owner())
-        ).redeem(_msgSender(), tokenIds, amounts);
-        emit Redeem(_msgSender(), totalReward, totalCost);
+        DeMineNFTAdmin(payable(owner())).redeem(
+            _msgSender(),
+            tokenIds,
+            amounts
+        );
     }
 
     function setTokenRoyaltyBps(uint16 bps) external onlyOwner {
