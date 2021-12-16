@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "./DeMineNFTL2.sol";
+import "./DeMineNFT.sol";
 
 contract DeMineNFTAdmin is Ownable {
   event LogEthDeposit(address);
@@ -80,7 +80,7 @@ contract DeMineNFTAdmin is Ownable {
             NFTIds[i] = uint256(_nextPool) << 128 + startCycle + i;
             supplies[i] = supplyPerCycle;
         }
-        DeMineNFTL2(_nft).mint(recipient, NFTIds, supplies);
+        DeMineNFT(_nft).mint(recipient, NFTIds, supplies);
         _costPerNFT[_nextPool] = costPerToken;
         emit NewPool(_nextPool, infoHash, startCycle, numCycles, supplyPerCycle);
         _nextPool += 1;
@@ -116,7 +116,7 @@ contract DeMineNFTAdmin is Ownable {
             "billing too early"
         );
         _locked = true;
-        DeMineNFTL2(_nft).pause();
+        DeMineNFT(_nft).pause();
         bool success = IERC20(_rewardToken).approve(owner(), 2 ** 256 - 1);
         require(success, "failed to approve");
         emit Locked(_latestBillingCycle);
@@ -134,7 +134,7 @@ contract DeMineNFTAdmin is Ownable {
         require(success, "failed to revoke approve");
         _latestBillingCycle += _billingPeriod;
         _sellingPrice[_latestBillingCycle] = rewardTokenPrice;
-        DeMineNFTL2(_nft).unpause();
+        DeMineNFT(_nft).unpause();
         _locked = false;
         emit Unlocked(lastBillingCycle, _latestBillingCycle);
     }
