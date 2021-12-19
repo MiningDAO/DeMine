@@ -13,7 +13,7 @@ contract DeMineNFTAdminCloneFactory {
         implementation = address(new DeMineNFTAdmin());
     }
 
-    function clone(
+    function create(
         string memory uri,
         uint16 royaltyBps,
         address nftFactory,
@@ -82,7 +82,11 @@ contract DeMineNFTAdmin is OwnableUpgradeable {
         uint128 billingPeriod
     ) public initializer {
         __Ownable_init();
-        nft = DeMineNFTCloneFactory(nftFactory).clone(uri, royaltyBps);
+        nft = DeMineNFTCloneFactory(nftFactory).create(
+            uri,
+            royaltyBps,
+            address(this)
+        );
         _rewardToken = rewardToken;
         _costToken = costToken;
         _costRecipient = costRecipient;

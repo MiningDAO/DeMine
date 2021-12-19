@@ -17,13 +17,14 @@ contract DeMineNFTCloneFactory {
         implementation = address(new DeMineNFT());
     }
 
-    function clone(
+    function create(
         string memory uri,
-        uint16 royaltyBps
+        uint16 royaltyBps,
+        address owner
     ) external returns(address) {
         address cloned = ClonesUpgradeable.clone(implementation);
         DeMineNFT(cloned).initialize(uri, royaltyBps);
-        DeMineNFT(cloned).transferOwnership(msg.sender);
+        DeMineNFT(cloned).transferOwnership(owner);
         return cloned;
     }
 }
@@ -65,7 +66,7 @@ contract DeMineNFT is
         _mintBatch(recipient, tokenIds, supplies, "");
     }
 
-    function pause() external onlyOwner {
+    function pause() external onlyOwner whenNotPaused {
         _pause();
     }
 
