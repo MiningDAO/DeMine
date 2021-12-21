@@ -21,7 +21,6 @@ describe("DeMineNFT", function () {
         const tx = await nftFactory.create("some_url", 100, owner.address)
         const { gasUsed: createGasUsed, events } = await tx.wait();
         const { address } = events.find(Boolean);
-        console.log(`${name}.createToken: ${createGasUsed.toString()}`);
         nft = await NFT.attach(address);
     });
 
@@ -76,35 +75,73 @@ describe("DeMineNFT", function () {
     it("should be ERC1155", async function() {
         expect(await nft.uri(1)).to.equal("some_url");
 
-        let tokenIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let supplies = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
+        let tokenIds = [1, 2, 3, 4, 5];
+        let supplies = [100, 200, 300, 400, 500];
 
         // mint and check balance
         await nft.connect(owner).mint(user1.address, tokenIds, supplies);
-        for (let i = 0; i <= tokenIds.length; i++) {
-            expect(
-                await nft.balanceOf(user1.address, tokenIds[i])
-            ).to.equal(supplies[i]);
+        for (let i = 0; i < tokenIds.length; i++) {
+            let balance = await nft.balanceOf(
+                user1.address,
+                ethers.BigNumber.from(tokenIds[i])
+            );
+            expect(balance.eq(supplies[i])).to.be.true;
         }
 
-        // transfer
+        // transfer and balance
         await nft.safeTransferFrom(
-            user1.address, user2.address, tokenIds[0], supplies[0], ""
+            user1.address, user2.address, 2, 50, []
         );
-        expect(
-            await nft.balanceOf(user2.address, tokenIds[0])
-        ).to.equal(supplies[0]);
+        let balance = await nft.balanceOf(user1.address, 2);
+        expect(balance.eq(150)).to.be.true;
+        balance = await nft.balanceOf(user2.address, 2);
+        expect(balance.eq(50)).to.be.true;
 
-        // check balanceoOfBatch
+        // batch transfer and balance
+        await nft.safeBatchTransferFrom(
+            user1.address, user2.address, [2, 3], [100, 200], []
+        );
+        let [
+            balance12, balance13, balance22, balance23
+        ] = await nft.balanceOfBatch(
+            [user1.address, user1.address, user2.address, user2.address],
+            [2, 3, 2, 3]
+        );
+        expect(balance12.eq(50)).to.be.true;
+        expect(balance13.eq(100)).to.be.true;
+        expect(balance22.eq(150)).to.be.true;
+        expect(balance23.eq(200)).to.be.true;
+
+        // approve user2 for user1
+        await nft.connect(user1).setApprovalForAll(user2.address, true);
         expect(
-            await nft.balanceOfBatch(
-                [user1.address, user2.address], [tokenIds[0], tokenIds[1]]
-            )
-        ).to.equal([0, 0]);
-        expect(
-            await nft.balanceOfBatch(
-                [user2.address, user1, address], [tokenIds[0], tokenIds[1]]
-            )
-        ).to.equal([supplies[0], supplies[1]]);
+            await nft.isApprovedForAll(user1.address, user2.address)
+        ).to.be.true;
+
+        // user2 transfer on behalf of user1
+        await nft.connect(user2).safeTransferFrom(
+            user1.address, user2.address, 3, 50, []
+        );
+        [balance13, balance23] = await nft.balanceOfBatch(
+            [user1.address, user2.address],
+            [3, 3]
+        );
+        expect(balance13.eq(50)).to.be.true;
+        expect(balance23.eq(250)).to.be.true;
+
+        // user2 batch transfer on behalf of user1
+        await nft.safeBatchTransferFrom(
+            user1.address, user2.address, [2, 3], [50, 50], []
+        );
+        [
+            balance12, balance13, balance22, balance23
+        ] = await nft.balanceOfBatch(
+            [user1.address, user1.address, user2.address, user2.address],
+            [2, 3, 2, 3]
+        );
+        expect(balance12.eq(0)).to.be.true;
+        expect(balance13.eq(0)).to.be.true;
+        expect(balance22.eq(200)).to.be.true;
+        expect(balance23.eq(300)).to.be.true;
     });
 });
