@@ -4,42 +4,14 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "./DeMineNFT.sol";
+import "./DeMineNFTCloneFactory.sol";
+import "./IDeMineNFTAdmin.sol";
+import "./IDeMineNFT.sol";
 
-contract DeMineNFTAdminCloneFactory {
-    address immutable implementation;
-
-    constructor() {
-        implementation = address(new DeMineNFTAdmin());
-    }
-
-    function create(
-        string memory uri,
-        uint16 royaltyBps,
-        address nftFactory,
-        address rewardToken,
-        address costToken,
-        address costRecipient,
-        uint128 billingPeriod
-    ) external returns(address) {
-        address payable cloned = payable(
-            ClonesUpgradeable.clone(implementation)
-        );
-        DeMineNFTAdmin(cloned).initialize(
-            uri,
-            royaltyBps,
-            nftFactory,
-            rewardToken,
-            costToken,
-            costRecipient,
-            billingPeriod
-        );
-        DeMineNFTAdmin(cloned).transferOwnership(msg.sender);
-        return cloned;
-    }
-}
-
-contract DeMineNFTAdmin is OwnableUpgradeable {
+contract DeMineNFTAdmin is
+    OwnableUpgradeable,
+    IDeMineNFTAdmin
+{
     event LogEthDeposit(address);
     event NewPool(uint128, string, uint128, uint128, uint256);
     event CycleFinalized(uint128, uint256);
@@ -123,7 +95,7 @@ contract DeMineNFTAdmin is OwnableUpgradeable {
             NFTIds[i] = uint256(_nextPool) << 128 + startCycle + i;
             supplies[i] = supplyPerCycle;
         }
-        DeMineNFT(nft).mint(recipient, NFTIds, supplies);
+        IDeMineNFT(nft).mint(recipient, NFTIds, supplies);
         _costPerNFT[_nextPool] = costPerToken;
         emit NewPool(_nextPool, infoHash, startCycle, numCycles, supplyPerCycle);
         _nextPool += 1;
@@ -159,7 +131,7 @@ contract DeMineNFTAdmin is OwnableUpgradeable {
             "billing too early"
         );
         _locked = true;
-        DeMineNFT(nft).pause();
+        IDeMineNFT(nft).pause();
         bool success = IERC20(_rewardToken).approve(owner(), 2 ** 256 - 1);
         require(success, "failed to approve");
         emit Locked(_latestBillingCycle);
@@ -177,7 +149,7 @@ contract DeMineNFTAdmin is OwnableUpgradeable {
         require(success, "failed to revoke approve");
         _latestBillingCycle += _billingPeriod;
         _sellingPrice[_latestBillingCycle] = rewardTokenPrice;
-        DeMineNFT(nft).unpause();
+        IDeMineNFT(nft).unpause();
         _locked = false;
         emit Unlocked(lastBillingCycle, _latestBillingCycle);
     }
@@ -187,7 +159,7 @@ contract DeMineNFTAdmin is OwnableUpgradeable {
         address sender,
         uint256[] calldata NFTIds,
         uint256[] calldata amounts
-    ) external {
+    ) external override {
         require(msg.sender == nft, "disallowed caller");
         uint256 totalReward;
         uint256 totalCost;
@@ -285,5 +257,11 @@ contract DeMineNFTAdmin is OwnableUpgradeable {
         uint256 adjustment
     ) internal pure returns (uint256) {
         return value - value * adjustment / 1000000;
+    }
+
+    function supportsInterface(
+        bytes4 interfaceId
+    ) external pure returns(bool) {
+        return interfaceId == type(IDeMineNFTAdmin).interfaceId;
     }
 }

@@ -4,30 +4,11 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "./DeMineNFTAdmin.sol";
-
-contract DeMineNFTCloneFactory {
-    address immutable implementation;
-
-    constructor() {
-        implementation = address(new DeMineNFT());
-    }
-
-    function create(
-        string memory uri,
-        uint16 royaltyBps,
-        address owner
-    ) external returns(address) {
-        address cloned = ClonesUpgradeable.clone(implementation);
-        DeMineNFT(cloned).initialize(uri, royaltyBps);
-        DeMineNFT(cloned).transferOwnership(owner);
-        return cloned;
-    }
-}
+import "./IDeMineNFTAdmin.sol";
+import "./IDeMineNFT.sol";
 
 /// @title DeMineNFT
 /// @author Shu Dong
@@ -36,7 +17,8 @@ contract DeMineNFT is
     ERC1155Upgradeable,
     OwnableUpgradeable,
     PausableUpgradeable,
-    IERC2981Upgradeable
+    IERC2981Upgradeable,
+    IDeMineNFT
 {
     // Events
     event LogEthDeposit(address);
@@ -62,15 +44,15 @@ contract DeMineNFT is
         address recipient,
         uint256[] memory tokenIds,
         uint256[] memory supplies
-    ) external onlyOwner {
+    ) external override onlyOwner {
         _mintBatch(recipient, tokenIds, supplies, "");
     }
 
-    function pause() external onlyOwner whenNotPaused {
+    function pause() external override onlyOwner whenNotPaused {
         _pause();
     }
 
-    function unpause() external onlyOwner whenPaused {
+    function unpause() external override onlyOwner whenPaused {
         _unpause();
     }
 
@@ -79,9 +61,8 @@ contract DeMineNFT is
         uint256[] calldata tokenIds,
         uint256[] calldata amounts
     ) external whenNotPaused {
-        // burn token
         _burnBatch(_msgSender(), tokenIds, amounts);
-        DeMineNFTAdmin(payable(owner())).redeem(
+        IDeMineNFTAdmin(payable(owner())).redeem(
             _msgSender(),
             tokenIds,
             amounts
@@ -100,5 +81,18 @@ contract DeMineNFT is
         returns (address, uint256)
     {
         return (owner(), (value * _royaltyBps) / 10000);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(ERC1155Upgradeable, IERC165Upgradeable)
+        returns (bool)
+    {
+        return
+            interfaceId == type(IDeMineNFT).interfaceId ||
+            interfaceId == type(IERC2981Upgradeable).interfaceId ||
+            super.supportsInterface(interfaceId);
     }
 }
