@@ -2,7 +2,6 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("DeMineNFT", function () {
-    const name = "DeMineNFTCloneFactory";
     var owner;
     var user1;
     var user2;
@@ -11,7 +10,7 @@ describe("DeMineNFT", function () {
 
     before(async function() {
         [user1, user2, owner] = await ethers.getSigners();
-        const NFTFactory = await ethers.getContractFactory(name);
+        const NFTFactory = await ethers.getContractFactory("DeMineNFTCloneFactory");
         nftFactory = await NFTFactory.deploy();
         await nftFactory.deployed();
     });
@@ -19,12 +18,12 @@ describe("DeMineNFT", function () {
     beforeEach(async function() {
         const NFT = await ethers.getContractFactory("DeMineNFT");
         const tx = await nftFactory.create("some_url", 100, owner.address)
-        const { gasUsed: createGasUsed, events } = await tx.wait();
+        const { events } = await tx.wait();
         const { address } = events.find(Boolean);
         nft = await NFT.attach(address);
     });
 
-    it("should with royalty info", async function () {
+    it("should be ERC2981", async function () {
         let [recipient, bps] = await nft.royaltyInfo(1, 100);
         expect(recipient).to.equal(owner.address);
         expect(bps).to.equal(1);
@@ -143,5 +142,23 @@ describe("DeMineNFT", function () {
         expect(balance13.eq(0)).to.be.true;
         expect(balance22.eq(200)).to.be.true;
         expect(balance23.eq(300)).to.be.true;
+    });
+
+    it("should be redeemable", async function() {
+        await nft.connect(owner).mint(user1.address, [1, 2], [100, 200]);
+
+        const AdminFactory = await ethers.getContractFactory(
+            "DeMineNFTAdminTest"
+        );
+        admin = await AdminFactory.deploy();
+        await admin.deployed();
+        await nft.connect(owner).transferOwnership(admin.address);
+        await expect(
+            nft.connect(user1).redeem([1, 2], [50, 100])
+        ).to.emit(admin, "Redeem").withArgs(
+            user1.address, 1, 1, [1, 2], [50, 100]
+        );
+        expect((await nft.balanceOf(user1.address, 1)).eq(50)).to.be.true;
+        expect((await nft.balanceOf(user1.address, 2)).eq(100)).to.be.true;
     });
 });

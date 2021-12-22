@@ -16,10 +16,12 @@ contract WrappedTokenCloneFactory {
     function create(
         string memory name,
         string memory symbol,
-        uint8 decimals
+        uint8 decimals,
+        address owner
     ) external returns(address) {
         address clone = ClonesUpgradeable.clone(implementation);
         WrappedToken(clone).initialize(name, symbol, decimals);
+        WrappedToken(clone).transferOwnership(owner);
         return clone;
     }
 }

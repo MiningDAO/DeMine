@@ -11,27 +11,24 @@ contract DeMineNFTAdminCloneFactory {
     }
 
     function create(
-        string memory uri,
-        uint16 royaltyBps,
-        address nftFactory,
+        uint128 billingPeriod,
+        address nft,
         address rewardToken,
         address costToken,
         address costRecipient,
-        uint128 billingPeriod
+        address owner
     ) external returns(address) {
         address payable cloned = payable(
             ClonesUpgradeable.clone(implementation)
         );
         DeMineNFTAdmin(cloned).initialize(
-            uri,
-            royaltyBps,
-            nftFactory,
+            billingPeriod,
+            nft,
             rewardToken,
             costToken,
-            costRecipient,
-            billingPeriod
+            costRecipient
         );
-        DeMineNFTAdmin(cloned).transferOwnership(msg.sender);
+        DeMineNFTAdmin(cloned).transferOwnership(owner);
         return cloned;
     }
 }
