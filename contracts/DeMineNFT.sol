@@ -25,10 +25,12 @@ contract DeMineNFT is
     event TokenRoyaltySet(uint256);
     event Redeem(address, uint256, uint256);
 
+    address private _royaltyRecipient;
     uint16 private _royaltyBps; // EIP2981
 
     function initialize(
         string memory uri,
+        address royaltyRecipient,
         uint16 royaltyBps
     ) public initializer {
         __Ownable_init();
@@ -69,7 +71,11 @@ contract DeMineNFT is
         );
     }
 
-    function setTokenRoyaltyBps(uint16 bps) external onlyOwner {
+    function setTokenRoyaltyBps(
+        address recipient,
+        uint16 bps
+    ) external onlyOwner {
+        _royaltyRecipient = recipient;
         _royaltyBps = bps;
         emit TokenRoyaltySet(bps);
     }
@@ -80,7 +86,7 @@ contract DeMineNFT is
         override
         returns (address, uint256)
     {
-        return (owner(), (value * _royaltyBps) / 10000);
+        return (_royaltyRecipient, (value * _royaltyBps) / 10000);
     }
 
     function supportsInterface(bytes4 interfaceId)

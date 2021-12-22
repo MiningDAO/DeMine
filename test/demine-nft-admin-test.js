@@ -44,7 +44,9 @@ describe("DeMineNFTAdmin", function () {
 
         // setup nft
         const NFT = await ethers.getContractFactory("DeMineNFT");
-        const tx3 = await nftFactory.create("some_url", 100, owner.address);
+        const tx3 = await nftFactory.create(
+            "some_url", owner.address, 100, owner.address
+        );
         const { events: events3 } = await tx3.wait();
         const { address: address3 } = events3.find(Boolean);
         let nft = NFT.attach(address3);

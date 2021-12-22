@@ -17,7 +17,7 @@ describe("DeMineNFT", function () {
 
     beforeEach(async function() {
         const NFT = await ethers.getContractFactory("DeMineNFT");
-        const tx = await nftFactory.create("some_url", 100, owner.address)
+        const tx = await nftFactory.create("some_url", owner.address, 100, owner.address)
         const { events } = await tx.wait();
         const { address } = events.find(Boolean);
         nft = await NFT.attach(address);

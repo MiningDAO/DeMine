@@ -12,11 +12,16 @@ contract DeMineNFTCloneFactory {
 
     function create(
         string memory uri,
+        address royaltyRecipient,
         uint16 royaltyBps,
         address owner
     ) external returns(address) {
         address cloned = ClonesUpgradeable.clone(implementation);
-        DeMineNFT(cloned).initialize(uri, royaltyBps);
+        DeMineNFT(cloned).initialize(
+            uri,
+            royaltyRecipient,
+            royaltyBps
+        );
         DeMineNFT(cloned).transferOwnership(owner);
         return cloned;
     }
