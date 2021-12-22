@@ -3,7 +3,6 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "./DeMineNFTCloneFactory.sol";
 import "./IDeMineNFTAdmin.sol";
@@ -22,16 +21,15 @@ contract DeMineNFTAdminTest is IDeMineNFTAdmin {
 
 contract DeMineNFTAdmin is
     OwnableUpgradeable,
-    PausableUpgradeable,
     IDeMineNFTAdmin
 {
     event LogEthDeposit(address);
     event NewPool(uint128, string, uint128, uint128, uint256);
     event CycleFinalized(uint128, uint256);
-    event CycleFinalizedWithAdjustment(uint128, uint256, uint128[], uint256[]);
+    event AdjustmentSet(uint128, uint128[], uint256[]);
     event PoolCostReset(uint128, uint256);
     event PoolCostResetBatch(uint128[], uint256[]);
-    event LastBillingCycleSet(uint128, uint128, uint128);
+    event LastBillingCycleSet(uint128, uint128);
     event Redeem(address, uint256, uint256, uint256[], uint256[]);
 
     address private _rewardToken;
@@ -78,7 +76,7 @@ contract DeMineNFTAdmin is
         uint128 numCycles,
         uint256 supplyPerCycle,
         address recipient
-    ) external {
+    ) external onlyOwner {
         uint256[] memory NFTIds = new uint256[](numCycles);
         uint256[] memory supplies = new uint256[](numCycles);
         for (uint128 i = 0; i < numCycles; i++) {
@@ -91,17 +89,19 @@ contract DeMineNFTAdmin is
         _nextPool += 1;
     }
 
-    function finalizeCycle(uint128 expectedRewardPerToken) external onlyOwner {
+    function finalizeCycle(
+        uint128 expectedRewardPerToken
+    ) public onlyOwner {
         _rewardPerNFT[_nextCycle] = expectedRewardPerToken;
-        _nextCycle += 1;
         emit CycleFinalized(_nextCycle, expectedRewardPerToken);
+        _nextCycle += 1;
     }
 
     function finalizeCycleWithAdjustment(
         uint128 expectedRewardPerToken,
         uint128[] calldata pools,
         uint256[] calldata adjustments
-    ) external {
+    ) external onlyOwner {
         require(
             pools.length == adjustments.length,
             "array length mismatch"
@@ -110,38 +110,27 @@ contract DeMineNFTAdmin is
             require(adjustments[i] <= 1000000, "invalid adjustment");
             _adjustments[uint256(pools[i]) << 128 + _nextCycle] = adjustments[i];
         }
-        _rewardPerNFT[_nextCycle] = expectedRewardPerToken;
-        emit CycleFinalizedWithAdjustment(_nextCycle, expectedRewardPerToken, pools, adjustments);
-        _nextCycle += 1;
+        emit AdjustmentSet(_nextCycle, pools, adjustments);
+        finalizeCycle(expectedRewardPerToken);
     }
 
-    function pause() external onlyOwner whenNotPaused {
+    function lock() external onlyOwner {
         require(
             _lastBillingCycle + _billingPeriod <  _nextCycle,
             "billing too early"
         );
-        _pause();
         IDeMineNFT(_nft).pause();
         bool success = IERC20(_rewardToken).approve(owner(), 2 ** 256 - 1);
         require(success, "failed to approve");
     }
 
-    function unpause(
-        uint128 lastBillingCycle, // for sanity check
-        uint256 rewardTokenPrice
-    ) external onlyOwner whenPaused {
-        require(
-            _lastBillingCycle == lastBillingCycle,
-            "wrong billing to unlock"
-        );
+    function unlock(uint256 rewardTokenPrice) external onlyOwner {
+        IDeMineNFT(_nft).unpause();
         bool success = IERC20(_rewardToken).approve(owner(), 0);
         require(success, "failed to revoke approve");
         _lastBillingCycle += _billingPeriod;
         _soldPrice[_lastBillingCycle] = rewardTokenPrice;
-        IDeMineNFT(_nft).unpause();
-        _unpause();
         emit LastBillingCycleSet(
-            lastBillingCycle,
             _lastBillingCycle,
             _billingPeriod
         );

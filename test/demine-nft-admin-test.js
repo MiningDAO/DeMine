@@ -73,6 +73,48 @@ describe("DeMineNFTAdmin", function () {
         costToken.connect(owner).mint(user2.address, 100);
     });
 
+    it("should be viewable", async function () {
+        let [rewardAddr, costAddr] = await admin.treasureSource();
+        expect(rewardAddr).to.be.equal(rewardToken.address);
+        expect(costAddr).to.be.equal(costToken.address);
+    });
+
     it("should be ownable", async function () {
+        const error = "Ownable: caller is not the owner";
+        await expect(
+            admin.connect(user1).newPool(
+                "hash", 1, 10, 1000, 100, user2.address
+            )
+        ).to.be.revertedWith(error);
+
+        await expect(
+            admin.connect(user1).finalizeCycle(1)
+        ).to.be.revertedWith(error);
+
+        await expect(
+            admin.connect(
+                user1
+            ).finalizeCycleWithAdjustment(
+                1, [1, 2], [100, 100]
+            )
+        ).to.be.revertedWith(error);
+
+        await expect(
+            admin.connect(user1).lock()
+        ).to.be.revertedWith(error);
+
+        await expect(
+            admin.connect(user1).unlock(1000)
+        ).to.be.revertedWith(error);
+
+        await expect(
+            admin.connect(user1).resetPoolCost(1, 2)
+        ).to.be.revertedWith(error);
+
+        await expect(
+            admin.connect(
+                user1
+            ).batchResetPoolCost([1, 2], [1, 1])
+        ).to.be.revertedWith(error);
     });
 });
