@@ -29,9 +29,9 @@ describe("DeMineNFT", function () {
         expect(bps).to.equal(1);
 
         // test set royalty info
-        nft.connect(owner).setTokenRoyaltyBps(1000);
+        nft.connect(owner).setTokenRoyaltyInfo(user1.address, 1000);
         [recipient, bps] = await nft.royaltyInfo(1, 100);
-        expect(recipient).to.equal(owner.address);
+        expect(recipient).to.equal(user1.address);
         expect(bps).to.equal(10);
     });
 
@@ -46,7 +46,7 @@ describe("DeMineNFT", function () {
             nft.connect(user1).unpause()
         ).to.be.revertedWith("Ownable: caller is not the owner");
         await expect(
-            nft.connect(user1).setTokenRoyaltyBps(1000)
+            nft.connect(user1).setTokenRoyaltyInfo(user1.address, 1000)
         ).to.be.revertedWith("Ownable: caller is not the owner");
     });
 

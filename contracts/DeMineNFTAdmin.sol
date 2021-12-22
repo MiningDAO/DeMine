@@ -9,6 +9,17 @@ import "./DeMineNFTCloneFactory.sol";
 import "./IDeMineNFTAdmin.sol";
 import "./IDeMineNFT.sol";
 
+contract DeMineNFTAdminTest is IDeMineNFTAdmin {
+    event Redeem(address, uint256, uint256, uint256[], uint256[]);
+    function redeem(
+        address sender,
+        uint256[] calldata tokenIds,
+        uint256[] calldata amounts
+    ) external override {
+        emit Redeem(sender, 1, 1, tokenIds, amounts);
+    }
+}
+
 contract DeMineNFTAdmin is
     OwnableUpgradeable,
     PausableUpgradeable,
@@ -20,7 +31,7 @@ contract DeMineNFTAdmin is
     event CycleFinalizedWithAdjustment(uint128, uint256, uint128[], uint256[]);
     event PoolCostReset(uint128, uint256);
     event PoolCostResetBatch(uint128[], uint256[]);
-    event LastBillingCycleSet(uint128, uint128);
+    event LastBillingCycleSet(uint128, uint128, uint128);
     event Redeem(address, uint256, uint256, uint256[], uint256[]);
 
     address private _rewardToken;
@@ -30,12 +41,12 @@ contract DeMineNFTAdmin is
     uint128 private _nextCycle;
     uint128 private _nextPool;
 
-    address public nft;
-    uint128 public billingPeriod;
-    uint128 public lastBillingCycle;
+    address private _nft;
+    uint128 private _billingPeriod;
+    uint128 private _lastBillingCycle;
 
-    // billing cycle to reward token sold price to pay bill
-    mapping(uint128 => uint256) private _sellingPrice;
+    // billing cycle to reward token sold price in cost token
+    mapping(uint128 => uint256) private _soldPrice;
     // cycle to reward ERC20 token per NFT
     mapping(uint128 => uint256) private _rewardPerNFT;
     // pool to cost ERC20 token per NFT
@@ -44,35 +55,21 @@ contract DeMineNFTAdmin is
     mapping(uint256 => uint256) private _adjustments;
 
     function initialize(
-        uint128 _billingPeriod,
-        address _nft,
+        uint128 billingPeriod,
+        address nft,
         address rewardToken,
         address costToken,
         address costRecipient
     ) public initializer {
         __Ownable_init();
-        billingPeriod = _billingPeriod;
-        nft = _nft;
+        _billingPeriod = billingPeriod;
+        _nft = nft;
         _rewardToken = rewardToken;
         _costToken = costToken;
         _costRecipient = costRecipient;
     }
 
     constructor() initializer {}
-
-    fallback() external payable {
-      emit LogEthDeposit(_msgSender());
-    }
-
-    receive() external payable {
-      emit LogEthDeposit(_msgSender());
-    }
-
-    function getRoyalty() external onlyOwner {
-        uint256 amount = address(this).balance;
-        (bool success, ) = owner().call{value: amount}("");
-        require(success, "failed to extract");
-    }
 
     function newPool(
         string calldata infoHash,
@@ -88,7 +85,7 @@ contract DeMineNFTAdmin is
             NFTIds[i] = uint256(_nextPool) << 128 + startCycle + i;
             supplies[i] = supplyPerCycle;
         }
-        IDeMineNFT(nft).mint(recipient, NFTIds, supplies);
+        IDeMineNFT(_nft).mint(recipient, NFTIds, supplies);
         _costPerNFT[_nextPool] = costPerToken;
         emit NewPool(_nextPool, infoHash, startCycle, numCycles, supplyPerCycle);
         _nextPool += 1;
@@ -120,30 +117,34 @@ contract DeMineNFTAdmin is
 
     function pause() external onlyOwner whenNotPaused {
         require(
-            lastBillingCycle + billingPeriod <  _nextCycle,
+            _lastBillingCycle + _billingPeriod <  _nextCycle,
             "billing too early"
         );
         _pause();
-        IDeMineNFT(nft).pause();
+        IDeMineNFT(_nft).pause();
         bool success = IERC20(_rewardToken).approve(owner(), 2 ** 256 - 1);
         require(success, "failed to approve");
     }
 
     function unpause(
-        uint128 _lastBillingCycle, // for sanity check
+        uint128 lastBillingCycle, // for sanity check
         uint256 rewardTokenPrice
     ) external onlyOwner whenPaused {
         require(
-            lastBillingCycle == _lastBillingCycle,
+            _lastBillingCycle == lastBillingCycle,
             "wrong billing to unlock"
         );
         bool success = IERC20(_rewardToken).approve(owner(), 0);
         require(success, "failed to revoke approve");
-        lastBillingCycle += billingPeriod;
-        _sellingPrice[lastBillingCycle] = rewardTokenPrice;
-        IDeMineNFT(nft).unpause();
+        _lastBillingCycle += _billingPeriod;
+        _soldPrice[_lastBillingCycle] = rewardTokenPrice;
+        IDeMineNFT(_nft).unpause();
         _unpause();
-        emit LastBillingCycleSet(_lastBillingCycle, lastBillingCycle);
+        emit LastBillingCycleSet(
+            lastBillingCycle,
+            _lastBillingCycle,
+            _billingPeriod
+        );
     }
 
     function redeem(
@@ -151,14 +152,14 @@ contract DeMineNFTAdmin is
         uint256[] calldata NFTIds,
         uint256[] calldata amounts
     ) external override {
-        require(msg.sender == nft, "disallowed caller");
+        require(msg.sender == _nft, "disallowed caller");
         (uint256 reward, uint256 cost) = aggregate(NFTIds, amounts);
         bool success;
         // pay cost, user need to approve to pay first
         if (cost > 0) {
             success = IERC20(_costToken).transferFrom(
                 sender,
-                address(this),
+                _costRecipient,
                 cost
             );
             require(success, "failed to pay cost");
@@ -227,12 +228,12 @@ contract DeMineNFTAdmin is
                 amounts[i] * _rewardPerNFT[cycle],
                 _adjustments[i]
             );
-            if (cycle > lastBillingCycle) { // cost not paid yet
+            if (cycle > _lastBillingCycle) { // cost not paid yet
                 totalReward += reward;
                 totalCost += cost;
             } else { // cost already paid by selling reward token
                 totalReward += (
-                    reward - cost / _sellingPrice[cycle - cycle % billingPeriod]
+                    reward - cost / _soldPrice[cycle - cycle % _billingPeriod]
                 );
             }
         }

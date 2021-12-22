@@ -36,6 +36,7 @@ contract DeMineNFT is
         __Ownable_init();
         __Pausable_init();
         __ERC1155_init(uri);
+        _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
     }
 
@@ -71,7 +72,7 @@ contract DeMineNFT is
         );
     }
 
-    function setTokenRoyaltyBps(
+    function setTokenRoyaltyInfo(
         address recipient,
         uint16 bps
     ) external onlyOwner {
