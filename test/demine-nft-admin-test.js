@@ -11,6 +11,7 @@ describe("DeMineNFTAdmin", function () {
     var tokenFactory;
 
     var admin;
+    var nft;
     var rewardToken;
     var costToken;
 
@@ -49,7 +50,7 @@ describe("DeMineNFTAdmin", function () {
         );
         const { events: events3 } = await tx3.wait();
         const { address: address3 } = events3.find(Boolean);
-        let nft = NFT.attach(address3);
+        nft = NFT.attach(address3);
 
         // setup nft admin
         const Admin = await ethers.getContractFactory("DeMineNFTAdmin");
@@ -73,7 +74,7 @@ describe("DeMineNFTAdmin", function () {
         costToken.connect(owner).mint(user2.address, 100);
     });
 
-    it("should be viewable", async function () {
+    it("should get reward cost token address", async function () {
         let [rewardAddr, costAddr] = await admin.treasureSource();
         expect(rewardAddr).to.be.equal(rewardToken.address);
         expect(costAddr).to.be.equal(costToken.address);
@@ -88,33 +89,111 @@ describe("DeMineNFTAdmin", function () {
         ).to.be.revertedWith(error);
 
         await expect(
-            admin.connect(user1).finalizeCycle(1)
+            admin.connect(user1).reward(1)
         ).to.be.revertedWith(error);
 
         await expect(
             admin.connect(
                 user1
-            ).finalizeCycleWithAdjustment(
+            ).rewardWithAdjustment(
                 1, [1, 2], [100, 100]
             )
         ).to.be.revertedWith(error);
 
         await expect(
-            admin.connect(user1).lock()
+            admin.connect(user1).settlePrep()
         ).to.be.revertedWith(error);
 
         await expect(
-            admin.connect(user1).unlock(1000)
+            admin.connect(user1).settle(1000)
         ).to.be.revertedWith(error);
+    });
+
+    it("full lifecycle", async function () {
+        let mint = async function(
+            pool, cost, startCycle, numCycles, supplyPerCycle, user
+        ) {
+            let tokenIds = [];
+            let supplies = [];
+            for (let i = startCycle; i < startCycle + numCycles; i++) {
+               tokenIds.push(ethers.BigNumber.from(2).pow(128).mul(pool).add(i));
+               supplies.push(supplyPerCycle);
+            }
+            await expect(
+                admin.connect(owner).newPool(
+                    "hash",
+                    cost,
+                    startCycle,
+                    numCycles,
+                    supplyPerCycle,
+                    user.address
+                )
+            ).to.emit(admin, "NewPool").withArgs(
+                pool, "hash", cost
+            ).to.emit(nft, "TransferBatch").withArgs(
+                admin.address,
+                '0x0000000000000000000000000000000000000000',
+                user.address,
+                tokenIds,
+                supplies
+            );
+        };
+
+        let reward = async function(
+            startCycle, endCycle, rewardToSet, pools, adjustments
+        ) {
+            for (let i = startCycle; i < endCycle; i++) {
+                if (i % 10 == 0) {
+                    await expect(
+                        admin.connect(owner).rewardWithAdjustment(
+                            rewardToSet, pools, adjustments
+                        )
+                    ).to.emit(admin, "RewardWithAdjustment").withArgs(
+                        // 1% adjustment for pool 0
+                        i, rewardToSet, pools, adjustments
+                    );
+                } else {
+                    await expect(
+                        admin.connect(owner).reward(rewardToSet)
+                    ).to.emit(admin, "Reward").withArgs(i, rewardToSet);
+                }
+
+                let [reward, cost, adjustment] = await admin.NFTStats(i);
+                expect(reward.eq(rewardToSet)).to.be.true;
+                expect(cost.eq(3000)).to.be.true;
+                expect(adjustment.eq(i % 10 == 0 ? 1000000 : 0)).to.be.true;
+            }
+        };
+
+        let checkStats = async function(
+            pool, startCycle, endCycle, amount, expectedReward, expectedCost
+        ) {
+            let ids = [];
+            let amounts = [];
+            for (let i = startCycle; i < endCycle; i++) {
+               ids.push(ethers.BigNumber.from(2).pow(128).mul(pool).add(i));
+               amounts.push(amount);
+            }
+
+            let [reward, cost] = await admin.aggregate(ids, amounts);
+            expect(reward.eq(expectedReward)).to.be.true;
+            expect(cost.eq(expectedCost)).to.be.true;
+        };
+
+        await mint(0, 3000, 10, 540, 10000, user1);
+        await mint(1, 2000, 40, 180, 100000, user2);
 
         await expect(
-            admin.connect(user1).resetPoolCost(1, 2)
-        ).to.be.revertedWith(error);
+            admin.connect(owner).march(10)
+        ).to.emit(admin, "March").withArgs(0, 10);
 
-        await expect(
-            admin.connect(
-                user1
-            ).batchResetPoolCost([1, 2], [1, 1])
-        ).to.be.revertedWith(error);
+        await reward(10, 20, 200, [0], [1000000]);
+        await reward(20, 30, 190, [0], [1000000]);
+        await reward(30, 40, 180, [0], [1000000]);
+
+        await checkStats(0, 10, 40, 1000, 5694300, 89910000);
+
+        await reward(40, 70, 170, [0, 1], [1000000, 100000]);
+        await reward(70, 100, 180, [0, 1], [1000000, 100000]);
     });
 });

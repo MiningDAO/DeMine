@@ -45,8 +45,8 @@ contract DeMineNFT is
     // @notice start a new pool
     function mint(
         address recipient,
-        uint256[] calldata tokenIds,
-        uint256[] calldata supplies
+        uint256[] memory tokenIds,
+        uint256[] memory supplies
     ) external override onlyOwner {
         _mintBatch(recipient, tokenIds, supplies, "");
     }
