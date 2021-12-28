@@ -68,10 +68,9 @@ describe("DeMineNFTAdmin", function () {
         await nft.connect(owner).transferOwnership(admin.address);
 
         // initialize token
-        rewardToken.connect(owner).mint(user1.address, 100);
-        rewardToken.connect(owner).mint(user2.address, 100);
-        costToken.connect(owner).mint(user1.address, 100);
-        costToken.connect(owner).mint(user2.address, 100);
+        await rewardToken.connect(owner).mint(owner.address, 1000000000);
+        await costToken.connect(owner).mint(user1.address, 10000000);
+        await costToken.connect(owner).mint(user2.address, 10000000);
     });
 
     it("should get reward cost token address", async function () {
@@ -140,26 +139,27 @@ describe("DeMineNFTAdmin", function () {
         };
 
         let reward = async function(
-            startCycle, endCycle, rewardToSet, pools, adjustments
+            startCycle, endCycle, totalReward, rewardPerToken, pools, adjustments
         ) {
+            await rewardToken.connect(owner).transfer(admin.address, totalReward);
             for (let i = startCycle; i < endCycle; i++) {
                 if (i % 10 == 0) {
                     await expect(
                         admin.connect(owner).rewardWithAdjustment(
-                            rewardToSet, pools, adjustments
+                            rewardPerToken, pools, adjustments
                         )
                     ).to.emit(admin, "RewardWithAdjustment").withArgs(
                         // 1% adjustment for pool 0
-                        i, rewardToSet, pools, adjustments
+                        i, rewardPerToken, pools, adjustments
                     );
                 } else {
                     await expect(
-                        admin.connect(owner).reward(rewardToSet)
-                    ).to.emit(admin, "Reward").withArgs(i, rewardToSet);
+                        admin.connect(owner).reward(rewardPerToken)
+                    ).to.emit(admin, "Reward").withArgs(i, rewardPerToken);
                 }
 
                 let [reward, cost, adjustment] = await admin.NFTStats(i);
-                expect(reward.eq(rewardToSet)).to.be.true;
+                expect(reward.eq(rewardPerToken)).to.be.true;
                 expect(cost.eq(3000)).to.be.true;
                 expect(adjustment.eq(i % 10 == 0 ? 1000000 : 0)).to.be.true;
             }
@@ -180,6 +180,36 @@ describe("DeMineNFTAdmin", function () {
             expect(cost.eq(expectedCost)).to.be.true;
         };
 
+        let settle = async function(rewardTokenPrice) {
+            await expect(
+                admin.connect(owner).settle(rewardTokenPrice)
+            ).to.be.revertedWith("Pausable: not paused");
+
+            await expect(
+                admin.connect(owner).settlePrep()
+            ).emit(nft, "Paused").withArgs(admin.address);
+            expect(await nft.paused()).to.be.true;
+            let allowance = await rewardToken.allowance(
+                admin.address, owner.address
+            );
+            expect(
+                allowance.eq(ethers.BigNumber.from(2).pow(256).sub(1))
+            ).to.be.true;
+
+            await expect(
+                admin.connect(owner).settlePrep()
+            ).to.be.revertedWith("Pausable: paused");
+
+            await expect(
+                admin.connect(owner).settle(rewardTokenPrice)
+            ).emit(nft, "Unpaused").withArgs(admin.address);
+            expect(await nft.paused()).to.be.false;
+            allowance = await rewardToken.allowance(
+                admin.address, owner.address
+            );
+            expect(allowance.eq(0)).to.be.true
+        };
+
         await mint(0, 3000, 10, 540, 10000, user1);
         await mint(1, 2000, 40, 180, 100000, user2);
 
@@ -187,13 +217,14 @@ describe("DeMineNFTAdmin", function () {
             admin.connect(owner).march(10)
         ).to.emit(admin, "March").withArgs(0, 10);
 
-        await reward(10, 20, 200, [0], [1000000]);
-        await reward(20, 30, 190, [0], [1000000]);
-        await reward(30, 40, 180, [0], [1000000]);
+        await reward(10, 20, 18981000, 200, [0], [1000000]);
+        await reward(20, 30, 18981000, 190, [0], [1000000]);
+        await reward(30, 40, 18981000, 180, [0], [1000000]);
 
         await checkStats(0, 10, 40, 1000, 5694300, 89910000);
+        await settle(5000000);
 
-        await reward(40, 70, 170, [0, 1], [1000000, 100000]);
-        await reward(70, 100, 180, [0, 1], [1000000, 100000]);
+//        await reward(40, 70, 170, [0, 1], [1000000, 100000]);
+//        await reward(70, 100, 180, [0, 1], [1000000, 100000]);
     });
 });
