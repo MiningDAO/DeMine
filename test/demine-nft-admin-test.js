@@ -67,10 +67,6 @@ describe("DeMineNFTAdmin", function () {
         admin = await Admin.attach(address);
         await nft.connect(owner).transferOwnership(admin.address);
 
-        // initialize token
-        await rewardToken.connect(owner).mint(owner.address, 1000000000);
-        await costToken.connect(owner).mint(user1.address, 10000000);
-        await costToken.connect(owner).mint(user2.address, 10000000);
     });
 
     it("should get reward cost token address", async function () {
@@ -159,7 +155,7 @@ describe("DeMineNFTAdmin", function () {
             );
         };
 
-        let totalReward = function(startCycle, endCycle) {
+        let totalRewardF = function(startCycle, endCycle) {
             let result = 0;
             for (let cycle = startCycle; cycle < endCycle; cycle++) {
                 for (let [pool, supply] of cycles[cycle]) {
@@ -173,7 +169,7 @@ describe("DeMineNFTAdmin", function () {
         let reward = async function(startCycle, endCycle, poolsToAdjust) {
             await rewardToken.connect(owner).transfer(
                 admin.address,
-                totalReward(startCycle, endCycle)
+                totalRewardF(startCycle, endCycle)
             );
             for (let i = startCycle; i < endCycle; i++) {
                 let pools = []
@@ -230,7 +226,6 @@ describe("DeMineNFTAdmin", function () {
                 let adjustment = adjustmentF(cycle, pool);
                 let reward = adjustCeil(rewardF(cycle) * amount, adjustment);
                 let cost = adjust(costs[pool] * amount, adjustment);
-
                 if (cycle < lastBillingRound * billingPeriod) {
                     let costed = Math.ceil(cost / soldPrice[Math.floor(cycle / billingPeriod) + 1]);
                     rewardResult += (reward > costed ? reward - costed : 0);
@@ -286,13 +281,20 @@ describe("DeMineNFTAdmin", function () {
             );
             expect(allowance.eq(0)).to.be.true
 
-            let [billingRound, period, price] = await admin.lastBilling();
+            let [billingRound, period, price] = await admin.billingInfo();
             lastBillingRound += 1;
             billingPeriod = period;
             soldPrice[lastBillingRound] = rewardTokenPrice;
             expect(billingRound.eq(lastBillingRound)).to.be.true;
             expect(price.eq(rewardTokenPrice)).to.be.true;
         };
+
+        // initialize reward cost token
+        await rewardToken.connect(owner).mint(owner.address, 1000000000);
+        await costToken.connect(owner).mint(user1.address, 10000000);
+        await costToken.connect(owner).mint(user2.address, 10000000);
+        await costToken.connect(user1).approve(admin.address, 10000000);
+        await costToken.connect(user2).approve(admin.address, 10000000);
 
         await mint(0, 10, 540, 10000, user1);
         await mint(1, 40, 180, 100000, user2);
@@ -302,17 +304,108 @@ describe("DeMineNFTAdmin", function () {
         ).to.emit(admin, "March").withArgs(0, 10);
 
         await reward(10, 40, [0]);
-
         await checkStats([0], 10, 40, 1000);
+
         await settle(5000000);
         await checkStats([0], 10, 40, 100);
 
-        await reward(40, 70, [0, 1]);
+        // redeem
+        let id = function(cycle, pool) { return base.mul(pool).add(cycle); };
+        await nft.connect(user1).safeBatchTransferFrom(
+            user1.address,
+            user2.address,
+            [id(10, 0), id(11, 0), id(40, 0), id(41, 0)],
+            [1000, 1000, 1000, 1000],
+            []
+        );
+        await nft.connect(user2).safeBatchTransferFrom(
+            user2.address,
+            user1.address,
+            [id(40, 1), id(41, 1)],
+            [1000, 1000],
+            []
+        );
+
+        let checkBalances = async function(users, tokenIds, expectedBalances) {
+            let accounts = [];
+            let ids = [];
+            for (let u of users) {
+                for (let id of tokenIds) {
+                    accounts.push(u.address);
+                    ids.push(id);
+                }
+            }
+            let balances = [];
+            for (let b of await nft.balanceOfBatch(accounts, ids)) {
+                balances.push(b.toNumber());
+            }
+            expect(balances).to.deep.equal(expectedBalances);
+        }
+        checkBalances(
+            [user1, user2],
+            [id(10, 0), id(11, 0), id(40, 0), id(41, 0), id(40, 1), id(41, 1)],
+            [
+                9000, 9000, 9000, 9000, 1000, 1000,
+                1000, 1000, 1000, 1000, 99000, 99000
+            ]
+        );
+
+        await expect(admin.connect(user1).redeem(
+            user1.address,
+            [id(10, 0), id(11, 0), id(40, 1), id(41, 1)],
+            [1000, 1000, 1000, 1000]
+        )).to.be.revertedWith("disallowed caller");
+
+        await expect(nft.connect(user1).redeem(
+            [id(10, 0), id(11, 0), id(40, 1), id(41, 1)],
+            [1000, 1000, 1000, 2000]
+        )).to.be.revertedWith("ERC1155: burn amount exceeds balance");
+
+        await expect(nft.connect(user1).redeem(
+            [id(10, 0), id(11, 0), id(40, 1), id(41, 1)],
+            [1000, 1000, 1000, 1000]
+        )).to.be.revertedWith("unrewarded cycle");
+
+        // reward cycle 40 to 50
+        await reward(40, 50, [0, 1]);
+
+        expect((await rewardToken.balanceOf(user1.address)).eq(0)).to.be.true;
+        expect((await rewardToken.balanceOf(user2.address)).eq(0)).to.be.true;
+        expect((await costToken.balanceOf(owner.address)).eq(0)).to.be.true;
+
+        let NFTIds = [id(10, 0), id(11, 0), id(40, 1), id(41, 1)];
+        let amounts = [1000, 1000, 1000, 1000];
+        let [
+            totalReward, totalCost
+        ] = await admin.aggregate(NFTIds, amounts);
+        await expect(
+            nft.connect(user1).redeem(NFTIds, amounts)
+        ).to.emit(admin, "Redeem").withArgs(
+            user1.address,
+            totalReward,
+            totalCost
+        );
+        await expect(
+            nft.connect(user2).redeem(NFTIds, amounts)
+        ).to.emit(admin, "Redeem").withArgs(
+            user2.address,
+            totalReward,
+            totalCost
+        );
+        checkBalances(
+            [user1, user2],
+            NFTIds,
+            [8000, 8000, 0, 0, 0, 0, 98000, 98000]
+        );
+        expect((await rewardToken.balanceOf(user1.address)).eq(totalReward)).to.be.true;
+        expect((await rewardToken.balanceOf(user2.address)).eq(totalReward)).to.be.true;
+        expect((await costToken.balanceOf(owner.address)).eq(totalCost * 2)).to.be.true;
+
+        // reward more
+        await reward(50, 70, [0, 1]);
         await checkStats([0], 40, 70, 1000);
         await checkStats([1], 40, 70, 1000);
         await checkStats([0, 1], 40, 70, 500);
         await settle(5000000);
-
-        // redeem
     });
 });

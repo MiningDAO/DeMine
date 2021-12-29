@@ -9,13 +9,13 @@ import "./IDeMineNFTAdmin.sol";
 import "./IDeMineNFT.sol";
 
 contract DeMineNFTAdminTest is IDeMineNFTAdmin {
-    event Redeem(address, uint256, uint256, uint256[], uint256[]);
+    event Redeem(address, uint256, uint256);
     function redeem(
         address sender,
-        uint256[] calldata tokenIds,
-        uint256[] calldata amounts
+        uint256[] calldata,
+        uint256[] calldata
     ) external override {
-        emit Redeem(sender, 1, 1, tokenIds, amounts);
+        emit Redeem(sender, 1, 1);
     }
 }
 
@@ -30,7 +30,7 @@ contract DeMineNFTAdmin is
     event PoolCostReset(uint128, uint256);
     event PoolCostResetBatch(uint128[], uint256[]);
     event LastBillingCycleSet(uint128, uint128);
-    event Redeem(address, uint256, uint256, uint256[], uint256[]);
+    event Redeem(address, uint256, uint256);
 
     address private _rewardToken;
     address private _costToken;
@@ -167,14 +167,10 @@ contract DeMineNFTAdmin is
         }
         // redeem reward
         if (totalReward > 0) {
-            success = IERC20(_rewardToken).transferFrom(
-                address(this),
-                sender,
-                totalReward
-            );
+            success = IERC20(_rewardToken).transfer(sender, totalReward);
             require(success, "failed to withdraw reward");
         }
-        emit Redeem(sender, totalReward, totalCost, NFTIds, amounts);
+        emit Redeem(sender, totalReward, totalCost);
     }
 
     // view functions
@@ -194,6 +190,7 @@ contract DeMineNFTAdmin is
         uint256 totalCost;
         for (uint256 i = 0; i < NFTIds.length; i++) {
             uint128 cycle = uint128(NFTIds[i]);
+            require(cycle < _nextCycle, "unrewarded cycle");
             uint256 rewardToken = adjustCeil(
                 amounts[i] * _rewardPerNFT[cycle],
                 _adjustments[NFTIds[i]]
@@ -232,7 +229,7 @@ contract DeMineNFTAdmin is
         );
     }
 
-    function lastBilling() external view returns(uint128, uint128, uint256) {
+    function billingInfo() external view returns(uint128, uint128, uint256) {
         return (
             _lastBillingRound,
             _billingPeriod,

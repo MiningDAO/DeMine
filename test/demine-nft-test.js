@@ -179,7 +179,7 @@ describe("DeMineNFT", function () {
         await expect(
             nft.connect(user1).redeem([1, 2], [50, 100])
         ).to.emit(admin, "Redeem").withArgs(
-            user1.address, 1, 1, [1, 2], [50, 100]
+            user1.address, 1, 1
         );
         expect((await nft.balanceOf(user1.address, 1)).eq(50)).to.be.true;
         expect((await nft.balanceOf(user1.address, 2)).eq(100)).to.be.true;

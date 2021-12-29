@@ -23,7 +23,6 @@ contract DeMineNFT is
     // Events
     event LogEthDeposit(address);
     event TokenRoyaltySet(uint256);
-    event Redeem(address, uint256, uint256);
 
     address private _royaltyRecipient;
     uint16 private _royaltyBps; // EIP2981
