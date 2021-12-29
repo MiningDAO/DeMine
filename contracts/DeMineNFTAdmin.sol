@@ -41,7 +41,7 @@ contract DeMineNFTAdmin is
 
     address private _nft;
     uint128 private _billingPeriod;
-    uint128 private _lastBillingCycle;
+    uint128 private _lastBillingRound;
 
     // billing cycle to reward token sold price in cost token
     mapping(uint128 => uint256) private _soldPrice;
@@ -131,7 +131,7 @@ contract DeMineNFTAdmin is
 
     function settlePrep() external onlyOwner {
         require(
-            _lastBillingCycle + _billingPeriod <  _nextCycle,
+            (_lastBillingRound + 1) * _billingPeriod < _nextCycle,
             "billing too early"
         );
         IDeMineNFT(_nft).pause();
@@ -143,12 +143,9 @@ contract DeMineNFTAdmin is
         IDeMineNFT(_nft).unpause();
         bool success = IERC20(_rewardToken).approve(owner(), 0);
         require(success, "failed to revoke approve");
-        _lastBillingCycle += _billingPeriod;
-        _soldPrice[_lastBillingCycle] = rewardTokenPrice;
-        emit LastBillingCycleSet(
-            _lastBillingCycle,
-            _billingPeriod
-        );
+        _lastBillingRound += 1;
+        _soldPrice[_lastBillingRound] = rewardTokenPrice;
+        emit LastBillingCycleSet(_lastBillingRound, _billingPeriod);
     }
 
     function redeem(
@@ -197,7 +194,7 @@ contract DeMineNFTAdmin is
         uint256 totalCost;
         for (uint256 i = 0; i < NFTIds.length; i++) {
             uint128 cycle = uint128(NFTIds[i]);
-            uint256 rewardToken = adjust(
+            uint256 rewardToken = adjustCeil(
                 amounts[i] * _rewardPerNFT[cycle],
                 _adjustments[NFTIds[i]]
             );
@@ -205,13 +202,19 @@ contract DeMineNFTAdmin is
                 amounts[i] * _costPerNFT[uint128(NFTIds[i] >> 128)],
                 _adjustments[NFTIds[i]]
             );
-            if (cycle > _lastBillingCycle) { // cost not paid yet
+            // cost already paid by sold reward token
+            if (cycle < _lastBillingRound * _billingPeriod) {
+                uint256 costed = ceil(
+                    costToken,
+                    _soldPrice[cycle / _billingPeriod + 1]
+                );
+                totalReward += (
+                    rewardToken > costed ? rewardToken - costed : 0
+                );
+            // cost not paid yet
+            } else {
                 totalReward += rewardToken;
                 totalCost += costToken;
-            } else { // cost already paid by sold reward token
-                totalReward += (
-                    rewardToken - costToken / _soldPrice[cycle - cycle % _billingPeriod]
-                );
             }
         }
         return (totalReward, totalCost);
@@ -229,12 +232,32 @@ contract DeMineNFTAdmin is
         );
     }
 
+    function lastBilling() external view returns(uint128, uint128, uint256) {
+        return (
+            _lastBillingRound,
+            _billingPeriod,
+            _soldPrice[_lastBillingRound]
+        );
+    }
+
     // pure functions
     function adjust(
         uint256 value,
         uint256 adjustment
     ) internal pure returns (uint256) {
         return value - value * adjustment / 100000000;
+    }
+
+    function adjustCeil(
+        uint256 value,
+        uint256 adjustment
+    ) internal pure returns (uint256) {
+        uint256 adjusted = ceil(value * adjustment, 100000000);
+        return value > adjusted ? value - adjusted : 0;
+    }
+
+    function ceil(uint256 a, uint256 m) internal pure returns (uint256) {
+        return (a + m - 1) / m;
     }
 
     function supportsInterface(
