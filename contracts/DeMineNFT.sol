@@ -1,31 +1,32 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "./IDeMineNFTAdmin.sol";
-import "./IDeMineNFT.sol";
 
-/// @title DeMineNFT
 /// @author Shu Dong
-/// This smart contract enables DeMine DAO to issue new NFTs and manage value of them.
 contract DeMineNFT is
     ERC1155Upgradeable,
     OwnableUpgradeable,
-    PausableUpgradeable,
-    IERC2981Upgradeable,
-    IDeMineNFT
+    IERC2981Upgradeable
 {
     // Events
     event LogEthDeposit(address);
     event TokenRoyaltySet(uint256);
+    event Reward(uint256, uint256);
+    event Redeem(address, uint256);
 
     address private _royaltyRecipient;
     uint16 private _royaltyBps; // EIP2981
+
+    address private _rewardToken;
+    address private _nft;
+    uint256 private _nextCycle;
+    mapping(uint256 => uint256) private _reward;
 
     function initialize(
         string memory uri,
@@ -33,7 +34,6 @@ contract DeMineNFT is
         uint16 royaltyBps
     ) public initializer {
         __Ownable_init();
-        __Pausable_init();
         __ERC1155_init(uri);
         _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
@@ -41,34 +41,45 @@ contract DeMineNFT is
 
     constructor() initializer {}
 
-    // @notice start a new pool
     function mint(
-        address recipient,
-        uint256[] memory tokenIds,
-        uint256[] memory supplies
-    ) external override onlyOwner {
-        _mintBatch(recipient, tokenIds, supplies, "");
+        uint256 startCycle,
+        uint256 numCycles,
+        uint256 supplyPerCycle,
+        address recipient
+    ) external onlyOwner {
+        require(startCycle > _nextCycle, "cannot start from past");
+        uint256[] memory cycles = new uint256[](numCycles);
+        uint256[] memory supplies = new uint256[](numCycles);
+        for (uint256 i = 0; i < numCycles; i++) {
+            cycles[i] = i + startCycle;
+            supplies[i] = supplyPerCycle;
+        }
+        _mintBatch(recipient, cycles, supplies, "");
     }
 
-    function pause() external override onlyOwner whenNotPaused {
-        _pause();
+    function reward(uint256 expectedRewardPerToken) external onlyOwner {
+        _reward[_nextCycle] = expectedRewardPerToken;
+        emit Reward(_nextCycle, expectedRewardPerToken);
+        _nextCycle += 1;
     }
 
-    function unpause() external override onlyOwner whenPaused {
-        _unpause();
-    }
-
-    // @notice redeem and burn the NFT tokens
     function redeem(
-        uint256[] calldata tokenIds,
+        uint256[] calldata cycles,
         uint256[] calldata amounts
-    ) external whenNotPaused {
-        _burnBatch(_msgSender(), tokenIds, amounts);
-        IDeMineNFTAdmin(payable(owner())).redeem(
-            _msgSender(),
-            tokenIds,
-            amounts
-        );
+    ) external {
+        _burnBatch(_msgSender(), cycles, amounts);
+        uint256 totalReward;
+        for (uint256 i = 0; i < cycles.length; i++) {
+            require(cycles[i] < _nextCycle, "unrewarded cycle");
+            totalReward += amounts[i] * _reward[cycles[i]];
+        }
+        if (totalReward > 0) {
+            bool success = IERC20(_rewardToken).transfer(
+                _msgSender(), totalReward
+            );
+            require(success, "failed to withdraw reward");
+        }
+        emit Redeem(_msgSender(), totalReward);
     }
 
     function setTokenRoyaltyInfo(
@@ -78,6 +89,11 @@ contract DeMineNFT is
         _royaltyRecipient = recipient;
         _royaltyBps = bps;
         emit TokenRoyaltySet(bps);
+    }
+
+    // view functions
+    function treasureSource() external view returns (address) {
+        return _rewardToken;
     }
 
     function royaltyInfo(uint256, uint256 value)
@@ -97,7 +113,6 @@ contract DeMineNFT is
         returns (bool)
     {
         return
-            interfaceId == type(IDeMineNFT).interfaceId ||
             interfaceId == type(IERC2981Upgradeable).interfaceId ||
             super.supportsInterface(interfaceId);
     }
