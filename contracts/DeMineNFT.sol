@@ -17,12 +17,12 @@ contract DeMineNFT is
 {
     // Events
     event TokenRoyaltySet(uint256);
-    event NewPool(uint128 indexed, address, string, uint256);
+    event NewPool(uint128 indexed, address indexed, uint256, string);
     event Reward(uint128 indexed, uint256);
     event RewardWithOverrides(uint128 indexed, uint256, uint128[], uint256[]);
-    event Cashout(address, uint256);
+    event Cashout(address indexed, address indexed, address indexed, uint256);
 
-    address public agent;
+    address private _agent;
     address private _rewardToken;
     uint128 private _nextCycle;
     uint128 private _nextPool;
@@ -37,13 +37,13 @@ contract DeMineNFT is
         string memory uri,
         address royaltyRecipient,
         uint16 royaltyBps,
-        address _agent
+        address agent
     ) public initializer {
         __Ownable_init();
         __ERC1155_init(uri);
         _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
-        agent = _agent;
+        _agent = agent;
     }
 
     constructor() initializer {}
@@ -63,9 +63,9 @@ contract DeMineNFT is
             ids[i] = (uint256(_nextPool) << 128) + i + startCycle;
             supplies[i] = supplyPerCycle;
         }
-        DeMineAgent(agent).setPool(_nextPool, issuer, costPerToken);
-        _mintBatch(agent, ids, supplies, "");
-        emit NewPool(_nextPool, issuer, info, costPerToken);
+        DeMineAgent(_agent).setPool(_nextPool, issuer, costPerToken);
+        _mintBatch(_agent, ids, supplies, "");
+        emit NewPool(_nextPool, issuer, costPerToken, info);
         _nextPool += 1;
     }
 
@@ -111,25 +111,28 @@ contract DeMineNFT is
     }
 
     function cashout(
+        address from,
+        address to,
         uint256[] calldata ids,
         uint256[] calldata amounts
-    ) external {
-        _burnBatch(_msgSender(), ids, amounts);
+    ) external returns(uint256) {
+        _burnBatch(from, ids, amounts);
         uint256 totalReward;
         for (uint256 i = 0; i < ids.length; i++) {
-            uint128 cycle = uint128(ids[i]);
+            uint256 id = ids[i];
+            uint128 cycle = uint128(id);
             require(cycle < _nextCycle, "unrewarded cycle");
             totalReward += amounts[i] * (
-                _overrides[ids[i]] > 0 ? _overrides[ids[i]] : _reward[cycle]
+                _overrides[id] > 0 ? _overrides[id] : _reward[cycle]
             );
         }
         if (totalReward > 0) {
             bool success = IERC20(_rewardToken).transfer(
-                _msgSender(), totalReward
+                to, totalReward
             );
             require(success, "failed to withdraw reward");
         }
-        emit Cashout(_msgSender(), totalReward);
+        return totalReward;
     }
 
     // view functions

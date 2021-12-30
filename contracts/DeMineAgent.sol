@@ -11,14 +11,14 @@ contract DeMineAgent is
     OwnableUpgradeable,
     IERC1155Receiver
 {
-    event PoolSet(uint128, address, uint256);
+    event PoolTransfer(uint128, address, address);
     event SellingSet(address, address, uint256[], uint256[], uint256[]);
     event SellingUnset(address, address, uint256[]);
     event Claim(address, uint256, uint256, uint256[], uint256[]);
     event Redeem(address, uint256, uint256[], uint256[]);
     event Withdraw(address, uint256);
 
-    address public nft;
+    address private _nft;
     address private _costToken;
     address private _costRecipient;
 
@@ -27,84 +27,100 @@ contract DeMineAgent is
         uint256 costPerToken;
     }
     mapping(uint128 => Pool) private _pools;
-    mapping(uint256 => uint256) private _balances;
+    mapping(uint256 => uint256) private _inventory;
     struct SaleInfo {
         uint256 amount;
         uint256 price;
     }
-    mapping(address => mapping(uint256 => SaleInfo)) private _selling;
+    struct Selling {
+        bool cashedout;
+        uint256 total;
+        mapping(address => SaleInfo) saleInfo;
+    }
+    mapping(uint256 => Selling) private _selling;
     mapping(address => uint256) private _income;
+
+    modifier onlyNFT {
+        require(
+            _nft == _msgSender(),
+            "DeMineAgent: only nft contract allowed"
+        );
+        _;
+    }
 
     function initialize(
         address costToken,
         address costRecipient,
-        address _nft
+        address nft
     ) public initializer {
         __Ownable_init();
         _costToken = costToken;
         _costRecipient = costRecipient;
-        nft = _nft;
+        _nft = nft;
     }
 
     constructor() initializer {}
 
-    function setPool(
-        uint128 pool,
-        address issuer,
-        uint256 costPerToken
-    ) external {
-        require(_msgSender() == nft, "only nft contract allowed");
-        _pools[pool].issuer = issuer;
-        _pools[pool].costPerToken = costPerToken;
-        emit PoolSet(pool, issuer, costPerToken);
-    }
-
     function setSelling(
-        address recipient,
+        address to,
         uint256[] calldata ids,
         uint256[] calldata amounts,
         uint256[] calldata prices
     ) external {
         require(
             ids.length == amounts.length && amounts.length == prices.length,
-            "array length mismatch"
+            "DeMineAgent: array length mismatch"
         );
         address sender = _msgSender();
-        require(sender != recipient, "cannot set issuer as recipient");
+        require(sender != to, "cannot set issuer as recipient");
         for (uint256 i = 0; i < ids.length; i++) {
-            uint128 pool = uint128(ids[i] >> 128);
-            require(sender == _pools[pool].issuer, "only token issuer allowed");
+            uint256 id = ids[i];
+            require(
+                !_selling[id].cashedout,
+                "DeMineAgent: already cashed out"
+            );
+            uint128 pool = uint128(id >> 128);
+            require(
+                sender == _pools[pool].issuer,
+                "DeMineAgent: only token issuer allowed"
+            );
             require(
                 prices[i] >= _pools[pool].costPerToken,
-                "price too low to cover cost"
+                "DeMineAgent: price too low to cover cost"
             );
-            uint256 balance = _balances[ids[i]];
-            uint256 selling = _selling[recipient][ids[i]].amount;
+            uint256 selling = _selling[id].saleInfo[to].amount;
             require(
-                balance + selling >= amounts[i],
+                _inventory[id] + selling >= amounts[i],
                 "DeMineAgent: insufficient balance to sale"
             );
-            _balances[ids[i]] = balance + selling - amounts[i];
-            _selling[recipient][ids[i]].amount = amounts[i];
-            _selling[recipient][ids[i]].price = prices[i];
+            _inventory[id] = _inventory[id] + selling - amounts[i];
+            _selling[id].total = _selling[id].total - selling + amounts[i];
+            _selling[id].saleInfo[to].amount = amounts[i];
+            _selling[id].saleInfo[to].price = prices[i];
         }
-        emit SellingSet(sender, recipient, ids, amounts, prices);
+        emit SellingSet(sender, to, ids, amounts, prices);
     }
 
     function unsetSelling(
-        address recipient,
+        address to,
         uint256[] calldata ids
     ) external {
         for (uint256 i = 0; i < ids.length; i++) {
-            uint128 pool = uint128(ids[i] >> 128);
+            uint256 id = ids[i];
             require(
-                _msgSender() == _pools[pool].issuer,
-                "only token issuer allowed"
+                !_selling[id].cashedout,
+                "DeMineAgent: already cashed out"
             );
-            _balances[ids[i]] += _selling[recipient][ids[i]].amount;
-            _selling[recipient][ids[i]].amount = 0;
+            require(
+                _msgSender() == _pools[uint128(id >> 128)].issuer,
+                "DeMineAgent: only token issuer allowed"
+            );
+            uint256 amount = _selling[id].saleInfo[to].amount;
+            _inventory[id] += amount;
+            _selling[id].total -= amount;
+            _selling[id].saleInfo[to].amount = 0;
         }
-        emit SellingUnset(_msgSender(), recipient, ids);
+        emit SellingUnset(_msgSender(), to, ids);
     }
 
     function claim(
@@ -128,7 +144,7 @@ contract DeMineAgent is
         }
         pay(sender, _costRecipient, totalCost);
         pay(sender, address(this), totalPrice - totalCost);
-        DeMineNFT(nft).safeBatchTransferFrom(
+        DeMineNFT(_nft).safeBatchTransferFrom(
             address(this), sender, ids, amounts, ""
         );
         emit Claim(sender, totalCost, totalPrice, ids, amounts);
@@ -139,20 +155,26 @@ contract DeMineAgent is
         uint256 id,
         uint256 amount
     ) private returns(uint256) {
-        uint256 allowance1 = _selling[buyer][id].amount;
-        uint256 allowance2 = _selling[address(0)][id].amount;
+        require(
+            !_selling[id].cashedout,
+            "DeMineAgent: already cashed out"
+        );
+        uint256 allowance1 = _selling[id].saleInfo[buyer].amount;
+        uint256 allowance2 = _selling[id].saleInfo[address(0)].amount;
         require(
             allowance1 + allowance2 >= amount,
-            "DeMineAgent: insufficient locked to claim"
+            "DeMineAgent: insufficient allowance to claim"
         );
         if (allowance1 >= amount) {
-            _selling[buyer][id].amount = allowance1 - amount;
-            return amount * _selling[buyer][id].price;
+            _selling[id].saleInfo[buyer].amount = allowance1 - amount;
+            _selling[id].total -= amount;
+            return amount * _selling[id].saleInfo[buyer].price;
         } else {
-            _selling[buyer][id].amount = 0;
-            _selling[address(0)][id].amount = allowance1 + allowance2 - amount;
-            return _selling[buyer][id].price * allowance1 +
-                _selling[address(0)][id].price * (amount - allowance1);
+            _selling[id].saleInfo[buyer].amount = 0;
+            _selling[id].saleInfo[address(0)].amount = allowance1 + allowance2 - amount;
+            _selling[id].total -= amount;
+            return _selling[id].saleInfo[buyer].price * allowance1 +
+                _selling[id].saleInfo[address(0)].price * (amount - allowance1);
         }
     }
 
@@ -162,25 +184,25 @@ contract DeMineAgent is
     ) external {
         require(
             ids.length == amounts.length,
-            "array length mismatch"
+            "DeMineAgent: array length mismatch"
         );
         uint256 totalCost;
         for (uint256 i = 0; i < ids.length; i++) {
-            uint128 pool = uint128(ids[i] >> 128);
+            uint256 id = ids[i];
+            uint128 pool = uint128(id >> 128);
             require(
                 _msgSender() == _pools[pool].issuer,
-                "only token issuer allowed"
+                "DeMineAgent: only token issuer allowed"
             );
-            uint256 fromBalance = _balances[ids[i]];
             require(
-                fromBalance >= amounts[i],
+                _inventory[id] >= amounts[i],
                 "DeMineAdmin: insufficient balance to liquidize"
             );
-            _balances[ids[i]] = fromBalance - amounts[i];
+            _inventory[id] = _inventory[id] - amounts[i];
             totalCost += _pools[pool].costPerToken * amounts[i];
         }
         pay(_msgSender(), _costRecipient, totalCost);
-        DeMineNFT(nft).safeBatchTransferFrom(
+        DeMineNFT(_nft).safeBatchTransferFrom(
             address(this), _msgSender(), ids, amounts, ""
         );
         emit Redeem(
@@ -191,18 +213,39 @@ contract DeMineAgent is
         );
     }
 
+    function transferPool(
+        uint128 pool,
+        address newIssuer
+    ) external {
+        require (
+            _msgSender() == _pools[pool].issuer,
+            "DeMineAgent: only issuer is allowed"
+        );
+        _pools[pool].issuer = newIssuer;
+        emit PoolTransfer(pool, _msgSender(), newIssuer);
+    }
+
+    function setPool(
+        uint128 pool,
+        address issuer,
+        uint256 costPerToken
+    ) external onlyNFT {
+        _pools[pool].issuer = issuer;
+        _pools[pool].costPerToken = costPerToken;
+    }
+
     function onERC1155Received(
-        address operator,
+        address,
         address from,
         uint256 id,
         uint256 amount,
         bytes calldata
-    ) external override returns (bytes4) {
+    ) external onlyNFT override returns (bytes4) {
         require(
-            operator == nft && from == address(0),
+            from == address(0),
             "only newly minted token allowed"
         );
-        _balances[id] += amount;
+        _inventory[id] += amount;
         return bytes4(
             keccak256(
                 "onERC1155Received(address,address,uint256,uint256,bytes)"
@@ -211,24 +254,36 @@ contract DeMineAgent is
     }
 
     function onERC1155BatchReceived(
-        address operator,
+        address,
         address from,
         uint256[] calldata ids,
         uint256[] calldata amounts,
         bytes calldata
-    ) external override returns (bytes4) {
+    ) external onlyNFT override returns (bytes4) {
         require(
-            operator == nft && from == address(0),
+            from == address(0),
             "only newly minted token allowed"
         );
         for (uint256 i = 0; i < ids.length; i++) {
-            _balances[ids[i]] += amounts[i];
+            _inventory[ids[i]] += amounts[i];
         }
         return bytes4(
             keccak256(
                 "onERC1155BatchReceived(address,address,uint256[],uint256[],bytes)"
             )
         );
+    }
+
+    function cashout(uint256[] calldata ids) external onlyOwner {
+        uint256[] memory amounts = new uint256[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            uint256 id = ids[i];
+            _selling[id].cashedout = true;
+            amounts[i] = _inventory[id] + _selling[id].total;
+            _selling[id].total = 0;
+            _inventory[id] = 0;
+        }
+        DeMineNFT(_nft).cashout(address(this), owner(), ids, amounts);
     }
 
     function withdraw(uint256 amount) external {
@@ -244,10 +299,6 @@ contract DeMineAgent is
 
     function income() external view returns(uint256) {
         return _income[_msgSender()];
-    }
-
-    function getNft() external view returns(address) {
-        return nft;
     }
 
     function supportsInterface(bytes4 interfaceId)
