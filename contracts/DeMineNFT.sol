@@ -22,14 +22,14 @@ contract DeMineNFT is
     event RewardWithOverrides(uint128 indexed, uint256, uint128[], uint256[]);
     event Cashout(address, uint256);
 
+    address public agent;
+    address private _rewardToken;
+    uint128 private _nextCycle;
+    uint128 private _nextPool;
+
     address private _royaltyRecipient;
     uint16 private _royaltyBps; // EIP2981
 
-    address private _rewardToken;
-    address private _agent;
-
-    uint128 private _nextCycle;
-    uint128 private _nextPool;
     mapping(uint128 => uint256) private _reward;
     mapping(uint256 => uint256) private _overrides;
 
@@ -37,13 +37,13 @@ contract DeMineNFT is
         string memory uri,
         address royaltyRecipient,
         uint16 royaltyBps,
-        address agent
+        address _agent
     ) public initializer {
         __Ownable_init();
         __ERC1155_init(uri);
         _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
-        _agent = agent;
+        agent = _agent;
     }
 
     constructor() initializer {}
@@ -63,8 +63,8 @@ contract DeMineNFT is
             ids[i] = (uint256(_nextPool) << 128) + i + startCycle;
             supplies[i] = supplyPerCycle;
         }
-        DeMineAgent(_agent).setPool(_nextPool, issuer, costPerToken);
-        _mintBatch(_agent, ids, supplies, "");
+        DeMineAgent(agent).setPool(_nextPool, issuer, costPerToken);
+        _mintBatch(agent, ids, supplies, "");
         emit NewPool(_nextPool, issuer, info, costPerToken);
         _nextPool += 1;
     }
@@ -144,10 +144,6 @@ contract DeMineNFT is
         returns (address, uint256)
     {
         return (_royaltyRecipient, (value * _royaltyBps) / 10000);
-    }
-
-    function getAgent() external view returns(address) {
-        return _agent;
     }
 
     function supportsInterface(bytes4 interfaceId)

@@ -18,7 +18,7 @@ contract DeMineAgent is
     event Redeem(address, uint256, uint256[], uint256[]);
     event Withdraw(address, uint256);
 
-    address private _nft;
+    address public nft;
     address private _costToken;
     address private _costRecipient;
 
@@ -38,12 +38,12 @@ contract DeMineAgent is
     function initialize(
         address costToken,
         address costRecipient,
-        address nft
+        address _nft
     ) public initializer {
         __Ownable_init();
-        _nft = nft;
         _costToken = costToken;
         _costRecipient = costRecipient;
+        nft = _nft;
     }
 
     constructor() initializer {}
@@ -53,7 +53,7 @@ contract DeMineAgent is
         address issuer,
         uint256 costPerToken
     ) external {
-        require(_msgSender() == _nft, "only nft contract allowed");
+        require(_msgSender() == nft, "only nft contract allowed");
         _pools[pool].issuer = issuer;
         _pools[pool].costPerToken = costPerToken;
         emit PoolSet(pool, issuer, costPerToken);
@@ -128,7 +128,7 @@ contract DeMineAgent is
         }
         pay(sender, _costRecipient, totalCost);
         pay(sender, address(this), totalPrice - totalCost);
-        DeMineNFT(_nft).safeBatchTransferFrom(
+        DeMineNFT(nft).safeBatchTransferFrom(
             address(this), sender, ids, amounts, ""
         );
         emit Claim(sender, totalCost, totalPrice, ids, amounts);
@@ -180,7 +180,7 @@ contract DeMineAgent is
             totalCost += _pools[pool].costPerToken * amounts[i];
         }
         pay(_msgSender(), _costRecipient, totalCost);
-        DeMineNFT(_nft).safeBatchTransferFrom(
+        DeMineNFT(nft).safeBatchTransferFrom(
             address(this), _msgSender(), ids, amounts, ""
         );
         emit Redeem(
@@ -199,7 +199,7 @@ contract DeMineAgent is
         bytes calldata
     ) external override returns (bytes4) {
         require(
-            operator == _nft && from == address(0),
+            operator == nft && from == address(0),
             "only newly minted token allowed"
         );
         _balances[id] += amount;
@@ -218,7 +218,7 @@ contract DeMineAgent is
         bytes calldata
     ) external override returns (bytes4) {
         require(
-            operator == _nft && from == address(0),
+            operator == nft && from == address(0),
             "only newly minted token allowed"
         );
         for (uint256 i = 0; i < ids.length; i++) {
@@ -247,7 +247,7 @@ contract DeMineAgent is
     }
 
     function getNft() external view returns(address) {
-        return _nft;
+        return nft;
     }
 
     function supportsInterface(bytes4 interfaceId)
