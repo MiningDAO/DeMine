@@ -43,10 +43,9 @@ contract DeMineNFT is
 {
     // Events
     event TokenRoyaltySet(uint256);
-    event NewPool(uint128 indexed, string);
-    event Reward(uint128 indexed, uint256);
-    event RewardWithOverrides(uint128, uint256, uint128[], uint256[]);
-    event Redeem(address, uint256);
+    event NewPool(uint128 indexed, address, string, uint256);
+    event Reward(uint128 indexed, uint256, uint128[], uint256[]);
+    event Cashout(address, uint256);
 
     address private _royaltyRecipient;
     uint16 private _royaltyBps; // EIP2981
@@ -89,19 +88,13 @@ contract DeMineNFT is
             ids[i] = (uint256(_nextPool) << 128) + i + startCycle;
             supplies[i] = supplyPerCycle;
         }
-        DeMineAgent(_agent).newPool(_nextPool, issuer, costPerToken);
+        DeMineAgent(_agent).setPool(_nextPool, issuer, costPerToken);
         _mintBatch(_agent, ids, supplies, "");
-        emit NewPool(_nextPool, info);
+        emit NewPool(_nextPool, issuer, info, costPerToken);
         _nextPool += 1;
     }
 
-    function reward(uint256 expectedRewardPerToken) external onlyOwner {
-        _reward[_nextCycle] = expectedRewardPerToken;
-        emit Reward(_nextCycle, expectedRewardPerToken);
-        _nextCycle += 1;
-    }
-
-    function rewardWithOverrides(
+    function reward(
         uint128 expectedRewardPerToken,
         uint128[] calldata pools,
         uint256[] calldata overrides
@@ -116,7 +109,7 @@ contract DeMineNFT is
             ] = overrides[i];
         }
         _reward[_nextCycle] = expectedRewardPerToken;
-        emit RewardWithOverrides(
+        emit Reward(
             _nextCycle,
             expectedRewardPerToken,
             pools,
@@ -134,7 +127,7 @@ contract DeMineNFT is
         emit TokenRoyaltySet(bps);
     }
 
-    function redeem(
+    function cashout(
         uint256[] calldata ids,
         uint256[] calldata amounts
     ) external {
@@ -153,7 +146,7 @@ contract DeMineNFT is
             );
             require(success, "failed to withdraw reward");
         }
-        emit Redeem(_msgSender(), totalReward);
+        emit Cashout(_msgSender(), totalReward);
     }
 
     // view functions

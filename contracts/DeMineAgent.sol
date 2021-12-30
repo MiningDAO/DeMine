@@ -22,7 +22,6 @@ contract DeMineAgentCloneFactory {
     ) external returns(address) {
         address cloned = Clones.clone(implementation);
         DeMineAgent(cloned).initialize(
-            nft,
             costToken,
             costRecipient
         );
@@ -36,12 +35,12 @@ contract DeMineAgent is
     OwnableUpgradeable,
     IERC1155Receiver
 {
-    event NewPool(uint128, address, uint256);
-    event Withdraw(address, uint256);
-    event SetSaleInfo(address, address, uint256[], uint256[], uint256[]);
-    event UnsetSaleInfo(address, address, uint256[]);
+    event PoolSet(uint128, address, uint256);
+    event SellingSet(address, address, uint256[], uint256[], uint256[]);
+    event SellingUnset(address, address, uint256[]);
     event Claim(address, uint256, uint256, uint256[], uint256[]);
-    event Liquidize(address, uint256, uint256[], uint256[]);
+    event Redeem(address, uint256, uint256[], uint256[]);
+    event Withdraw(address, uint256);
 
     address private _nft;
     address private _costToken;
@@ -61,17 +60,19 @@ contract DeMineAgent is
     mapping(address => uint256) private _income;
 
     function initialize(
-        address nft,
         address costToken,
         address costRecipient
     ) public initializer {
         __Ownable_init();
-        _nft = nft;
         _costToken = costToken;
         _costRecipient = costRecipient;
     }
 
-    function newPool(
+    function setNFT(address nft) external onlyOwner {
+        _nft = nft;
+    }
+
+    function setPool(
         uint128 pool,
         address issuer,
         uint256 costPerToken
@@ -79,10 +80,10 @@ contract DeMineAgent is
         require(_msgSender() == _nft, "only nft contracts allowed");
         _pools[pool].issuer = issuer;
         _pools[pool].costPerToken = costPerToken;
-        emit NewPool(pool, issuer, costPerToken);
+        emit PoolSet(pool, issuer, costPerToken);
     }
 
-    function setSaleInfo(
+    function setSelling(
         address recipient,
         uint256[] calldata ids,
         uint256[] calldata amounts,
@@ -111,10 +112,10 @@ contract DeMineAgent is
             _selling[recipient][ids[i]].amount = amounts[i];
             _selling[recipient][ids[i]].price = prices[i];
         }
-        emit SetSaleInfo(sender, recipient, ids, amounts, prices);
+        emit SellingSet(sender, recipient, ids, amounts, prices);
     }
 
-    function unsetSaleInfo(
+    function unsetSelling(
         address recipient,
         uint256[] calldata ids
     ) external {
@@ -127,7 +128,7 @@ contract DeMineAgent is
             _balances[ids[i]] += _selling[recipient][ids[i]].amount;
             _selling[recipient][ids[i]].amount = 0;
         }
-        emit UnsetSaleInfo(_msgSender(), recipient, ids);
+        emit SellingUnset(_msgSender(), recipient, ids);
     }
 
     function claim(
@@ -179,7 +180,7 @@ contract DeMineAgent is
         }
     }
 
-    function liquidize(
+    function redeem(
         uint256[] calldata ids,
         uint256[] calldata amounts
     ) external {
@@ -206,7 +207,7 @@ contract DeMineAgent is
         DeMineNFT(_nft).safeBatchTransferFrom(
             address(this), _msgSender(), ids, amounts, ""
         );
-        emit Liquidize(
+        emit Redeem(
             _msgSender(),
             totalCost,
             ids,
