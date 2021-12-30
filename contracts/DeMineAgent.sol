@@ -41,6 +41,7 @@ contract DeMineAgent is
     event Claim(address, uint256, uint256, uint256[], uint256[]);
     event Redeem(address, uint256, uint256[], uint256[]);
     event Withdraw(address, uint256);
+    event NFTSet(address);
 
     address private _nft;
     address private _costToken;
@@ -60,16 +61,27 @@ contract DeMineAgent is
     mapping(address => uint256) private _income;
 
     function initialize(
+        address nft,
         address costToken,
         address costRecipient
     ) public initializer {
         __Ownable_init();
+        _nft = nft;
         _costToken = costToken;
         _costRecipient = costRecipient;
     }
 
-    function setNFT(address nft) external onlyOwner {
+    function setNFT() external onlyOwner {
+        require(
+            _nft == address(0),
+            "nft address already set"
+        );
+        require(
+            DeMineNFT(nft).agent() == address(this),
+            "unpaired nft"
+        );
         _nft = nft;
+        emit NFTSet(agent);
     }
 
     function setPool(
@@ -77,7 +89,7 @@ contract DeMineAgent is
         address issuer,
         uint256 costPerToken
     ) external {
-        require(_msgSender() == _nft, "only nft contracts allowed");
+        require(_msgSender() == _nft, "only nft contract allowed");
         _pools[pool].issuer = issuer;
         _pools[pool].costPerToken = costPerToken;
         emit PoolSet(pool, issuer, costPerToken);
@@ -270,6 +282,19 @@ contract DeMineAgent is
         return _income[_msgSender()];
     }
 
+    function nft() external view returns(address) {
+        return _nft;
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        pure
+        override
+        returns (bool)
+    {
+        return interfaceId == type(IERC1155Receiver).interfaceId;
+    }
+
     function pay(
         address payer,
         address payee,
@@ -281,14 +306,5 @@ contract DeMineAgent is
             );
             require(success, "failed to pay cost");
         }
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        pure
-        override
-        returns (bool)
-    {
-        return interfaceId == type(IERC1155Receiver).interfaceId;
     }
 }

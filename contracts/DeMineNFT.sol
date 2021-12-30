@@ -44,7 +44,8 @@ contract DeMineNFT is
     // Events
     event TokenRoyaltySet(uint256);
     event NewPool(uint128 indexed, address, string, uint256);
-    event Reward(uint128 indexed, uint256, uint128[], uint256[]);
+    event Reward(uint128 indexed, uint256);
+    event RewardWithOverrides(uint128 indexed, uint256, uint128[], uint256[]);
     event Cashout(address, uint256);
 
     address private _royaltyRecipient;
@@ -94,7 +95,15 @@ contract DeMineNFT is
         _nextPool += 1;
     }
 
-    function reward(
+    function reward(uint128 expectedRewardPerToken) external onlyOwner {
+        _reward[_nextCycle] = expectedRewardPerToken;
+        emit Reward(
+            _nextCycle,
+            expectedRewardPerToken
+        );
+    }
+
+    function rewardWithOverrides(
         uint128 expectedRewardPerToken,
         uint128[] calldata pools,
         uint256[] calldata overrides
@@ -109,7 +118,7 @@ contract DeMineNFT is
             ] = overrides[i];
         }
         _reward[_nextCycle] = expectedRewardPerToken;
-        emit Reward(
+        emit RewardWithOverrides(
             _nextCycle,
             expectedRewardPerToken,
             pools,
@@ -161,6 +170,10 @@ contract DeMineNFT is
         returns (address, uint256)
     {
         return (_royaltyRecipient, (value * _royaltyBps) / 10000);
+    }
+
+    function agent() external view returns(address) {
+        return _agent;
     }
 
     function supportsInterface(bytes4 interfaceId)
