@@ -2,33 +2,9 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./DeMineNFT.sol";
-
-contract DeMineAgentCloneFactory {
-    address immutable implementation;
-
-    constructor() {
-        implementation = address(new DeMineAgent());
-    }
-
-    function create(
-        address nft,
-        address costToken,
-        address costRecipient,
-        address owner
-    ) external returns(address) {
-        address cloned = Clones.clone(implementation);
-        DeMineAgent(cloned).initialize(
-            costToken,
-            costRecipient
-        );
-        DeMineAgent(cloned).transferOwnership(owner);
-        return cloned;
-    }
-}
 
 /// @author Shu Dong
 contract DeMineAgent is
@@ -41,7 +17,6 @@ contract DeMineAgent is
     event Claim(address, uint256, uint256, uint256[], uint256[]);
     event Redeem(address, uint256, uint256[], uint256[]);
     event Withdraw(address, uint256);
-    event NFTSet(address);
 
     address private _nft;
     address private _costToken;
@@ -61,9 +36,9 @@ contract DeMineAgent is
     mapping(address => uint256) private _income;
 
     function initialize(
-        address nft,
         address costToken,
-        address costRecipient
+        address costRecipient,
+        address nft
     ) public initializer {
         __Ownable_init();
         _nft = nft;
@@ -71,18 +46,7 @@ contract DeMineAgent is
         _costRecipient = costRecipient;
     }
 
-    function setNFT() external onlyOwner {
-        require(
-            _nft == address(0),
-            "nft address already set"
-        );
-        require(
-            DeMineNFT(nft).agent() == address(this),
-            "unpaired nft"
-        );
-        _nft = nft;
-        emit NFTSet(agent);
-    }
+    constructor() initializer {}
 
     function setPool(
         uint128 pool,
@@ -282,7 +246,7 @@ contract DeMineAgent is
         return _income[_msgSender()];
     }
 
-    function nft() external view returns(address) {
+    function getNft() external view returns(address) {
         return _nft;
     }
 

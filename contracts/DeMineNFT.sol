@@ -9,32 +9,6 @@ import "@openzeppelin/contracts-upgradeable/interfaces/IERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
 import "./DeMineAgent.sol";
 
-contract DeMineNFTCloneFactory {
-    address immutable implementation;
-
-    constructor() {
-        implementation = address(new DeMineNFT());
-    }
-
-    function create(
-        string memory uri,
-        address royaltyRecipient,
-        uint16 royaltyBps,
-        address agent,
-        address owner
-    ) external returns(address) {
-        address cloned = Clones.clone(implementation);
-        DeMineNFT(cloned).initialize(
-            uri,
-            royaltyRecipient,
-            royaltyBps,
-            agent
-        );
-        DeMineNFT(cloned).transferOwnership(owner);
-        return cloned;
-    }
-}
-
 /// @author Shu Dong
 contract DeMineNFT is
     ERC1155Upgradeable,
@@ -172,7 +146,7 @@ contract DeMineNFT is
         return (_royaltyRecipient, (value * _royaltyBps) / 10000);
     }
 
-    function agent() external view returns(address) {
+    function getAgent() external view returns(address) {
         return _agent;
     }
 
