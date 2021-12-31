@@ -61,7 +61,7 @@ contract DeMineAgent is
 
     constructor() initializer {}
 
-    function list(
+    function listing(
         address to,
         uint256[] calldata ids,
         uint256[] calldata amounts,
@@ -104,7 +104,7 @@ contract DeMineAgent is
         emit SellingSet(sender, to, ids, amounts, prices);
     }
 
-    function unlist(
+    function unlisting(
         address to,
         uint256[] calldata ids
     ) external {
