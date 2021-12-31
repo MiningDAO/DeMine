@@ -5,7 +5,9 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./DeMineNFT.sol";
 import "./DeMineAgent.sol";
 
-contract DeMineAgentCloneFactory {
+contract DeMineCloneFactory {
+    event NewContract(address indexed, address indexed);
+
     address immutable nftImpl;
     address immutable agentImpl;
 
@@ -40,6 +42,7 @@ contract DeMineAgentCloneFactory {
         );
         DeMineNFT(nftCloned).transferOwnership(owner);
         DeMineAgent(agentCloned).transferOwnership(owner);
+        emit NewContract(nftCloned, agentCloned);
         return (nftCloned, agentCloned);
     }
 }

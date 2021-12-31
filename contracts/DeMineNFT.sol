@@ -37,13 +37,13 @@ contract DeMineNFT is
         string memory uri,
         address royaltyRecipient,
         uint16 royaltyBps,
-        address agent
+        address agentAddr
     ) public initializer {
         __Ownable_init();
         __ERC1155_init(uri);
         _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
-        _agent = agent;
+        _agent = agentAddr;
     }
 
     constructor() initializer {}
@@ -138,6 +138,10 @@ contract DeMineNFT is
     // view functions
     function treasureSource() external view returns (address) {
         return _rewardToken;
+    }
+
+    function agent() external view returns(address) {
+        return _agent;
     }
 
     function royaltyInfo(uint256, uint256 value)

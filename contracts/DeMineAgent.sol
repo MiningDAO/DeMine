@@ -51,12 +51,12 @@ contract DeMineAgent is
     function initialize(
         address costToken,
         address costRecipient,
-        address nft
+        address nftAddr
     ) public initializer {
         __Ownable_init();
         _costToken = costToken;
         _costRecipient = costRecipient;
-        _nft = nft;
+        _nft = nftAddr;
     }
 
     constructor() initializer {}
@@ -291,6 +291,10 @@ contract DeMineAgent is
 
     function income() external view returns(uint256) {
         return _income[_msgSender()];
+    }
+
+    function nft() external view returns(address) {
+        return _nft;
     }
 
     function supportsInterface(bytes4 interfaceId)
