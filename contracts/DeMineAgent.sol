@@ -35,7 +35,7 @@ contract DeMineAgent is
     struct Listing {
         bool cashedout;
         uint256 total;
-        mapping(address => ListingInfo) saleInfo;
+        mapping(address => ListingInfo) info;
     }
     mapping(uint256 => Listing) private _listing;
     mapping(address => uint256) private _income;
@@ -91,15 +91,15 @@ contract DeMineAgent is
                 prices[i] >= _pools[pool].costPerToken,
                 "DeMineAgent: price too low to cover cost"
             );
-            uint256 selling = _listing[id].saleInfo[to].amount;
+            uint256 selling = _listing[id].info[to].amount;
             require(
                 _inventory[id] + selling >= amounts[i],
                 "DeMineAgent: insufficient balance to sale"
             );
             _inventory[id] = _inventory[id] + selling - amounts[i];
             _listing[id].total = _listing[id].total - selling + amounts[i];
-            _listing[id].saleInfo[to].amount = amounts[i];
-            _listing[id].saleInfo[to].price = prices[i];
+            _listing[id].info[to].amount = amounts[i];
+            _listing[id].info[to].price = prices[i];
         }
         emit SellingSet(sender, to, ids, amounts, prices);
     }
@@ -118,10 +118,10 @@ contract DeMineAgent is
                 _msgSender() == _pools[uint128(id >> 128)].issuer,
                 "DeMineAgent: only token issuer allowed"
             );
-            uint256 amount = _listing[id].saleInfo[to].amount;
+            uint256 amount = _listing[id].info[to].amount;
             _inventory[id] += amount;
             _listing[id].total -= amount;
-            _listing[id].saleInfo[to].amount = 0;
+            _listing[id].info[to].amount = 0;
         }
         emit SellingUnset(_msgSender(), to, ids);
     }
@@ -143,21 +143,21 @@ contract DeMineAgent is
                 !_listing[id].cashedout,
                 "DeMineAgent: already cashed out"
             );
-            uint256 v1 = _listing[id].saleInfo[sender].amount;
-            uint256 v2 = _listing[id].saleInfo[address(0)].amount;
+            uint256 v1 = _listing[id].info[sender].amount;
+            uint256 v2 = _listing[id].info[address(0)].amount;
             require(
                 v1 + v2 >= amounts[i],
                 "DeMineAgent: insufficient allowance"
             );
-            uint256 senderPrice = _listing[id].saleInfo[sender].price;
-            uint256 basePrice = _listing[id].saleInfo[address(0)].price;
+            uint256 senderPrice = _listing[id].info[sender].price;
+            uint256 basePrice = _listing[id].info[address(0)].price;
             uint256 price;
             if (v1 >= amounts[i]) {
-                _listing[id].saleInfo[sender].amount = v1 - amounts[i];
+                _listing[id].info[sender].amount = v1 - amounts[i];
                 price = amounts[i] * senderPrice;
             } else {
-                _listing[id].saleInfo[sender].amount = 0;
-                _listing[id].saleInfo[address(0)].amount = v1 + v2 - amounts[i];
+                _listing[id].info[sender].amount = 0;
+                _listing[id].info[address(0)].amount = v1 + v2 - amounts[i];
                 price = basePrice * (amounts[i] - v1) + senderPrice * v1;
             }
             _listing[id].total -= amounts[i];
