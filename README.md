@@ -37,9 +37,10 @@ We need receive cost of tokens to pay billing of mining farm, including electric
 # Account System
 
 - Admin: owner of DeMineAgent and DeMineNFT contract
-- Rewarder: account holding all mined coins to reward DeMineNFT contract, could be same with owner
-- Cost Recipient: recipient of cost paid by liqudizing tokens, could be same with owner
-- Reward Recipient: recipient of cashed out reward to pay billing, could be same with owner
+- Rewarder: account holding all mined coins to reward DeMineNFT contract, could be same with admin
+- Cost Recipient: recipient of cost paid by liqudizing tokens, could be same with admin
+- Royalty Recipient: recipient of royalty of token transfer, could be same with admin
+- Reward Recipient: recipient of cashed out reward to pay billing, could be same with admin
 - DeMineNFT: the nft contract, holding nft tokens and reward tokens mined
 - DeMineAgent: the agent contract, holding income from selling tokens for token issuer
 
@@ -55,7 +56,6 @@ ERC2981:
 - getRoyaltyInfo
 
 ERC1155:
-- Mint new token
 - SetApprovedForAll
 - isApprovedForAll
 - balanceOf/balanceOfBatch
@@ -64,8 +64,14 @@ ERC1155:
 - transfer/transferBatch
 
 DeMineNFT Specific:
+- create new pool with wrong supply array, should fail
+- create new pool from rewarded cycles, should fail
+- create new pool
+  - event TransferBatch from address(0) should be emitted
+  - event NewPool should be emitted
+  - DeMineAgent should with pool set
+  - balanceOf issuer for ids should be same with supplies
 - reward
-- rewardWithOverrides
 
 >> Test with both sender/operator:
 - cashout unrewarded cycle, should fail

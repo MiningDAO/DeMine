@@ -12,6 +12,7 @@ contract DeMineAgent is
     IERC1155Receiver
 {
     event PoolTransfer(uint128 indexed, address indexed, address indexed);
+
     event List(address indexed, address indexed, uint256[], uint256[], uint256[]);
     event Unlist(address indexed, address indexed, uint256[]);
     event Claim(address indexed, uint256, uint256, uint256[], uint256[]);
@@ -61,6 +62,15 @@ contract DeMineAgent is
     }
 
     constructor() initializer {}
+
+    function setPool(
+        uint128 pool,
+        address issuer,
+        uint256 costPerToken
+    ) external onlyNFT {
+        _pools[pool].issuer = issuer;
+        _pools[pool].costPerToken = costPerToken;
+    }
 
     function list(
         address to,
@@ -220,15 +230,6 @@ contract DeMineAgent is
         );
         _pools[pool].issuer = newIssuer;
         emit PoolTransfer(pool, _msgSender(), newIssuer);
-    }
-
-    function setPool(
-        uint128 pool,
-        address issuer,
-        uint256 costPerToken
-    ) external onlyNFT {
-        _pools[pool].issuer = issuer;
-        _pools[pool].costPerToken = costPerToken;
     }
 
     function onERC1155Received(

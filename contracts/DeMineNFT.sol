@@ -16,92 +16,90 @@ contract DeMineNFT is
     IERC2981Upgradeable
 {
     // Events
-    event TokenRoyaltySet(uint256);
     event NewPool(uint128 indexed, address indexed, uint256, string);
-    event Reward(uint128 indexed, uint256);
-    event RewardWithOverrides(uint128 indexed, uint256, uint128[], uint256[]);
+    event RewardSet(uint128 indexed, address indexed, uint256, uint256);
+    event RewarderSet(address indexed, address indexed);
     event Cashout(address indexed, address indexed, address indexed, uint256);
+    event TokenRoyaltySet(address indexed, uint256);
 
     address private _agent;
     address private _rewardToken;
-    uint128 private _nextCycle;
-    uint128 private _nextPool;
+    uint128 private _cycle;
+    uint128 private _pool;
 
     address private _royaltyRecipient;
     uint16 private _royaltyBps; // EIP2981
 
-    mapping(uint128 => uint256) private _reward;
-    mapping(uint256 => uint256) private _overrides;
+    struct Cycle {
+        uint256 supply;
+        uint256 rewardPerToken;
+    }
+    mapping(uint128 => Cycle) private _cycles;
 
     function initialize(
         string memory uri,
         address royaltyRecipient,
         uint16 royaltyBps,
-        address agentAddr
+        address agentContract
     ) public initializer {
         __Ownable_init();
         __ERC1155_init(uri);
         _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
-        _agent = agentAddr;
+        _agent = agentContract;
     }
 
     constructor() initializer {}
 
     function newPool(
         string calldata info,
-        uint256[] calldata ids,
+        uint128 startCycle,
+        uint128 numCycles,
         uint256[] calldata supplies,
         uint256 costPerToken,
         address issuer
     ) external onlyOwner {
+        require(
+            supplies.length == numCycles,
+            "DeMineNFT: supply array length mismatch"
+        );
+        require(
+            startCycle > _cycle + 3,
+            "DeMineNFT: startCycle too early"
+        );
+        _pool += 1;
+        uint256[] memory ids = new uint256[](numCycles);
+        for (uint128 i = 0; i < numCycles; i++) {
+            ids[i] = (uint256(_pool) << 128) + startCycle + i;
+            _cycles[startCycle + i].supply += supplies[i];
+        }
         DeMineAgent(_agent).setPool(
-            _nextPool, issuer, costPerToken
+            _pool, issuer, costPerToken
         );
         _mintBatch(_agent, ids, supplies, "");
-        emit NewPool(_nextPool, issuer, costPerToken, info);
-        _nextPool += 1;
+        emit NewPool(_pool, issuer, costPerToken, info);
     }
 
-    function reward(uint128 expectedRewardPerToken) external onlyOwner {
-        _reward[_nextCycle] = expectedRewardPerToken;
-        emit Reward(
-            _nextCycle,
-            expectedRewardPerToken
-        );
-    }
-
-    function rewardWithOverrides(
-        uint128 expectedRewardPerToken,
-        uint128[] calldata pools,
-        uint256[] calldata overrides
+    function reward(
+        address rewarder,
+        uint128 rewarded
     ) external onlyOwner {
-        require(
-            pools.length == overrides.length,
-            "array length mismatch"
+        _cycle += 1;
+        _cycles[_cycle].rewardPerToken = rewarded / _cycles[_cycle].supply;
+        bool success = IERC20(
+            _rewardToken
+        ).transferFrom(
+            rewarder,
+            address(this),
+            _cycles[_cycle].rewardPerToken * _cycles[_cycle].supply
         );
-        for (uint256 i = 0; i < pools.length; i++) {
-            _overrides[
-                (uint256(pools[i]) << 128) + _nextCycle
-            ] = overrides[i];
-        }
-        _reward[_nextCycle] = expectedRewardPerToken;
-        emit RewardWithOverrides(
-            _nextCycle,
-            expectedRewardPerToken,
-            pools,
-            overrides
+        require(success, "DeMineNFT: failed to transfer reward");
+        emit RewardSet(
+            _cycle,
+            rewarder,
+            _cycles[_cycle].rewardPerToken,
+            _cycles[_cycle].supply
         );
-        _nextCycle += 1;
-    }
-
-    function setTokenRoyaltyInfo(
-        address recipient,
-        uint16 bps
-    ) external onlyOwner {
-        _royaltyRecipient = recipient;
-        _royaltyBps = bps;
-        emit TokenRoyaltySet(bps);
     }
 
     function cashout(
@@ -116,12 +114,10 @@ contract DeMineNFT is
             uint256 id = ids[i];
             uint128 cycle = uint128(id);
             require(
-                cycle < _nextCycle,
+                cycle < _cycle,
                 "DeMineNFT: unrewarded cycle"
             );
-            totalReward += amounts[i] * (
-                _overrides[id] > 0 ? _overrides[id] : _reward[cycle]
-            );
+            totalReward += amounts[i] * _cycles[cycle].rewardPerToken;
         }
         if (totalReward > 0) {
             bool success = IERC20(_rewardToken).transfer(
@@ -139,6 +135,23 @@ contract DeMineNFT is
 
     function agent() external view returns(address) {
         return _agent;
+    }
+
+    function getCycle(uint128 cycle) external view returns (uint256, uint256) {
+        return (
+            _cycles[cycle].supply,
+            _cycles[cycle].rewardPerToken
+        );
+    }
+
+    // ERC 2981
+    function setTokenRoyaltyInfo(
+        address recipient,
+        uint16 bps
+    ) external onlyOwner {
+        _royaltyRecipient = recipient;
+        _royaltyBps = bps;
+        emit TokenRoyaltySet(recipient, bps);
     }
 
     function royaltyInfo(uint256, uint256 value)
