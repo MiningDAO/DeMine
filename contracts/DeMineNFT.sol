@@ -40,6 +40,7 @@ contract DeMineNFT is
         string memory uri,
         address royaltyRecipient,
         uint16 royaltyBps,
+        address rewardToken,
         address agentContract
     ) public initializer {
         __Ownable_init();
@@ -47,6 +48,7 @@ contract DeMineNFT is
         _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
         _agent = agentContract;
+        _rewardToken = rewardToken;
     }
 
     constructor() initializer {}

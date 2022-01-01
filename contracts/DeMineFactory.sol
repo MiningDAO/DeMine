@@ -21,6 +21,7 @@ contract DeMineCloneFactory {
         string memory uri,
         address royaltyRecipient,
         uint16 royaltyBps,
+        address rewardToken,
         // admin
         address[] memory paymentMethods,
         address[] memory paymentRecipients,
@@ -34,6 +35,7 @@ contract DeMineCloneFactory {
             uri,
             royaltyRecipient,
             royaltyBps,
+            rewardToken,
             agentCloned
         );
         DeMineAgent(agentCloned).initialize(

@@ -5,8 +5,8 @@ const ERC1155 = require("./ERC1155.js");
 
 describe("DeMine", function () {
     var signers;
-    var rewardToken;
     var costTokens;
+    var rewardToken;
     var nft;
     var agent;
 
@@ -55,11 +55,13 @@ describe("DeMine", function () {
             costRecipient1,
             costRecipient2,
             costRecipient3,
+            rewarder,
             rewardRecipient,
             royaltyRecipient
         ] = await ethers.getSigners();
         signers = {
             admin: admin,
+            rewarder: rewarder,
             royaltyRecipient: royaltyRecipient,
             rewardRecipient: rewardRecipient,
             costRecipients: [
@@ -69,17 +71,23 @@ describe("DeMine", function () {
             ],
             users: [user1, user2, user3]
         };
-        rewardToken = utils.setupRewardToken(admin);
-        costTokens = utils.setupPaymentTokens(admin, 3);
     });
 
     beforeEach(async function() {
-        let { nft, agent } = await utils.setupDeMine(signers);
+        rewardToken = await utils.setupRewardToken(admin);
+        costTokens = await utils.setupPaymentTokens(admin, 3);
+        const value = await utils.setupDeMine(
+            rewardToken,
+            costTokens,
+            signers
+        );
+        nft = value.nft;
+        agent = value.agent;
     });
 
     it("nft should be ownable", async function () {
         const error = "Ownable: caller is not the owner";
-        const [user1, _, _] = signers.users;
+        const [user1, _] = signers.users;
         let { ids, supplies } = utils.newPool(0, 10, 130, 1000);
         await expect(
             nft.connect(user1).newPool(
@@ -88,15 +96,7 @@ describe("DeMine", function () {
         ).to.be.revertedWith(error);
 
         await expect(
-            nft.connect(user1).reward(1)
-        ).to.be.revertedWith(error);
-
-        await expect(
-            nft.connect(
-                user1
-            ).rewardWithOverrides(
-                1, [1, 2], [100, 100]
-            )
+            nft.connect(user1).reward(rewarder.address, 1)
         ).to.be.revertedWith(error);
 
         await expect(
@@ -108,6 +108,7 @@ describe("DeMine", function () {
 
     it("agent should be ownable", async function () {
         const error = "Ownable: caller is not the owner";
+        const [user1, _] = signers.users;
         await expect(
             agent.connect(user1).cashout([1, 2])
         ).to.be.revertedWith(error);
@@ -129,14 +130,14 @@ describe("DeMine", function () {
     });
 
     it("nft mint and liquidize", async function() {
-        expect(await nft.uri(1)).to.equal("some_url");
-        const [user1, _, _] = signers.users;
+        expect(await nft.uri(1)).to.equal("demine_nft");
+        const [user1, _] = signers.users;
         let ids1 = await createPool(
-            0, "pool0", 10, 130, 100, 3000, user1.address
+            1, "pool0", 10, 130, 100, 3000, user1.address
         );
         checkBalances(Array(ids1.length).fill(agent.address), ids1);
         let ids2 = await createPool(
-            1, "pool1", 40, 160, 1000, 2000, user2.address
+            2, "pool1", 40, 160, 1000, 2000, user2.address
         );
         checkBalances(Array(ids2.length).fill(agent.address), ids2);
     });

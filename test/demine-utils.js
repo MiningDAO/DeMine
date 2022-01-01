@@ -7,11 +7,12 @@ async function setupERC20() {
     const TokenFactory = await ethers.getContractFactory("WrappedTokenCloneFactory");
     tokenFactory = await TokenFactory.deploy();
     await tokenFactory.deployed();
-    return await ethers.getContractFactory("WrappedToken");
+    const Token = await ethers.getContractFactory("WrappedToken");
+    return [tokenFactory, Token];
 }
 
 async function setupRewardToken(admin) {
-    const Token = setupERC20();
+    const [tokenFactory, Token] = await setupERC20();
     const tx = await tokenFactory.create("Reward", "REWARD", 8, admin.address);
     const { events: events } = await tx.wait();
     const { address: address } = events.find(Boolean);
@@ -19,7 +20,7 @@ async function setupRewardToken(admin) {
 }
 
 async function setupPaymentTokens(admin, num) {
-    const Token = setupERC20();
+    const [tokenFactory, Token] = await setupERC20();
     let costTokens = [];
     for (let i = 0; i < num; i++) {
         const tx = await tokenFactory.create(
@@ -36,11 +37,15 @@ async function setupPaymentTokens(admin, num) {
     return costTokens;
 }
 
-function toAddresses(signers) {
-    return signers.map(s => s.address);
+function toAddresses(values) {
+    return values.map(v => v.address);
 }
 
-async function setupDeMine(signers) {
+async function setupDeMine(rewardToken, costTokens, signers) {
+    const DeMineFactory = await ethers.getContractFactory("DeMineCloneFactory");
+    demineFactory = await DeMineFactory.deploy();
+    await demineFactory.deployed();
+
     const NFT = await ethers.getContractFactory("DeMineNFT");
     const Agent = await ethers.getContractFactory("DeMineAgent");
     const tx = await demineFactory.create(
@@ -48,9 +53,10 @@ async function setupDeMine(signers) {
         "demine_nft",
         signers.royaltyRecipient.address,
         100,
+        rewardToken.address,
         // agent
-        toAddresses(signer.costTokens),
-        toAddresses(signer.costRecipients),
+        toAddresses(costTokens),
+        toAddresses(signers.costRecipients),
         signers.rewardRecipient.address,
         // owner
         signers.admin.address
@@ -86,7 +92,7 @@ function newPool(
 module.exports = {
     setupRewardToken,
     setupPaymentTokens,
-    setup,
+    setupDeMine,
     id,
     newPool
 };
