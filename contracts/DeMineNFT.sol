@@ -50,21 +50,15 @@ contract DeMineNFT is
 
     function newPool(
         string calldata info,
-        uint128 startCycle,
-        uint128 numCycles,
-        uint256 supplyPerCycle,
+        uint256[] calldata ids,
+        uint256[] calldata supplies,
         uint256 costPerToken,
         address issuer
     ) external onlyOwner {
-        require(startCycle > _nextCycle, "cannot start from past");
-        uint256[] memory ids = new uint256[](numCycles);
-        uint256[] memory supplies = new uint256[](numCycles);
-        for (uint256 i = 0; i < numCycles; i++) {
-            ids[i] = (uint256(_nextPool) << 128) + i + startCycle;
-            supplies[i] = supplyPerCycle;
-        }
-        DeMineAgent(_agent).setPool(_nextPool, issuer, costPerToken);
         _mintBatch(_agent, ids, supplies, "");
+        DeMineAgent(_agent).setPool(
+            _nextPool, issuer, costPerToken
+        );
         emit NewPool(_nextPool, issuer, costPerToken, info);
         _nextPool += 1;
     }

@@ -27,17 +27,18 @@ contract DeMineAgent is
         uint256 costPerToken;
     }
     mapping(uint128 => Pool) private _pools;
-    mapping(uint256 => uint256) private _inventory;
     struct ListingInfo {
         uint256 amount;
         uint256 price;
     }
-    struct Listing {
+    struct TokenInfo {
         bool cashedout;
-        uint256 total;
-        mapping(address => ListingInfo) info;
+        uint256 liquidized;
+        uint256 locked;
+        uint256 listed;
+        mapping(address => ListingInfo) listing;
     }
-    mapping(uint256 => Listing) private _listing;
+    mapping(uint256 => TokenInfo) private _stats;
     mapping(address => uint256) private _income;
 
     modifier onlyNFT {
@@ -79,7 +80,7 @@ contract DeMineAgent is
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             require(
-                !_listing[id].cashedout,
+                !_stats[id].cashedout,
                 "DeMineAgent: already cashed out"
             );
             uint128 pool = uint128(id >> 128);
@@ -91,15 +92,16 @@ contract DeMineAgent is
                 prices[i] >= _pools[pool].costPerToken,
                 "DeMineAgent: price too low to cover cost"
             );
-            uint256 selling = _listing[id].info[to].amount;
+            uint256 selling = _stats[id].listing[to].amount;
+            uint256 locked = _stats[id].locked;
             require(
-                _inventory[id] + selling >= amounts[i],
+                locked + selling >= amounts[i],
                 "DeMineAgent: insufficient balance to sale"
             );
-            _inventory[id] = _inventory[id] + selling - amounts[i];
-            _listing[id].total = _listing[id].total - selling + amounts[i];
-            _listing[id].info[to].amount = amounts[i];
-            _listing[id].info[to].price = prices[i];
+            _stats[id].locked = locked + selling - amounts[i];
+            _stats[id].listed = _stats[id].listed - selling + amounts[i];
+            _stats[id].listing[to].amount = amounts[i];
+            _stats[id].listing[to].price = prices[i];
         }
         emit List(sender, to, ids, amounts, prices);
     }
@@ -111,17 +113,17 @@ contract DeMineAgent is
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             require(
-                !_listing[id].cashedout,
+                !_stats[id].cashedout,
                 "DeMineAgent: already cashed out"
             );
             require(
                 _msgSender() == _pools[uint128(id >> 128)].issuer,
                 "DeMineAgent: only token issuer allowed"
             );
-            uint256 amount = _listing[id].info[to].amount;
-            _inventory[id] += amount;
-            _listing[id].total -= amount;
-            _listing[id].info[to].amount = 0;
+            uint256 amount = _stats[id].listing[to].amount;
+            _stats[id].locked += amount;
+            _stats[id].listed -= amount;
+            _stats[id].listing[to].amount = 0;
         }
         emit Unlist(_msgSender(), to, ids);
     }
@@ -140,27 +142,28 @@ contract DeMineAgent is
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             require(
-                !_listing[id].cashedout,
+                !_stats[id].cashedout,
                 "DeMineAgent: already cashed out"
             );
-            uint256 v1 = _listing[id].info[sender].amount;
-            uint256 v2 = _listing[id].info[address(0)].amount;
+            uint256 v1 = _stats[id].listing[sender].amount;
+            uint256 v2 = _stats[id].listing[address(0)].amount;
             require(
                 v1 + v2 >= amounts[i],
                 "DeMineAgent: insufficient allowance"
             );
-            uint256 senderPrice = _listing[id].info[sender].price;
-            uint256 basePrice = _listing[id].info[address(0)].price;
+            uint256 senderPrice = _stats[id].listing[sender].price;
+            uint256 basePrice = _stats[id].listing[address(0)].price;
             uint256 price;
             if (v1 >= amounts[i]) {
-                _listing[id].info[sender].amount = v1 - amounts[i];
+                _stats[id].listing[sender].amount = v1 - amounts[i];
                 price = amounts[i] * senderPrice;
             } else {
-                _listing[id].info[sender].amount = 0;
-                _listing[id].info[address(0)].amount = v1 + v2 - amounts[i];
+                _stats[id].listing[sender].amount = 0;
+                _stats[id].listing[address(0)].amount = v1 + v2 - amounts[i];
                 price = basePrice * (amounts[i] - v1) + senderPrice * v1;
             }
-            _listing[id].total -= amounts[i];
+            _stats[id].listed -= amounts[i];
+            _stats[id].liquidized += amounts[i];
             uint128 pool = uint128(id >> 128);
             uint256 cost = _pools[pool].costPerToken * amounts[i];
             totalCost += cost;
@@ -191,11 +194,13 @@ contract DeMineAgent is
                 _msgSender() == _pools[pool].issuer,
                 "DeMineAgent: only token issuer allowed"
             );
+            uint256 locked = _stats[id].locked;
             require(
-                _inventory[id] >= amounts[i],
+                locked >= amounts[i],
                 "DeMineAdmin: insufficient balance to liquidize"
             );
-            _inventory[id] = _inventory[id] - amounts[i];
+            _stats[id].locked = locked - amounts[i];
+            _stats[id].liquidized += amounts[i];
             totalCost += _pools[pool].costPerToken * amounts[i];
         }
         pay(_msgSender(), _costRecipient, totalCost);
@@ -237,7 +242,7 @@ contract DeMineAgent is
             from == address(0),
             "only newly minted token allowed"
         );
-        _inventory[id] += amount;
+        _stats[id].locked += amount;
         return bytes4(
             keccak256(
                 "onERC1155Received(address,address,uint256,uint256,bytes)"
@@ -257,7 +262,7 @@ contract DeMineAgent is
             "only newly minted token allowed"
         );
         for (uint256 i = 0; i < ids.length; i++) {
-            _inventory[ids[i]] += amounts[i];
+            _stats[ids[i]].locked += amounts[i];
         }
         return bytes4(
             keccak256(
@@ -270,10 +275,11 @@ contract DeMineAgent is
         uint256[] memory amounts = new uint256[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
-            _listing[id].cashedout = true;
-            amounts[i] = _inventory[id] + _listing[id].total;
-            _listing[id].total = 0;
-            _inventory[id] = 0;
+            _stats[id].cashedout = true;
+            amounts[i] = _stats[id].locked + _stats[id].listed;
+            _stats[id].liquidized += amounts[i];
+            _stats[id].listed = 0;
+            _stats[id].locked = 0;
         }
         DeMineNFT(_nft).cashout(address(this), owner(), ids, amounts);
     }
@@ -287,6 +293,52 @@ contract DeMineAgent is
         pay(address(this), sender, amount);
         _income[sender] -= amount;
         emit Withdraw(sender, amount);
+    }
+
+    function pay(
+        address payer,
+        address payee,
+        uint256 value
+    ) private {
+        if (value > 0) {
+            bool success = IERC20(_costToken).transferFrom(
+                payer, payee, value
+            );
+            require(success, "failed to pay cost");
+        }
+    }
+
+    function poolStats(
+        uint128 pool
+    ) external view returns(address, uint256) {
+        return (
+            _pools[pool].issuer,
+            _pools[pool].costPerToken
+        );
+    }
+
+    function listing(
+        uint256 id,
+        address[] calldata recipients
+    ) external view returns(uint256[] memory, uint256[] memory) {
+        uint256[] memory prices = new uint256[](recipients.length);
+        uint256[] memory amounts = new uint256[](recipients.length);
+        for (uint256 i = 0; i < recipients.length; i++) {
+            prices[i] = _stats[id].listing[recipients[i]].price;
+            amounts[i] = _stats[id].listing[recipients[i]].amount;
+        }
+        return (prices, amounts);
+    }
+
+    function tokenStats(
+        uint256 id
+    ) external view returns(bool, uint256, uint256, uint256) {
+        return (
+            _stats[id].cashedout,
+            _stats[id].liquidized,
+            _stats[id].locked,
+            _stats[id].listed
+        );
     }
 
     function income() external view returns(uint256) {
@@ -304,18 +356,5 @@ contract DeMineAgent is
         returns (bool)
     {
         return interfaceId == type(IERC1155Receiver).interfaceId;
-    }
-
-    function pay(
-        address payer,
-        address payee,
-        uint256 value
-    ) private {
-        if (value > 0) {
-            bool success = IERC20(_costToken).transferFrom(
-                payer, payee, value
-            );
-            require(success, "failed to pay cost");
-        }
     }
 }
