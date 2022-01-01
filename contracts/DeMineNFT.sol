@@ -137,7 +137,7 @@ contract DeMineNFT is
         return _agent;
     }
 
-    function getCycle(uint128 cycle) external view returns (uint256, uint256) {
+    function cycleInfo(uint128 cycle) external view returns (uint256, uint256) {
         return (
             _cycles[cycle].supply,
             _cycles[cycle].rewardPerToken

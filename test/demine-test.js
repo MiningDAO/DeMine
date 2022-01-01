@@ -40,7 +40,7 @@ describe("DeMine", function () {
         simulator.mintBatch(agent.address, ids, supplies);
         await expect(
             nft.connect(admin).newPool(
-                info, ids, supplies, costPerToken, issuer
+                info, startCycle, numCycles, supplies, costPerToken, issuer
             )
         ).to.emit(nft, "TransferBatch").withArgs(
             admin.address,
@@ -113,7 +113,7 @@ describe("DeMine", function () {
         let { ids, supplies } = utils.newPool(0, 10, 130, 1000);
         await expect(
             nft.connect(user1).newPool(
-                "hash", ids, supplies, 100, user2.address
+                "hash", 10, 130, supplies, 100, user2.address
             )
         ).to.be.revertedWith(error);
 

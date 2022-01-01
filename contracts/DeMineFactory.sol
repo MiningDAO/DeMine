@@ -22,8 +22,9 @@ contract DeMineCloneFactory {
         address royaltyRecipient,
         uint16 royaltyBps,
         // admin
-        address costToken,
-        address costRecipient,
+        address[] memory paymentMethods,
+        address[] memory paymentRecipients,
+        address rewardRecipient,
         // owner
         address owner
     ) external returns(address, address) {
@@ -36,8 +37,9 @@ contract DeMineCloneFactory {
             agentCloned
         );
         DeMineAgent(agentCloned).initialize(
-            costToken,
-            costRecipient,
+            paymentMethods,
+            paymentRecipients,
+            rewardRecipient,
             nftCloned
         );
         DeMineNFT(nftCloned).transferOwnership(owner);
