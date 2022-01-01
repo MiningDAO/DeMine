@@ -113,12 +113,12 @@ contract DeMineAgent is
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             require(
-                !_stats[id].cashedout,
-                "DeMineAgent: already cashed out"
-            );
-            require(
                 _msgSender() == _pools[uint128(id >> 128)].issuer,
                 "DeMineAgent: only token issuer allowed"
+            );
+            require(
+                !_stats[id].cashedout,
+                "DeMineAgent: already cashed out"
             );
             uint256 amount = _stats[id].listing[to].amount;
             _stats[id].locked += amount;
@@ -275,6 +275,10 @@ contract DeMineAgent is
         uint256[] memory amounts = new uint256[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
+            require(
+                !_stats[id].cashedout,
+                "DeMineAgent: already cashed out"
+            );
             _stats[id].cashedout = true;
             amounts[i] = _stats[id].locked + _stats[id].listed;
             _stats[id].liquidized += amounts[i];

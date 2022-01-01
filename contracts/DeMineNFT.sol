@@ -55,10 +55,10 @@ contract DeMineNFT is
         uint256 costPerToken,
         address issuer
     ) external onlyOwner {
-        _mintBatch(_agent, ids, supplies, "");
         DeMineAgent(_agent).setPool(
             _nextPool, issuer, costPerToken
         );
+        _mintBatch(_agent, ids, supplies, "");
         emit NewPool(_nextPool, issuer, costPerToken, info);
         _nextPool += 1;
     }
@@ -115,7 +115,10 @@ contract DeMineNFT is
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             uint128 cycle = uint128(id);
-            require(cycle < _nextCycle, "unrewarded cycle");
+            require(
+                cycle < _nextCycle,
+                "DeMineNFT: unrewarded cycle"
+            );
             totalReward += amounts[i] * (
                 _overrides[id] > 0 ? _overrides[id] : _reward[cycle]
             );
@@ -124,7 +127,7 @@ contract DeMineNFT is
             bool success = IERC20(_rewardToken).transfer(
                 to, totalReward
             );
-            require(success, "failed to withdraw reward");
+            require(success, "DeMineNFT: failed to withdraw reward");
         }
         return totalReward;
     }

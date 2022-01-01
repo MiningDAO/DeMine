@@ -12,6 +12,7 @@ describe("DeMine", function () {
     var royaltyRecipient;
 
     // contracts
+    var demineFactory;
     var rewardToken;
     var costToken;
     var nft;
@@ -36,7 +37,7 @@ describe("DeMine", function () {
         let { ids, supplies } = utils.newPool(
             pool, startCycle, numCycles, supplyPerCycle
         );
-        simulator.mintBatch(agent, ids, supplies);
+        simulator.mintBatch(agent.address, ids, supplies);
         await expect(
             nft.connect(admin).newPool(
                 info, ids, supplies, costPerToken, issuer
@@ -80,7 +81,9 @@ describe("DeMine", function () {
         const DeMineFactory = await ethers.getContractFactory("DeMineCloneFactory");
         demineFactory = await DeMineFactory.deploy();
         await demineFactory.deployed();
+    });
 
+    beforeEach(async function() {
         // setup nft and agent
         const NFT = await ethers.getContractFactory("DeMineNFT");
         const Agent = await ethers.getContractFactory("DeMineAgent");
@@ -152,15 +155,16 @@ describe("DeMine", function () {
         expect(value).to.equal(10);
     });
 
-    it("nft should be ERC1155", async function () {
+    it("nft mint and liquidize", async function() {
         expect(await nft.uri(1)).to.equal("some_url");
+
         let ids1 = await createPool(
             0, "pool0", 10, 130, 100, 3000, user1.address
         );
-        checkBalances(Array(ids1.length).fill(admin.address), ids1);
+        checkBalances(Array(ids1.length).fill(agent.address), ids1);
         let ids2 = await createPool(
             1, "pool1", 40, 160, 1000, 2000, user2.address
         );
-        checkBalances(Array(ids2.length).fill(admin.address), ids2);
+        checkBalances(Array(ids2.length).fill(agent.address), ids2);
     });
 });
