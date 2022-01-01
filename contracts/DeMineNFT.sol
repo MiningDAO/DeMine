@@ -82,7 +82,7 @@ contract DeMineNFT is
 
     function reward(
         address rewarder,
-        uint128 rewarded
+        uint256 rewarded
     ) external onlyOwner {
         _cycle += 1;
         _cycles[_cycle].rewardPerToken = rewarded / _cycles[_cycle].supply;
@@ -126,22 +126,6 @@ contract DeMineNFT is
             require(success, "DeMineNFT: failed to withdraw reward");
         }
         return totalReward;
-    }
-
-    // view functions
-    function treasureSource() external view returns (address) {
-        return _rewardToken;
-    }
-
-    function agent() external view returns(address) {
-        return _agent;
-    }
-
-    function cycleInfo(uint128 cycle) external view returns (uint256, uint256) {
-        return (
-            _cycles[cycle].supply,
-            _cycles[cycle].rewardPerToken
-        );
     }
 
     // ERC 2981

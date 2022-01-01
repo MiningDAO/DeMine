@@ -39,11 +39,6 @@ DeMineNFT Specific:
   - recipient should receive reward tokens
   - reward token balance of nft contract should decrease
 
-DeMineNFT View:
-- get agent address
-- get reward token address
-- cycleInfo
-
 ## DeMineAgent
 
 NFT Contract only:
@@ -53,12 +48,10 @@ NFT Contract only:
 - receive nft, token stats should be updated
 
 DeMineAgent View:
-- paymentInfo
-- poolInfo
+- isPaymentSupported
 - listingInfo
 - tokenInfo
 - incomeInfo
-- nft address
 
 DeMineAgent State Update:
 - set reward token recipient from non owner should fail

@@ -309,6 +309,12 @@ contract DeMineAgent is
         _payments[payment] = newRecipient;
     }
 
+    function paymentInfo(
+        address payment
+    ) external view returns(address) {
+        return _payments[payment];
+    }
+
     function cashout(uint256[] calldata ids) external onlyOwner {
         uint256[] memory amounts = new uint256[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
@@ -366,30 +372,24 @@ contract DeMineAgent is
         }
     }
 
-    function paymentInfo(
+    function isPaymentSupported(
         address payment
-    ) external view returns(address) {
-        return _payments[payment];
-    }
-
-    function poolInfo(
-        uint128 pool
-    ) external view returns(address, uint256) {
-        return (
-            _pools[pool].owner,
-            _pools[pool].costPerToken
-        );
+    ) external view returns(bool) {
+        return _payments[payment] != address(0);
     }
 
     function listingInfo(
-        uint256 id,
-        address[] calldata recipients
-    ) external view returns(uint256[] memory, uint256[] memory) {
-        uint256[] memory prices = new uint256[](recipients.length);
-        uint256[] memory amounts = new uint256[](recipients.length);
-        for (uint256 i = 0; i < recipients.length; i++) {
-            prices[i] = _stats[id].listing[recipients[i]].price;
-            amounts[i] = _stats[id].listing[recipients[i]].amount;
+        address recipient,
+        uint256[] calldata ids
+    ) external view returns(
+        uint256[] memory, uint256[] memory
+    ) {
+        uint256[] memory prices = new uint256[](ids.length);
+        uint256[] memory amounts = new uint256[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            uint256 id = ids[i];
+            prices[i] = _stats[id].listing[recipient].price;
+            amounts[i] = _stats[id].listing[recipient].amount;
         }
         return (prices, amounts);
     }
@@ -406,17 +406,14 @@ contract DeMineAgent is
     }
 
     function incomeInfo(
+        address who,
         address[] calldata payments
     ) external view returns(uint256[] memory) {
         uint256[] memory amounts = new uint256[](payments.length);
         for (uint256 i = 0; i < payments.length; i++) {
-            amounts[i] = _income[_msgSender()][payments[i]];
+            amounts[i] = _income[who][payments[i]];
         }
         return amounts;
-    }
-
-    function nft() external view returns(address) {
-        return _nft;
     }
 
     function supportsInterface(bytes4 interfaceId)

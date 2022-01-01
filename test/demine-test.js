@@ -4,17 +4,9 @@ const utils = require("./demine-utils.js");
 const ERC1155 = require("./ERC1155.js");
 
 describe("DeMine", function () {
-    // users
-    var user1;
-    var user2;
-    var admin;
-    var costRecipient;
-    var royaltyRecipient;
-
-    // contracts
-    var demineFactory;
+    var signers;
     var rewardToken;
-    var costToken;
+    var costTokens;
     var nft;
     var agent;
 
@@ -56,60 +48,38 @@ describe("DeMine", function () {
 
     before(async function() {
         [
-            user1, user2, admin, costRecipient, royaltyRecipient
+            user1,
+            user2,
+            user3,
+            admin,
+            costRecipient1,
+            costRecipient2,
+            costRecipient3,
+            rewardRecipient,
+            royaltyRecipient
         ] = await ethers.getSigners();
-
-        // setup token factory
-        const TokenFactory = await ethers.getContractFactory("WrappedTokenCloneFactory");
-        tokenFactory = await TokenFactory.deploy();
-        await tokenFactory.deployed();
-        const Token = await ethers.getContractFactory("WrappedToken");
-
-        // setup reward token
-        const tx1 = await tokenFactory.create("Reward", "REWARD", 8, admin.address);
-        const { events: events1 } = await tx1.wait();
-        const { address: address1 } = events1.find(Boolean);
-        rewardToken = await Token.attach(address1);
-
-        // setup cost token
-        const tx2 = await tokenFactory.create("Cost", "COST", 6, admin.address);
-        const { events: events2 } = await tx2.wait();
-        const { address: address2 } = events2.find(Boolean);
-        costToken = await Token.attach(address2);
-
-        // setup demine factory
-        const DeMineFactory = await ethers.getContractFactory("DeMineCloneFactory");
-        demineFactory = await DeMineFactory.deploy();
-        await demineFactory.deployed();
+        signers = {
+            admin: admin,
+            royaltyRecipient: royaltyRecipient,
+            rewardRecipient: rewardRecipient,
+            costRecipients: [
+                costRecipient1,
+                costRecipient2,
+                costRecipient3
+            ],
+            users: [user1, user2, user3]
+        };
+        rewardToken = utils.setupRewardToken(admin);
+        costTokens = utils.setupPaymentTokens(admin, 3);
     });
 
     beforeEach(async function() {
-        // setup nft and agent
-        const NFT = await ethers.getContractFactory("DeMineNFT");
-        const Agent = await ethers.getContractFactory("DeMineAgent");
-        const tx3 = await demineFactory.create(
-            // nft
-            "some_url",
-            royaltyRecipient.address,
-            100,
-            // agent
-            costToken.address,
-            costRecipient.address,
-            // owner
-            admin.address
-        );
-        const { events: events3 } = await tx3.wait();
-        const { args: [nftAddr, agentAddr] } = events3.find(
-            function(e) { return e.event === 'NewContract'; }
-        );
-        nft = await NFT.attach(nftAddr);
-        agent = await Agent.attach(agentAddr);
-        expect(await agent.nft()).to.equal(nft.address);
-        expect(await nft.agent()).to.equal(agent.address);
+        let { nft, agent } = await utils.setupDeMine(signers);
     });
 
     it("nft should be ownable", async function () {
         const error = "Ownable: caller is not the owner";
+        const [user1, _, _] = signers.users;
         let { ids, supplies } = utils.newPool(0, 10, 130, 1000);
         await expect(
             nft.connect(user1).newPool(
@@ -144,12 +114,15 @@ describe("DeMine", function () {
     });
 
     it("nft should be ERC2981", async function () {
-        let [recipient, bps] = await nft.royaltyInfo(1, 100);
+        // before
+        let [recipient, value] = await nft.royaltyInfo(1, 100);
         expect(recipient).to.equal(royaltyRecipient.address);
-        expect(bps).to.equal(1);
+        expect(value).to.equal(1);
 
-        // test set royalty info
+        // set royalty info
         nft.connect(admin).setTokenRoyaltyInfo(admin.address, 1000);
+
+        // after
         [recipient, value] = await nft.royaltyInfo(1, 100);
         expect(recipient).to.equal(admin.address);
         expect(value).to.equal(10);
@@ -157,7 +130,7 @@ describe("DeMine", function () {
 
     it("nft mint and liquidize", async function() {
         expect(await nft.uri(1)).to.equal("some_url");
-
+        const [user1, _, _] = signers.users;
         let ids1 = await createPool(
             0, "pool0", 10, 130, 100, 3000, user1.address
         );
