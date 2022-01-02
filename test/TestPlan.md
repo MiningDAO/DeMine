@@ -52,11 +52,17 @@ ERC1155:
 
 ## DeMineAgent
 
-NFT Contract only:
-[x] pool set, from non-nft should fail
-- pool set, pool stats should be updated
-- receive nft, from non-nft should fail
-- receive nft, token stats should be updated
+Pool
+[x] transferPool with non-owner, should fail
+[x] transferPool with owner, should success
+
+NFT Interaction
+[x] [transfer]receive nft, from not minted tokens should fail
+[x] [transfer batch]receive nft, from not minted tokens should fail
+[x] [transfer]receive nft, from non-nft should fail
+[x] [transfer batch]receive nft, from non-nft should fail
+[x] [transfer]receive nft, token stats should be updated
+[x] [transfer batch]receive nft, token stats should be updated
 
 DeMineAgent State Update:
 - set reward token recipient from non owner should fail

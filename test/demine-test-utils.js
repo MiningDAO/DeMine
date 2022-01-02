@@ -158,12 +158,16 @@ async function reward(contracts, signers, cycle, supply, totalReward) {
     ).to.equal(nftBalance.add(rewardPerToken * supply));
 }
 
-async function mintAndRedeem(contracts, signers, user) {
+async function airdrop(token, admin, owner, spender, value) {
+        await token.connect(admin).mint(owner.address, value);
+        await token.connect(owner).approve(spender.address, value);
+}
+
+async function mintAndRedeem(contracts, admin, user) {
         let { nft, agent, costTokens } = contracts;
-        let admin = signers.admin;
         // create pools
         for (let i = 1; i <= 3; i++) {
-            await nft.connect(signers.admin).newPool(
+            await nft.connect(admin).newPool(
                 "pool",
                 10 * i,
                 120,
@@ -171,23 +175,6 @@ async function mintAndRedeem(contracts, signers, user) {
                 1000 * i,
                 user.address
             )
-        }
-
-        // reward cycle 1-9, 0 per nft
-        for (let i = 1; i < 10; i++) {
-            await reward(contracts, signers, i, 0, 0);
-        }
-        // reward cycle 10-19, 3 per nft
-        for (let i = 10; i < 20; i++) {
-            await reward(contracts, signers, i, 100, 300);
-        }
-        // reward cycle 20-29, 2 per nft
-        for (let i = 20; i < 30; i++) {
-            await reward(contracts, signers, i, 300, 600);
-        }
-        // reward cycle 20-29, 2 per nft
-        for (let i = 30; i < 40; i++) {
-            await reward(contracts, signers, i, 600, 600);
         }
 
         //tokens to redeem
@@ -218,6 +205,7 @@ async function mintAndRedeem(contracts, signers, user) {
 
 module.exports = {
     setupDeMine,
+    airdrop,
     mintAndRedeem,
     id,
     ids,

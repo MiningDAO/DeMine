@@ -3,17 +3,18 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/IERC1155ReceiverUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./DeMineNFT.sol";
 
 /// @author Shu Dong
 contract DeMineAgent is
     OwnableUpgradeable,
-    IERC1155Receiver
+    IERC1155ReceiverUpgradeable
 {
     using SafeERC20 for IERC20;
 
+    event PoolSet(uint128 indexed, address indexed, uint256);
     event PoolTransfer(uint128 indexed, address indexed, address indexed);
     event List(address indexed, address indexed, uint256[], uint256[], uint256[]);
     event Unlist(address indexed, address indexed, uint256[]);
@@ -256,13 +257,13 @@ contract DeMineAgent is
         emit PoolTransfer(pool, _msgSender(), newOwner);
     }
 
-    function setPool(
-        uint128 pool,
-        address owner,
-        uint256 costPerToken
-    ) external onlyNFT {
-        _pools[pool].owner = owner;
-        _pools[pool].costPerToken = costPerToken;
+    function poolInfo(
+        uint128 pool
+    ) external view returns(address, uint256) {
+        return (
+            _pools[pool].owner,
+            _pools[pool].costPerToken
+        );
     }
 
     function onERC1155Received(
@@ -270,18 +271,15 @@ contract DeMineAgent is
         address from,
         uint256 id,
         uint256 amount,
-        bytes calldata
+        bytes memory data
     ) external onlyNFT override returns (bytes4) {
         require(
             from == address(0),
-            "only newly minted token allowed"
+            "DeMineAgent: only newly minted token allowed"
         );
+        setPool(data);
         _stats[id].locked += amount;
-        return bytes4(
-            keccak256(
-                "onERC1155Received(address,address,uint256,uint256,bytes)"
-            )
-        );
+        return IERC1155ReceiverUpgradeable.onERC1155Received.selector;
     }
 
     function onERC1155BatchReceived(
@@ -289,27 +287,28 @@ contract DeMineAgent is
         address from,
         uint256[] calldata ids,
         uint256[] calldata amounts,
-        bytes calldata
+        bytes memory data
     ) external onlyNFT override returns (bytes4) {
         require(
             from == address(0),
-            "only newly minted token allowed"
+            "DeMineAgent: only newly minted token allowed"
         );
+        setPool(data);
         for (uint256 i = 0; i < ids.length; i++) {
             _stats[ids[i]].locked += amounts[i];
         }
-        return bytes4(
-            keccak256(
-                "onERC1155BatchReceived(address,address,uint256[],uint256[],bytes)"
-            )
-        );
+        return IERC1155ReceiverUpgradeable.onERC1155BatchReceived.selector;
     }
 
-    function setRewardRecipient(
-        address newRewardRecipient
-    ) external onlyOwner {
-        emit RewardRecipientSet(_rewardRecipient, newRewardRecipient);
-        _rewardRecipient = newRewardRecipient;
+    function setPool(bytes memory data) private {
+        (
+            uint128 pool,
+            address owner,
+            uint256 costPerToken
+        ) = abi.decode(data, (uint128, address, uint256));
+        _pools[pool].owner = owner;
+        _pools[pool].costPerToken = costPerToken;
+        emit PoolSet(pool, owner, costPerToken);
     }
 
     function setPayment(
@@ -324,9 +323,7 @@ contract DeMineAgent is
         _payments[payment] = newRecipient;
     }
 
-    function paymentInfo(
-        address payment
-    ) external view returns(address) {
+    function paymentInfo(address payment) external view returns(address) {
         return _payments[payment];
     }
 
@@ -352,6 +349,13 @@ contract DeMineAgent is
         );
     }
 
+    function setRewardRecipient(
+        address newRewardRecipient
+    ) external onlyOwner {
+        emit RewardRecipientSet(_rewardRecipient, newRewardRecipient);
+        _rewardRecipient = newRewardRecipient;
+    }
+
     function withdraw(
         address[] calldata payments,
         uint256[] calldata amounts
@@ -371,12 +375,6 @@ contract DeMineAgent is
             _income[sender][payment] -= amounts[i];
         }
         emit Withdraw(sender, payments, amounts);
-    }
-
-    function isPaymentSupported(
-        address payment
-    ) external view returns(bool) {
-        return _payments[payment] != address(0);
     }
 
     function listingInfo(
@@ -423,6 +421,6 @@ contract DeMineAgent is
         override
         returns (bool)
     {
-        return interfaceId == type(IERC1155Receiver).interfaceId;
+        return interfaceId == type(IERC1155ReceiverUpgradeable).interfaceId;
     }
 }

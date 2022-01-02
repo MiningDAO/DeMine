@@ -59,7 +59,7 @@ contract DeMineNFT is
         uint128 numCycles,
         uint256[] calldata supplies,
         uint256 costPerToken,
-        address issuer
+        address owner
     ) external onlyOwner {
         require(
             supplies.length == numCycles,
@@ -75,11 +75,13 @@ contract DeMineNFT is
             ids[i] = (uint256(_pool) << 128) + startCycle + i;
             _cycles[startCycle + i].supply += supplies[i];
         }
-        DeMineAgent(_agent).setPool(
-            _pool, issuer, costPerToken
+        _mintBatch(
+            _agent,
+            ids,
+            supplies,
+            abi.encode(_pool, owner, costPerToken)
         );
-        _mintBatch(_agent, ids, supplies, "");
-        emit NewPool(_pool, issuer, costPerToken, info);
+        emit NewPool(_pool, owner, costPerToken, info);
     }
 
     function reward(

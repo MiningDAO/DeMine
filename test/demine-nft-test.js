@@ -155,8 +155,23 @@ describe("DeMine NFT", function () {
         let { nft, agent, rewardToken, costTokens } = contracts;
         const [user1, user2, _] = signers.users;
         let { ids, amounts } = await utils.mintAndRedeem(
-            contracts, signers, user1
+            contracts, signers.admin, user1
         );
+
+        // reward cycle 1-40, 0 per nft
+        for (let i = 1; i < 10; i++) {
+            await utils.reward(contracts, signers, i, 0, 0);
+        }
+        for (let i = 10; i < 20; i++) {
+            await utils.reward(contracts, signers, i, 100, 300);
+        }
+        for (let i = 20; i < 30; i++) {
+            await utils.reward(contracts, signers, i, 300, 600);
+        }
+        for (let i = 30; i < 40; i++) {
+            await utils.reward(contracts, signers, i, 600, 600);
+        }
+
         // cashout with insufficient balance, should fail
         await expect(
             nft.connect(user2).cashout(
@@ -296,7 +311,7 @@ describe("DeMine NFT", function () {
         let { nft } = contracts;
         const [user1, user2, _] = signers.users;
         let { ids, amounts } = await utils.mintAndRedeem(
-            contracts, signers, user1
+            contracts, signers.admin, user1
         );
         let id = ids[0];
         let amount = amounts[0];
@@ -381,7 +396,7 @@ describe("DeMine NFT", function () {
         let { nft } = contracts;
         const [user1, user2, _] = signers.users;
         let { ids, amounts } = await utils.mintAndRedeem(
-            contracts, signers, user1
+            contracts, signers.admin, user1
         );
         // not enough balance, should fail
         await expect(
