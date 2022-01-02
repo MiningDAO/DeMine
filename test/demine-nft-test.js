@@ -1,9 +1,8 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const utils = require("./demine-test-utils.js");
-const ERC1155 = require("./ERC1155.js");
 
-describe("DeMine", function () {
+describe("DeMine NFT", function () {
     const OwnableError = "Ownable: caller is not the owner";
     var signers;
     var costTokens;
@@ -119,7 +118,7 @@ describe("DeMine", function () {
         agent = value.agent;
     });
 
-    it("nft: should be ERC2981", async function () {
+    it("ERC2981", async function () {
         let admin = signers.admin;
         // set with non-admin
         await expect(
@@ -144,7 +143,7 @@ describe("DeMine", function () {
         expect(value).to.equal(10);
     });
 
-    it("nft: create new pool test", async function () {
+    it("create pool tests", async function () {
         const admin = signers.admin;
         const [user1, user2, _] = signers.users;
 
@@ -205,7 +204,7 @@ describe("DeMine", function () {
         }
     });
 
-    it("nft: reward test", async function() {
+    it("reward tests", async function() {
         const admin = signers.admin;
         const rewarder = signers.rewarder;
         const [user1, _] = signers.users;
@@ -254,7 +253,7 @@ describe("DeMine", function () {
         }
     });
 
-    it("nft: cashout test", async function () {
+    it("cashout test", async function () {
         const [user1, user2, _] = signers.users;
         let { ids, amounts} = await setupNFT(user1);
         // cashout with insufficient balance, should fail
@@ -367,7 +366,7 @@ describe("DeMine", function () {
         expect(nftBefore.sub(nftAfter).eq(delta)).to.be.true;
     });
 
-    it("nft: ERC1155", async function () {
+    it("ERC1155 general", async function () {
         const [user1, user2, _] = signers.users;
 
         // test uri
@@ -391,7 +390,7 @@ describe("DeMine", function () {
         ).to.be.true;
     });
 
-    it("nft: ERC1155 transfer", async function () {
+    it("ERC1155 transfer", async function () {
         const [user1, user2, _] = signers.users;
         let { ids, amounts } = await setupNFT(user1);
         let id = ids[0];
@@ -473,7 +472,7 @@ describe("DeMine", function () {
         expect(before2.sub(after2).eq(amount)).to.be.true;
     });
 
-    it("nft: ERC1155 batch transfer", async function () {
+    it("ERC1155 batch transfer", async function () {
         const [user1, user2, _] = signers.users;
         let { ids, amounts } = await setupNFT(user1);
 

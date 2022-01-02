@@ -58,12 +58,6 @@ NFT Contract only:
 - receive nft, from non-nft should fail
 - receive nft, token stats should be updated
 
-DeMineAgent View:
-- isPaymentSupported
-- listingInfo
-- tokenInfo
-- incomeInfo
-
 DeMineAgent State Update:
 - set reward token recipient from non owner should fail
 - set reward token recipient, recipient should be updated
@@ -150,3 +144,9 @@ DeMineAgent Actions:
     - token stats should be updated
     - owner should receive reward tokens
     - tokens should be burned
+
+DeMineAgent View:
+- isPaymentSupported
+- listingInfo
+- tokenInfo
+- incomeInfo
