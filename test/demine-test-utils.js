@@ -74,19 +74,12 @@ function id(pool, cycle) {
     return base.mul(pool).add(cycle);
 }
 
-function newPool(
-    pool,
-    startCycle,
-    numCycles,
-    supplyPerCycle
-) {
+function ids(pool, startCycle, numCycles) {
     var ids = [];
-    var supplies = [];
     for (let i = 0; i < numCycles; i++) {
         ids[i] = id(pool, startCycle + i);
-        supplies[i] = supplyPerCycle;
     }
-    return { ids, supplies };
+    return ids;
 }
 
 module.exports = {
@@ -94,5 +87,5 @@ module.exports = {
     setupPaymentTokens,
     setupDeMine,
     id,
-    newPool
+    ids
 };

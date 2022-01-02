@@ -6,14 +6,6 @@ ERC2981:
 [x] setRoyaltyInfo from non-owner should fail
 [x] setRoyaltyInfo, getRoyaltyInfo should updated
 
-ERC1155:
-- transfer/transferBatch with account owner
-  - balanceOf/balanceOfBatch should be updated
-- SetApprovedForAll
-- isApprovedForAll
-- transfer/transferBatch with authorized operator
-  - balanceOf/balanceOfBatch should be updated
-
 DeMineNFT Specific:
 - create new pool from non owner, should fail
 - create new pool with wrong supply array, should fail
@@ -38,6 +30,15 @@ DeMineNFT Specific:
   - tokens should be burned
   - recipient should receive reward tokens
   - reward token balance of nft contract should decrease
+
+ERC1155:
+- check uri
+- transfer/transferBatch with account owner
+  - balanceOf/balanceOfBatch should be updated
+- SetApprovedForAll
+- isApprovedForAll
+- transfer/transferBatch with authorized operator
+  - balanceOf/balanceOfBatch should be updated
 
 ## DeMineAgent
 
