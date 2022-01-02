@@ -53,7 +53,7 @@ ERC1155:
 ## DeMineAgent
 
 NFT Contract only:
-- pool set, from non-nft should fail
+[x] pool set, from non-nft should fail
 - pool set, pool stats should be updated
 - receive nft, from non-nft should fail
 - receive nft, token stats should be updated

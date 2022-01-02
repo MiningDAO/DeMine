@@ -25,5 +25,10 @@ describe("DeMine Agent", function () {
     });
 
     it("only nft functions", async function () {
+        await expect(
+            agent.connect(admin).setPool(1, 1000)
+        ).to.be.revertedWith(
+            "DeMineAgent: only nft contract allowed"
+        );
     });
 });

@@ -117,12 +117,108 @@ async function signers() {
     };
 }
 
+async function reward(nft, rewardToken, signers, cycle, supply, totalReward) {
+    let { rewarder, admin } = signers;
+    let rewarderBalance = await rewardToken.balanceOf(rewarder.address);
+    let nftBalance = await rewardToken.balanceOf(nft.address);
+
+    // mint new reward tokens for rewarder
+    await rewardToken.connect(admin).mint(rewarder.address, totalReward);
+    expect(
+        await rewardToken.balanceOf(rewarder.address)
+    ).to.equal(rewarderBalance.add(totalReward));
+    await rewardToken.connect(
+        rewarder
+    ).increaseAllowance(nft.address, totalReward);
+
+    // reward tokens to nft contract from rewarder
+    let rewardPerToken = 0;
+    if (supply > 0) {
+        rewardPerToken = Math.floor(totalReward / supply);
+    }
+    await expect(
+        nft.connect(admin).reward(rewarder.address, totalReward)
+    ).to.emit(nft, "Reward").withArgs(
+        cycle,
+        rewarder.address,
+        rewardPerToken,
+        supply
+    );
+
+    // check reward token balance of rewarder and nft contract
+    expect(
+        await rewardToken.balanceOf(rewarder.address)
+    ).to.equal(rewarderBalance.add(totalReward - rewardPerToken * supply));
+    expect(
+        await rewardToken.balanceOf(nft.address)
+    ).to.equal(nftBalance.add(rewardPerToken * supply));
+}
+
+async function mintAndRedeem(nft, agent, rewardToken, costTokens, signers, user) {
+        let admin = signers.admin;
+        // create pools
+        for (let i = 1; i <= 3; i++) {
+            await nft.connect(signers.admin).newPool(
+                "pool",
+                10 * i,
+                120,
+                Array(120).fill(100 * i),
+                1000 * i,
+                user.address
+            )
+        }
+
+        // reward cycle 1-9, 0 per nft
+        for (let i = 1; i < 10; i++) {
+            await reward(nft, rewardToken, signers, i, 0, 0);
+        }
+        // reward cycle 10-19, 3 per nft
+        for (let i = 10; i < 20; i++) {
+            await reward(nft, rewardToken, signers, i, 100, 300);
+        }
+        // reward cycle 20-29, 2 per nft
+        for (let i = 20; i < 30; i++) {
+            await reward(nft, rewardToken, signers, i, 300, 600);
+        }
+        // reward cycle 20-29, 2 per nft
+        for (let i = 30; i < 40; i++) {
+            await reward(nft, rewardToken, signers, i, 600, 600);
+        }
+
+        //tokens to redeem
+        let ids = [];
+        let amounts = [];
+        for (let i = 10; i < 40; i++) {
+            if (i < 20) {
+                ids.push(id(1, i));
+                amounts.push(10);
+            } else if (i < 30) {
+                ids.push(id(2, i));
+                amounts.push(20);
+            } else if (i < 40) {
+                ids.push(id(3, i));
+                amounts.push(30);
+            }
+        }
+
+        // get cost tokens to redeem
+        await costTokens[0].connect(
+            admin
+        ).mint(user.address, 10000000);
+        await costTokens[0].connect(user).approve(agent.address, 10000000);
+        await agent.connect(user).redeem(costTokens[0].address, ids, amounts);
+        return { ids, amounts };
+    };
+
+
 module.exports = {
     setupRewardToken,
     setupPaymentTokens,
     setupDeMine,
+    mintAndRedeem,
     id,
     ids,
     checkBalances,
-    signers
+    signers,
+    reward,
 };

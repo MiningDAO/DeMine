@@ -10,100 +10,6 @@ describe("DeMine NFT", function () {
     var nft;
     var agent;
 
-    let reward = async function(cycle, supply, totalReward) {
-        let rewarder = signers.rewarder;
-        let rewarderBalance = await rewardToken.balanceOf(rewarder.address);
-        let nftBalance = await rewardToken.balanceOf(nft.address);
-
-        // mint new reward tokens for rewarder
-        await rewardToken.connect(
-            signers.admin
-        ).mint(rewarder.address, totalReward);
-        expect(
-            await rewardToken.balanceOf(rewarder.address)
-        ).to.equal(rewarderBalance.add(totalReward));
-        await rewardToken.connect(
-            rewarder
-        ).increaseAllowance(nft.address, totalReward);
-
-        // reward tokens to nft contract from rewarder
-        let rewardPerToken = 0;
-        if (supply > 0) {
-            rewardPerToken = Math.floor(totalReward / supply);
-        }
-        await expect(
-            nft.connect(signers.admin).reward(rewarder.address, totalReward)
-        ).to.emit(nft, "Reward").withArgs(
-            cycle,
-            rewarder.address,
-            rewardPerToken,
-            supply
-        );
-
-        // check reward token balance of rewarder and nft contract
-        expect(
-            await rewardToken.balanceOf(rewarder.address)
-        ).to.equal(rewarderBalance.add(totalReward - rewardPerToken * supply));
-        expect(
-            await rewardToken.balanceOf(nft.address)
-        ).to.equal(nftBalance.add(rewardPerToken * supply));
-    };
-
-    let setupNFT = async function (user) {
-        // create pools
-        for (let i = 1; i <= 3; i++) {
-            await nft.connect(signers.admin).newPool(
-                "pool",
-                10 * i,
-                120,
-                Array(120).fill(100 * i),
-                1000 * i,
-                user.address
-            )
-        }
-
-        // reward cycle 1-9, 0 per nft
-        for (let i = 1; i < 10; i++) {
-            await reward(i, 0, 0);
-        }
-        // reward cycle 10-19, 3 per nft
-        for (let i = 10; i < 20; i++) {
-            await reward(i, 100, 300);
-        }
-        // reward cycle 20-29, 2 per nft
-        for (let i = 20; i < 30; i++) {
-            await reward(i, 300, 600);
-        }
-        // reward cycle 20-29, 2 per nft
-        for (let i = 30; i < 40; i++) {
-            await reward(i, 600, 600);
-        }
-
-        //tokens to redeem
-        let ids = [];
-        let amounts = [];
-        for (let i = 10; i < 40; i++) {
-            if (i < 20) {
-                ids.push(utils.id(1, i));
-                amounts.push(10);
-            } else if (i < 30) {
-                ids.push(utils.id(2, i));
-                amounts.push(20);
-            } else if (i < 40) {
-                ids.push(utils.id(3, i));
-                amounts.push(30);
-            }
-        }
-
-        // get cost tokens to redeem
-        await costTokens[0].connect(
-            signers.admin
-        ).mint(user.address, 10000000);
-        await costTokens[0].connect(user).approve(agent.address, 10000000);
-        await agent.connect(user).redeem(costTokens[0].address, ids, amounts);
-        return { ids, amounts };
-    };
-
     before(async function() { signers = await utils.signers(); });
 
     beforeEach(async function() {
@@ -164,7 +70,7 @@ describe("DeMine NFT", function () {
 
         // reward 9 cycle with 0 supply
         for (let i = 1; i < 10; i++) {
-            await reward(i, 0, 0);
+            await utils.reward(nft, rewardToken, signers, i, 0, 0);
         }
 
         // create new pool with rewarded start cycle
@@ -205,9 +111,7 @@ describe("DeMine NFT", function () {
     });
 
     it("reward tests", async function() {
-        const admin = signers.admin;
-        const rewarder = signers.rewarder;
-        const [user1, _] = signers.users;
+        const { admin, rewarder, users: [user1, _] } = signers;
 
         let startCycle = 10;
         // create new pool successfully
@@ -217,7 +121,7 @@ describe("DeMine NFT", function () {
 
         // reward cycle with 0 supply
         for (let i = 1; i < startCycle; i++) {
-            await reward(i, 0, 0);
+            await utils.reward(nft, rewardToken, signers, i, 0, 0);
         }
 
         // reward with non-owner, should revert
@@ -245,17 +149,19 @@ describe("DeMine NFT", function () {
 
         // reward with total reward divisiable by supply
         for (let i = startCycle; i < 20; i++) {
-            await reward(i, 100, 1000);
+            await utils.reward(nft, rewardToken, signers, i, 100, 1000);
         }
         // reward with total reward not divisiable by supply
         for (let i = 20; i < 40; i++) {
-            await reward(i, 100, 910);
+            await utils.reward(nft, rewardToken, signers, i, 100, 910);
         }
     });
 
     it("cashout test", async function () {
         const [user1, user2, _] = signers.users;
-        let { ids, amounts} = await setupNFT(user1);
+        let { ids, amounts } = await utils.mintAndRedeem(
+            nft, agent, rewardToken, costTokens, signers, user1
+        );
         // cashout with insufficient balance, should fail
         await expect(
             nft.connect(user2).cashout(
@@ -392,7 +298,9 @@ describe("DeMine NFT", function () {
 
     it("ERC1155 transfer", async function () {
         const [user1, user2, _] = signers.users;
-        let { ids, amounts } = await setupNFT(user1);
+        let { ids, amounts } = await utils.mintAndRedeem(
+            nft, agent, rewardToken, costTokens, signers, user1
+        );
         let id = ids[0];
         let amount = amounts[0];
 
@@ -474,8 +382,9 @@ describe("DeMine NFT", function () {
 
     it("ERC1155 batch transfer", async function () {
         const [user1, user2, _] = signers.users;
-        let { ids, amounts } = await setupNFT(user1);
-
+        let { ids, amounts } = await utils.mintAndRedeem(
+            nft, agent, rewardToken, costTokens, signers, user1
+        );
         // not enough balance, should fail
         await expect(
             nft.connect(user2).safeBatchTransferFrom(
