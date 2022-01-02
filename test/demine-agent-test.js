@@ -7,6 +7,14 @@ describe("DeMine Agent", function () {
     var signers;
     var contracts;
 
+    let checkBalances = async function(user, ids, expected)  {
+        let users = Array(ids.length).fill(user.address);
+        let balances = await nft.balanceOfBatch(users, ids);
+        for (var i = 0; i < ids.length; i++) {
+            expect(balances[i]).to.equal(expected[i]);
+        }
+    }
+
     before(async function() {
         signers = await utils.signers();
     });
@@ -31,13 +39,6 @@ describe("DeMine Agent", function () {
             1, user1.address, 1000
         );
 
-        let checkBalances = async function(user, ids, expected)  {
-            let users = Array(120).fill(user.address);
-            let balances = await nft.balanceOfBatch(users, ids);
-            for (var i = 0; i < ids.length; i++) {
-                expect(balances[i]).to.equal(expected[i]);
-            }
-        }
         checkBalances(agent, ids, supplies);
 
         // redeem all to user
@@ -141,5 +142,82 @@ describe("DeMine Agent", function () {
         ).to.emit(agent, "CustodianSet").withArgs(
             custodian.address, user1.address
         );
+    });
+
+    it("redeem", async function () {
+        // setup
+        const { admin, custodian, users: [user1, _] } = signers;
+        const { nft, agent, payments: [p1, p2, p3] } = contracts;
+        let numCycles = 120;
+        let supplies = Array(numCycles).fill(100);
+        await nft.connect(admin).newPool(
+            "pool", 10, 120, supplies, 1000, user1.address
+        ); // pool 1
+        await nft.connect(admin).newPool(
+            "pool", 10, 120, supplies, 1000, user1.address
+        ); // pool 2
+        await nft.connect(admin).newPool(
+            "pool", 10, 120, supplies, 1000, user2.address
+        ); // pool 3
+        await utils.airdrop(p1, admin, user1, agent, 100000000);
+        await utils.airdrop(p2, admin, user1, agent, 100000000);
+        await agent.connect(admin).setPayment(p2.address, false);
+
+        // test start
+        let ids = [utils.id(1, 10), utils.id(2, 10)];
+        await expect(
+            agent.connect(user1).redeem(p1.address, ids, [100, 100, 100])
+        ).to.be.revertedWith("DeMineAgent: array length mismatch");
+
+        await expect(
+            agent.connect(user1).redeem(p2.address, ids, [100, 100])
+        ).to.be.revertedWith("DeMineAgent: payment method not supported");
+
+        await expect(
+            agent.connect(user1).redeem(p1.address, ids, [100, 1000])
+        ).to.be.revertedWith("DeMineAgent: insufficient balance to liquidize");
+
+        await expect(
+            agent.connect(user1).redeem(
+                p1.address,
+                ids.concat([utils.id(3, 10)]),
+                [100, 100, 100]
+            )
+        ).to.be.revertedWith("DeMineAgent: only token owner allowed");
+
+        await expect(
+            agent.connect(user1).redeem(p3.address, ids, [50, 50])
+        ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+
+        await checkBalances(agent, ids, [100, 100]);
+        await checkBalances(user1, ids, [0, 0]);
+        let b1 = await p1.balanceOf(user1.address);
+        let bc = await p1.balanceOf(custodian.address);
+        for (let i = 0; i < ids; i++) {
+            let tokeninfo = await agent.tokeninfo(ids[i]);
+            expect(tokeninfo).to.deep.equal([false, 0, 100, 0]);
+        }
+
+        let totalCost = 1000 * 50 * 2;
+        await expect(
+            agent.connect(user1).redeem(p1.address, ids, [50, 50])
+        ).to.emit(agent, "Redeem").withArgs(
+            user1.address, totalCost, ids, [50, 50]
+        );
+
+        await checkBalances(agent, ids, [50, 50]);
+        await checkBalances(user1, ids, [50, 50]);
+        let b12 = await p1.balanceOf(user1.address);
+        let bc2 = await p1.balanceOf(custodian.address);
+        expect(b1.sub(b12)).to.equal(totalCost);
+        expect(bc2.sub(bc)).to.equal(totalCost);
+
+        for (let i = 0; i < ids; i++) {
+            let tokeninfo = await agent.tokeninfo(ids[i]);
+            expect(tokeninfo).to.deep.equal([false, 50, 50, 0]);
+        }
+    });
+
+    it("list and unlist", async function () {
     });
 });

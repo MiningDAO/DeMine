@@ -118,10 +118,11 @@ contract DeMineAgent is
         address to,
         uint256[] calldata ids
     ) external {
+        address sender = _msgSender();
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             require(
-                _msgSender() == _pools[uint128(id >> 128)].owner,
+                sender == _pools[uint128(id >> 128)].owner,
                 "DeMineAgent: only token owner allowed"
             );
             require(
@@ -133,7 +134,7 @@ contract DeMineAgent is
             _stats[id].listed -= amount;
             _stats[id].listing[to].amount = 0;
         }
-        emit Unlist(_msgSender(), to, ids);
+        emit Unlist(sender, to, ids);
     }
 
     function claim(
@@ -209,27 +210,28 @@ contract DeMineAgent is
             "DeMineAgent: payment method not supported"
         );
         uint256 totalCost;
+        address sender = _msgSender();
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             uint128 pool = uint128(id >> 128);
             require(
-                _msgSender() == _pools[pool].owner,
+                sender == _pools[pool].owner,
                 "DeMineAgent: only token owner allowed"
             );
             uint256 locked = _stats[id].locked;
             require(
                 locked >= amounts[i],
-                "DeMineAdmin: insufficient balance to liquidize"
+                "DeMineAgent: insufficient balance to liquidize"
             );
             _stats[id].locked = locked - amounts[i];
             _stats[id].liquidized += amounts[i];
             totalCost += _pools[pool].costPerToken * amounts[i];
         }
-        IERC20(payment).safeTransferFrom(_msgSender(), _custodian, totalCost);
+        IERC20(payment).safeTransferFrom(sender, _custodian, totalCost);
         DeMineNFT(_nft).safeBatchTransferFrom(
-            address(this), _msgSender(), ids, amounts, ""
+            address(this), sender, ids, amounts, ""
         );
-        emit Redeem(_msgSender(), totalCost, ids, amounts);
+        emit Redeem(sender, totalCost, ids, amounts);
     }
 
     function transferPool(

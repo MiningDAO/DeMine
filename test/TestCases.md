@@ -74,16 +74,16 @@ DeMineAgent State Update:
   - check isPaymentSupported()
 
 DeMineAgent Redeem Action
- - [ ] with non token issuer, should fail
- - [ ] with unsupported payment method, should fail
- - [ ] with amount larger than total locked, should fail
- - [ ] with not enough tokens to pay, should fail
- - [ ] with correct ids and amounts
-    - token stats should be updated
-    - cost recipient should be paid with proper payment method
+ - [x] with array length not match, should fail
+ - [x] with non token issuer, should fail
+ - [x] with unsupported payment method, should fail
+ - [x] with amount larger than total locked, should fail
+ - [x] with not enough tokens to pay, should fail
+ - [x] with correct ids and amounts
+    - token stats should be updated(tokenInfo covered)
+    - custodian should be paid with proper payment method
     - nft token should be transferred from agent to token issuer
     - Redeem event should be emitted
-    - tokenInfo covered
 
 DeMineAgent List Action
  - [ ] with sender as non token issuer, should fail
@@ -126,7 +126,7 @@ DeMineAgent Claim Action
  - [ ] with not enough cost tokens to pay, should fail
  - [ ] with amount lower than listed for recipient
     - token stats should be updated
-    - cost recipient should be paid
+    - custodian should be paid
     - income of token issuer should increase
     - token should be transferred to claimer
  - [ ] with amount larger than listed for recipient but lower than total listed
