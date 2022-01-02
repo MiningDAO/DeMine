@@ -5,26 +5,18 @@ const utils = require("./demine-test-utils.js");
 describe("DeMine NFT", function () {
     const OwnableError = "Ownable: caller is not the owner";
     var signers;
-    var costTokens;
-    var rewardToken;
-    var nft;
-    var agent;
+    var contracts;
 
-    before(async function() { signers = await utils.signers(); });
+    before(async function() {
+        signers = await utils.signers();
+    });
 
     beforeEach(async function() {
-        rewardToken = await utils.setupRewardToken(signers.admin);
-        costTokens = await utils.setupPaymentTokens(signers.admin, 3);
-        const value = await utils.setupDeMine(
-            rewardToken,
-            costTokens,
-            signers
-        );
-        nft = value.nft;
-        agent = value.agent;
+        contracts = await utils.setupDeMine(signers);
     });
 
     it("ERC2981", async function () {
+        let { nft } = contracts;
         let admin = signers.admin;
         // set with non-admin
         await expect(
@@ -50,6 +42,7 @@ describe("DeMine NFT", function () {
     });
 
     it("create pool tests", async function () {
+        let { nft, agent } = contracts;
         const admin = signers.admin;
         const [user1, user2, _] = signers.users;
 
@@ -70,7 +63,7 @@ describe("DeMine NFT", function () {
 
         // reward 9 cycle with 0 supply
         for (let i = 1; i < 10; i++) {
-            await utils.reward(nft, rewardToken, signers, i, 0, 0);
+            await utils.reward(contracts, signers, i, 0, 0);
         }
 
         // create new pool with rewarded start cycle
@@ -111,6 +104,7 @@ describe("DeMine NFT", function () {
     });
 
     it("reward tests", async function() {
+        let { nft, rewardToken } = contracts;
         const { admin, rewarder, users: [user1, _] } = signers;
 
         let startCycle = 10;
@@ -121,7 +115,7 @@ describe("DeMine NFT", function () {
 
         // reward cycle with 0 supply
         for (let i = 1; i < startCycle; i++) {
-            await utils.reward(nft, rewardToken, signers, i, 0, 0);
+            await utils.reward(contracts, signers, i, 0, 0);
         }
 
         // reward with non-owner, should revert
@@ -149,18 +143,19 @@ describe("DeMine NFT", function () {
 
         // reward with total reward divisiable by supply
         for (let i = startCycle; i < 20; i++) {
-            await utils.reward(nft, rewardToken, signers, i, 100, 1000);
+            await utils.reward(contracts, signers, i, 100, 1000);
         }
         // reward with total reward not divisiable by supply
         for (let i = 20; i < 40; i++) {
-            await utils.reward(nft, rewardToken, signers, i, 100, 910);
+            await utils.reward(contracts, signers, i, 100, 910);
         }
     });
 
     it("cashout test", async function () {
+        let { nft, agent, rewardToken, costTokens } = contracts;
         const [user1, user2, _] = signers.users;
         let { ids, amounts } = await utils.mintAndRedeem(
-            nft, agent, rewardToken, costTokens, signers, user1
+            contracts, signers, user1
         );
         // cashout with insufficient balance, should fail
         await expect(
@@ -273,6 +268,7 @@ describe("DeMine NFT", function () {
     });
 
     it("ERC1155 general", async function () {
+        let { nft } = contracts;
         const [user1, user2, _] = signers.users;
 
         // test uri
@@ -297,9 +293,10 @@ describe("DeMine NFT", function () {
     });
 
     it("ERC1155 transfer", async function () {
+        let { nft } = contracts;
         const [user1, user2, _] = signers.users;
         let { ids, amounts } = await utils.mintAndRedeem(
-            nft, agent, rewardToken, costTokens, signers, user1
+            contracts, signers, user1
         );
         let id = ids[0];
         let amount = amounts[0];
@@ -381,9 +378,10 @@ describe("DeMine NFT", function () {
     });
 
     it("ERC1155 batch transfer", async function () {
+        let { nft } = contracts;
         const [user1, user2, _] = signers.users;
         let { ids, amounts } = await utils.mintAndRedeem(
-            nft, agent, rewardToken, costTokens, signers, user1
+            contracts, signers, user1
         );
         // not enough balance, should fail
         await expect(
