@@ -204,9 +204,9 @@ contract DeMineAgent is
     }
 
     function redeem(
+        address payment,
         uint256[] calldata ids,
-        uint256[] calldata amounts,
-        address payment
+        uint256[] calldata amounts
     ) external {
         require(
             ids.length == amounts.length,

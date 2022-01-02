@@ -109,16 +109,15 @@ contract DeMineNFT is
         uint256[] calldata ids,
         uint256[] calldata amounts
     ) external returns(uint256) {
+        require(
+            from == _msgSender() || isApprovedForAll(from, _msgSender()),
+            "ERC1155: transfer caller is not owner nor approved"
+        );
         _burnBatch(from, ids, amounts);
         uint256 totalReward;
         for (uint256 i = 0; i < ids.length; i++) {
-            uint256 id = ids[i];
-            uint128 cycle = uint128(id);
-            require(
-                cycle < _cycle,
-                "DeMineNFT: unrewarded cycle"
-            );
-            totalReward += amounts[i] * _cycles[cycle].rewardPerToken;
+            require(uint128(ids[i]) <= _cycle, "DeMineNFT: unrewarded cycle");
+            totalReward += amounts[i] * _cycles[uint128(ids[i])].rewardPerToken;
         }
         if (totalReward > 0) {
             IERC20(_rewardToken).safeTransfer(to, totalReward);

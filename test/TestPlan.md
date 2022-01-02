@@ -9,13 +9,13 @@ ERC2981:
 DeMineNFT Specific:
 [x] create new pool from non owner, should fail
 [x] create new pool with wrong supply array, should fail
-[] create new pool with start cycle too late, should fail
+[x] create new pool with start cycle too late, should fail
+[x] create new pool from rewarded cycles, should fail
 [x] create new pool
   - event TransferBatch from address(0) should be emitted
   - event NewPool should be emitted
   - DeMineAgent should with pool set
   - balanceOf issuer for ids should be same with supplies
-[x] create new pool from rewarded cycles, should fail
 
 [x] reward from non-owner should fail
 [x] reward with insufficient allowance, should fail
@@ -24,22 +24,25 @@ DeMineNFT Specific:
 [x] reward with reward divisible by cycle supply
 [x] reward with reward not divisible by cycle supply
 
-- cashout unrewarded cycle, should fail
-- cashout rewarded cycle with approved operator
+[x] cashout unrewarded cycle, should fail
+[x] cashout insufficient balance, should fail
+[x] cashout insufficient allowance, should fail
+[x] cashout with id and amounts array length mismatch, should fail
+[x] cashout rewarded cycle with approved operator
   - tokens should be burned
   - recipient should receive reward tokens
   - reward token balance of nft contract should decrease
-- cashout rewarded cycle with account owner
+[x] cashout rewarded cycle with account owner
   - tokens should be burned
   - recipient should receive reward tokens
   - reward token balance of nft contract should decrease
 
 ERC1155:
-- check uri
+[x] check uri
+[x] SetApprovedForAll
+[x] isApprovedForAll
 - transfer/transferBatch with account owner
   - balanceOf/balanceOfBatch should be updated
-- SetApprovedForAll
-- isApprovedForAll
 - transfer/transferBatch with authorized operator
   - balanceOf/balanceOfBatch should be updated
 

@@ -11,23 +11,13 @@ describe("DeMine", function () {
     var nft;
     var agent;
 
-    // state simulator
-    var simulator;
-
-    var checkBalances = async function(users, ids) {
-        let balances = await nft.balanceOfBatch(users, ids);
-        let expectedBalances = simulator.balanceOfBatch(users, ids);
-        expect(balances.length).to.equal(expectedBalances.length);
-        for (var i = 0; i < balances.length; i++) {
-            expect(balances[i].eq(expectedBalances[i])).to.be.true;
-        }
-    };
 
     var createPool = async function(
         pool, info, startCycle, numCycles, supplies, costPerToken, issuer
     ){
         let ids = utils.ids(pool, startCycle, numCycles);
-        simulator.mintBatch(agent.address, ids, supplies);
+        let users = Array(ids.length).fill(agent.address);
+        let before = await nft.balanceOfBatch(users, ids);
         await expect(
             nft.connect(signers.admin).newPool(
                 info, startCycle, numCycles, supplies, costPerToken, issuer
@@ -41,7 +31,10 @@ describe("DeMine", function () {
         ).to.emit(nft, "NewPool").withArgs(
             pool, issuer, costPerToken, info
         );
-        checkBalances(Array(ids.length).fill(agent.address), ids);
+        let after = await nft.balanceOfBatch(users, ids);
+        for (var i = 0; i < ids.length; i++) {
+            expect(after[i].sub(before[i]).eq(supplies[i])).to.be.true;
+        }
     };
 
     let reward = async function(cycle, supply, totalReward) {
@@ -83,6 +76,62 @@ describe("DeMine", function () {
         ).to.equal(nftBalance.add(rewardPerToken * supply));
     };
 
+    let setupNFT = async function () {
+        const [user1, _] = signers.users;
+        // create pools
+        for (let i = 1; i <= 3; i++) {
+            await nft.connect(signers.admin).newPool(
+                "pool",
+                10 * i,
+                120,
+                Array(120).fill(100 * i),
+                1000 * i,
+                user1.address
+            )
+        }
+
+        // reward cycle 1-9, 0 per nft
+        for (let i = 1; i < 10; i++) {
+            await reward(i, 0, 0);
+        }
+        // reward cycle 10-19, 3 per nft
+        for (let i = 10; i < 20; i++) {
+            await reward(i, 100, 300);
+        }
+        // reward cycle 20-29, 2 per nft
+        for (let i = 20; i < 30; i++) {
+            await reward(i, 300, 600);
+        }
+        // reward cycle 20-29, 2 per nft
+        for (let i = 30; i < 40; i++) {
+            await reward(i, 600, 600);
+        }
+
+        //tokens to redeem
+        let ids = [];
+        let amounts = [];
+        for (let i = 10; i < 40; i++) {
+            if (i < 20) {
+                ids.push(utils.id(1, i));
+                amounts.push(10);
+            } else if (i < 30) {
+                ids.push(utils.id(2, i));
+                amounts.push(20);
+            } else if (i < 40) {
+                ids.push(utils.id(3, i));
+                amounts.push(30);
+            }
+        }
+
+        // get cost tokens to redeem
+        await costTokens[0].connect(
+            signers.admin
+        ).mint(user1.address, 10000000);
+        await costTokens[0].connect(user1).approve(agent.address, 10000000);
+        await agent.connect(user1).redeem(costTokens[0].address, ids, amounts);
+        return { ids, amounts };
+    };
+
     before(async function() {
         [
             user1,
@@ -108,11 +157,11 @@ describe("DeMine", function () {
             ],
             users: [user1, user2, user3]
         };
-        rewardToken = await utils.setupRewardToken(signers.admin);
-        costTokens = await utils.setupPaymentTokens(signers.admin, 3);
     });
 
     beforeEach(async function() {
+        rewardToken = await utils.setupRewardToken(signers.admin);
+        costTokens = await utils.setupPaymentTokens(signers.admin, 3);
         const value = await utils.setupDeMine(
             rewardToken,
             costTokens,
@@ -120,7 +169,6 @@ describe("DeMine", function () {
         );
         nft = value.nft;
         agent = value.agent;
-        simulator = new ERC1155();
     });
 
     it("nft: should be ERC2981", async function () {
@@ -155,14 +203,14 @@ describe("DeMine", function () {
         // create new pool with non owner, should revert
         await expect(
             nft.connect(user1).newPool(
-                "pool0", 10, 120, supplies, 100, user2.address
+                "pool1", 10, 120, supplies, 100, user2.address
             )
         ).to.be.revertedWith(OwnableError);
 
         // create new pool with wrong supplies, should revert
         await expect(
             nft.connect(admin).newPool(
-                "pool0", 10, 120, supplies.concat([1000]), 100, user2.address
+                "pool1", 10, 120, supplies.concat([1000]), 100, user2.address
             )
         ).to.be.revertedWith("DeMineNFT: supply array length mismatch");
 
@@ -174,19 +222,19 @@ describe("DeMine", function () {
         // create new pool with invalid start cycle
         await expect(
             nft.connect(admin).newPool(
-                "pool0", 9, 120, supplies, 100, user2.address
+                "pool1", 9, 120, supplies, 100, user2.address
             )
         ).to.be.revertedWith("DeMineNFT: startCycle too early");
         // create new pool with invalid start cycle
         await expect(
             nft.connect(admin).newPool(
-                "pool0", 12, 120, supplies, 100, user2.address
+                "pool1", 12, 120, supplies, 100, user2.address
             )
         ).to.be.revertedWith("DeMineNFT: startCycle too early");
         // create new pool successfully
         let ids = await createPool(
             1,
-            "pool0",
+            "pool1",
             13,
             120,
             Array(120).fill(100),
@@ -198,19 +246,13 @@ describe("DeMine", function () {
     it("nft: reward test", async function() {
         const admin = signers.admin;
         const rewarder = signers.rewarder;
-        const [user1, user2, _] = signers.users;
+        const [user1, _] = signers.users;
 
         let startCycle = 10;
         // create new pool successfully
-        await createPool(
-            1,
-            "pool0",
-            startCycle,
-            120,
-            Array(120).fill(100),
-            3000,
-            user1.address
-        );
+        await nft.connect(signers.admin).newPool(
+            "pool1", startCycle, 120, Array(120).fill(100), 3000, user1.address
+        )
 
         // reward cycle with 0 supply
         for (let i = 1; i < startCycle; i++) {
@@ -248,6 +290,102 @@ describe("DeMine", function () {
         for (let i = 20; i < 40; i++) {
             await reward(i, 100, 910);
         }
+    });
+
+    it("nft: cashout test", async function () {
+        const [user1, user2, _] = signers.users;
+        let { ids, amounts} = await setupNFT();
+        // cashout with insufficient balance, should fail
+        await expect(
+            nft.connect(user2).cashout(
+                user2.address,
+                user1.address,
+                ids,
+                amounts
+            )
+        ).to.be.revertedWith("ERC1155: burn amount exceeds balance");
+
+        // cashout with ids and amounts array mismatch, should fail
+        await expect(
+            nft.connect(user1).cashout(
+                user1.address,
+                user2.address,
+                ids.concat([utils.id(3, 41)]),
+                amounts
+            )
+        ).to.be.revertedWith("ERC1155: ids and amounts length mismatch");
+
+        // cashout with insufficient allowance, should fail
+        await expect(
+            nft.connect(user2).cashout(
+                user1.address,
+                user2.address,
+                ids,
+                amounts
+            )
+        ).to.be.revertedWith(
+            "ERC1155: transfer caller is not owner nor approved"
+        );
+
+        // cashout with unrewarded cycle, should fail
+        let unrewarded = utils.id(3, 41);
+        await agent.connect(user1).redeem(
+            costTokens[0].address,
+            [unrewarded],
+            [30]
+        );
+        await expect(
+            nft.connect(user1).cashout(
+                user1.address,
+                user2.address,
+                ids.concat([unrewarded]),
+                amounts.concat([30])
+            )
+        ).to.be.revertedWith("DeMineNFT: unrewarded cycle");
+
+        // redeem and cashout properly
+        let users = Array(ids.length).fill(user1.address);
+        await utils.checkBalances(users, ids, amounts);
+        let nftBefore = await rewardToken.balanceOf(nft.address);
+        let user2Before = await rewardToken.balanceOf(user2.address);
+        await nft.connect(user1).cashout(
+            user1.address,
+            user2.address,
+            ids,
+            amounts
+        );
+        await utils.checkBalances(users, ids, Array(ids.length).fill(0));
+        let nftAfter = await rewardToken.balanceOf(nft.address);
+        let user2After = await rewardToken.balanceOf(user2.address);
+        let delta = 10 * 3 * 10 + 20 * 2 * 10 + 30 * 1 * 10;
+        expect(user2After.sub(user2Before).eq(delta)).to.be.true;
+        expect(nftBefore.sub(nftAfter).eq(delta)).to.be.true;
+
+        // redeem more and cashout with approved user
+        await agent.connect(user1).redeem(costTokens[0].address, ids, amounts);
+        expect(
+            await nft.isApprovedForAll(user1.address, user2.address)
+        ).to.be.false;
+        await nft.connect(user1).setApprovalForAll(user2.address, true);
+        expect(
+            await nft.isApprovedForAll(user1.address, user2.address)
+        ).to.be.true;
+
+        await utils.checkBalances(users, ids, amounts);
+        nftBefore = await rewardToken.balanceOf(nft.address);
+        user2Before = await rewardToken.balanceOf(user2.address);
+        await nft.connect(user2).cashout(
+            user1.address,
+            user2.address,
+            ids,
+            amounts
+        );
+        await utils.checkBalances(users, ids, Array(ids.length).fill(0));
+        nftAfter = await rewardToken.balanceOf(nft.address);
+        user2After = await rewardToken.balanceOf(user2.address);
+        delta = 10 * 3 * 10 + 20 * 2 * 10 + 30 * 1 * 10;
+        expect(user2After.sub(user2Before).eq(delta)).to.be.true;
+        expect(nftBefore.sub(nftAfter).eq(delta)).to.be.true;
     });
 
     it("nft: ERC1155", async function () {

@@ -1,3 +1,4 @@
+const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 const base = ethers.BigNumber.from(2).pow(128);
@@ -82,10 +83,18 @@ function ids(pool, startCycle, numCycles) {
     return ids;
 }
 
+async function checkBalances(users, ids, amounts) {
+    let balances = await nft.balanceOfBatch(users, ids);
+    for (let i = 0; i < balances.length; i++) {
+        expect(balances[i].eq(amounts[i])).to.be.true;
+    }
+}
+
 module.exports = {
     setupRewardToken,
     setupPaymentTokens,
     setupDeMine,
     id,
-    ids
+    ids,
+    checkBalances
 };
