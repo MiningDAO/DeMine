@@ -21,11 +21,11 @@ contract DeMineAgent is
     event Claim(address indexed, uint256, uint256, uint256[], uint256[]);
     event Redeem(address indexed, uint256, uint256[], uint256[]);
     event Withdraw(address indexed, address[], uint256[]);
-    event PaymentSet(address indexed, address indexed, address indexed);
-    event RewardRecipientSet(address indexed, address indexed);
+    event PaymentSet(address indexed, bool);
+    event CustodianSet(address indexed, address indexed);
 
     address private _nft;
-    address private _rewardRecipient;
+    address private _custodian;
 
     struct Pool {
         address owner;
@@ -44,7 +44,7 @@ contract DeMineAgent is
         mapping(address => ListingInfo) listing;
     }
     mapping(uint256 => TokenInfo) private _stats;
-    mapping(address => address) private _payments;
+    mapping(address => bool) private _payments;
     mapping(address => mapping(address => uint256)) private _income;
 
     modifier onlyNFT {
@@ -56,20 +56,15 @@ contract DeMineAgent is
     }
 
     function initialize(
-        address[] memory paymentMethods,
-        address[] memory paymentRecipients,
-        address rewardRecipient,
+        address[] memory payments,
+        address custodian,
         address nftContract
     ) public initializer {
         __Ownable_init();
-        require(
-            paymentMethods.length == paymentRecipients.length,
-            "DeMineAgent: payment array length mismatch"
-        );
-        for (uint256 i = 0; i < paymentMethods.length; i++) {
-            _payments[paymentMethods[i]] = paymentRecipients[i];
+        for (uint256 i = 0; i < payments.length; i++) {
+            _payments[payments[i]] = true;
         }
-        _rewardRecipient = rewardRecipient;
+        _custodian = custodian;
         _nft = nftContract;
     }
 
@@ -151,7 +146,7 @@ contract DeMineAgent is
             "DeMineAgent: array length mismatch"
         );
         require(
-            _payments[payment] != address(0),
+            isPaymentSupported(payment),
             "DeMineAgent: payment method not supported"
         );
         address sender = _msgSender();
@@ -188,11 +183,7 @@ contract DeMineAgent is
             totalPrice += price;
             _income[_pools[pool].owner][payment] += (price - cost);
         }
-        IERC20(payment).safeTransferFrom(
-            sender,
-            _payments[payment],
-            totalCost
-        );
+        IERC20(payment).safeTransferFrom(sender, _custodian, totalCost);
         IERC20(payment).safeTransferFrom(
             sender,
             address(this),
@@ -214,7 +205,7 @@ contract DeMineAgent is
             "DeMineAgent: array length mismatch"
         );
         require(
-            _payments[payment] != address(0),
+            isPaymentSupported(payment),
             "DeMineAgent: payment method not supported"
         );
         uint256 totalCost;
@@ -234,11 +225,7 @@ contract DeMineAgent is
             _stats[id].liquidized += amounts[i];
             totalCost += _pools[pool].costPerToken * amounts[i];
         }
-        IERC20(payment).safeTransferFrom(
-            _msgSender(),
-            _payments[payment],
-            totalCost
-        );
+        IERC20(payment).safeTransferFrom(_msgSender(), _custodian, totalCost);
         DeMineNFT(_nft).safeBatchTransferFrom(
             address(this), _msgSender(), ids, amounts, ""
         );
@@ -311,19 +298,12 @@ contract DeMineAgent is
         emit PoolSet(pool, owner, costPerToken);
     }
 
-    function setPayment(
-        address payment,
-        address newRecipient
-    ) external onlyOwner {
-        emit PaymentSet(
-            payment,
-            _payments[payment],
-            newRecipient
-        );
-        _payments[payment] = newRecipient;
+    function setPayment(address payment, bool supported) external onlyOwner {
+        _payments[payment] = supported;
+        emit PaymentSet(payment, supported);
     }
 
-    function paymentInfo(address payment) external view returns(address) {
+    function isPaymentSupported(address payment) public view returns(bool) {
         return _payments[payment];
     }
 
@@ -343,17 +323,15 @@ contract DeMineAgent is
         }
         DeMineNFT(_nft).cashout(
             address(this),
-            _rewardRecipient,
+            _custodian,
             ids,
             amounts
         );
     }
 
-    function setRewardRecipient(
-        address newRewardRecipient
-    ) external onlyOwner {
-        emit RewardRecipientSet(_rewardRecipient, newRewardRecipient);
-        _rewardRecipient = newRewardRecipient;
+    function setCustodian(address newCustodian) external onlyOwner {
+        emit CustodianSet(_custodian, newCustodian);
+        _custodian = newCustodian;
     }
 
     function withdraw(

@@ -65,10 +65,11 @@ NFT Interaction
 [x] [transfer batch]receive nft, token stats should be updated
 
 DeMineAgent State Update:
-- set reward token recipient from non owner should fail
-- set reward token recipient, recipient should be updated
-- set payment from non owner should fail
-- set payment, payment info should be updated
+- set custodian, from non owner should fail
+- set custodian, recipient should be updated
+[x] set payment from non owner should fail
+[x] set payment, payment info should be updated
+  - check isPaymentSupported()
 
 DeMineAgent Actions:
 - list
@@ -152,7 +153,6 @@ DeMineAgent Actions:
     - tokens should be burned
 
 DeMineAgent View:
-- isPaymentSupported
 - listingInfo
 - tokenInfo
 - incomeInfo

@@ -152,7 +152,7 @@ describe("DeMine NFT", function () {
     });
 
     it("cashout test", async function () {
-        let { nft, agent, rewardToken, costTokens } = contracts;
+        let { nft, agent, rewardToken, payments } = contracts;
         const [user1, user2, _] = signers.users;
         let { ids, amounts } = await utils.mintAndRedeem(
             contracts, signers.admin, user1
@@ -207,7 +207,7 @@ describe("DeMine NFT", function () {
         // cashout with unrewarded cycle, should fail
         let unrewarded = utils.id(3, 41);
         await agent.connect(user1).redeem(
-            costTokens[0].address,
+            payments[0].address,
             [unrewarded],
             [30]
         );
@@ -251,7 +251,7 @@ describe("DeMine NFT", function () {
         expect(nftBefore.sub(nftAfter).eq(delta)).to.be.true;
 
         // redeem more and cashout with approved user
-        await agent.connect(user1).redeem(costTokens[0].address, ids, amounts);
+        await agent.connect(user1).redeem(payments[0].address, ids, amounts);
         await nft.connect(user1).setApprovalForAll(user2.address, true);
         await utils.checkBalances(users, ids, amounts);
         nftBefore = await rewardToken.balanceOf(nft.address);

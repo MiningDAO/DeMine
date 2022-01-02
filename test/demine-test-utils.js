@@ -22,7 +22,7 @@ async function setupRewardToken(admin) {
 
 async function setupPaymentTokens(admin, num) {
     const [tokenFactory, Token] = await setupERC20();
-    let costTokens = [];
+    let payments = [];
     for (let i = 0; i < num; i++) {
         const tx = await tokenFactory.create(
             "Cost" + i,
@@ -32,10 +32,10 @@ async function setupPaymentTokens(admin, num) {
         );
         const { events: events } = await tx.wait();
         const { address: address } = events.find(Boolean);
-        costTokens.push(await Token.attach(address));
+        payments.push(await Token.attach(address));
     }
 
-    return costTokens;
+    return payments;
 }
 
 function toAddresses(values) {
@@ -44,7 +44,7 @@ function toAddresses(values) {
 
 async function setupDeMine(signers) {
     const rewardToken = await setupRewardToken(signers.admin);
-    const costTokens = await setupPaymentTokens(signers.admin, 3);
+    const payments = await setupPaymentTokens(signers.admin, 3);
 
     const DeMineFactory = await ethers.getContractFactory("DeMineCloneFactory");
     demineFactory = await DeMineFactory.deploy();
@@ -59,9 +59,8 @@ async function setupDeMine(signers) {
         100,
         rewardToken.address,
         // agent
-        toAddresses(costTokens),
-        toAddresses(signers.costRecipients),
-        signers.rewardRecipient.address,
+        toAddresses(payments),
+        signers.custodian.address,
         // owner
         signers.admin.address
     );
@@ -71,7 +70,7 @@ async function setupDeMine(signers) {
     );
     nft = await NFT.attach(nftAddr);
     agent = await Agent.attach(agentAddr);
-    return { rewardToken, costTokens, nft, agent };
+    return { rewardToken, payments, nft, agent };
 }
 
 function id(pool, cycle) {
@@ -99,23 +98,15 @@ async function signers() {
         user2,
         user3,
         admin,
-        costRecipient1,
-        costRecipient2,
-        costRecipient3,
         rewarder,
-        rewardRecipient,
+        custodian,
         royaltyRecipient
     ] = await ethers.getSigners();
     return {
         admin: admin,
         rewarder: rewarder,
         royaltyRecipient: royaltyRecipient,
-        rewardRecipient: rewardRecipient,
-        costRecipients: [
-            costRecipient1,
-            costRecipient2,
-            costRecipient3
-        ],
+        custodian: custodian,
         users: [user1, user2, user3]
     };
 }
@@ -164,7 +155,7 @@ async function airdrop(token, admin, owner, spender, value) {
 }
 
 async function mintAndRedeem(contracts, admin, user) {
-        let { nft, agent, costTokens } = contracts;
+        let { nft, agent, payments } = contracts;
         // create pools
         for (let i = 1; i <= 3; i++) {
             await nft.connect(admin).newPool(
@@ -194,11 +185,11 @@ async function mintAndRedeem(contracts, admin, user) {
         }
 
         // get cost tokens to redeem
-        await costTokens[0].connect(
+        await payments[0].connect(
             admin
         ).mint(user.address, 10000000);
-        await costTokens[0].connect(user).approve(agent.address, 10000000);
-        await agent.connect(user).redeem(costTokens[0].address, ids, amounts);
+        await payments[0].connect(user).approve(agent.address, 10000000);
+        await agent.connect(user).redeem(payments[0].address, ids, amounts);
         return { ids, amounts };
     };
 

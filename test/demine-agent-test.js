@@ -17,14 +17,20 @@ describe("DeMine Agent", function () {
 
     it("ERC1155 Receiver", async function () {
         const { admin, users: [user1, user2, _] } = signers;
-        const { nft, costTokens, agent } = contracts;
+        const { nft, payments, agent } = contracts;
         let numCycles = 120;
         let ids = utils.ids(1, 10, numCycles);
         let supplies = Array(numCycles).fill(100);
+
         // create pool and receive tokens
-        await nft.connect(admin).newPool(
-            "pool", 10, 120, supplies, 1000, user1.address
+        await expect(
+            nft.connect(admin).newPool(
+                "pool", 10, 120, supplies, 1000, user1.address
+            )
+        ).to.emit(agent, "PoolSet").withArgs(
+            1, user1.address, 1000
         );
+
         let checkBalances = async function(user, ids, expected)  {
             let users = Array(120).fill(user.address);
             let balances = await nft.balanceOfBatch(users, ids);
@@ -36,10 +42,10 @@ describe("DeMine Agent", function () {
 
         // redeem all to user
         await utils.airdrop(
-            costTokens[0], admin, user1, agent, 100000000
+            payments[0], admin, user1, agent, 100000000
         );
         await agent.connect(user1).redeem(
-            costTokens[0].address, ids, supplies
+            payments[0].address, ids, supplies
         );
         checkBalances(agent, ids, Array(numCycles).fill(0));
         checkBalances(user1, ids, supplies);
@@ -97,6 +103,43 @@ describe("DeMine Agent", function () {
             agent.connect(user1).transferPool(1, user2.address)
         ).to.emit(agent, "PoolTransfer").withArgs(
             1, user1.address, user2.address
+        );
+    });
+
+    it("set payment", async function () {
+        let { admin, users: [user1, _] } = signers;
+        let { payments: [p1, p2, p3] } = contracts;
+        // get payment
+        expect(await agent.isPaymentSupported(p1.address)).to.be.true;
+        expect(await agent.isPaymentSupported(p2.address)).to.be.true;
+        expect(await agent.isPaymentSupported(p3.address)).to.be.true;
+
+        // set with non-owner, should fail
+        await expect(
+            agent.connect(user1).setPayment(p1.address, false)
+        ).to.be.revertedWith(OwnableError);
+
+        // set payment
+        await expect(
+            agent.connect(admin).setPayment(p1.address, false)
+        ).to.emit(agent, "PaymentSet").withArgs(
+            p1.address, false
+        );
+        expect(await agent.isPaymentSupported(p1.address)).to.be.false;
+    });
+
+    it("set reward token recipient", async function () {
+        let { custodian } = signers;
+        // set with non-owner, should fail
+        await expect(
+            agent.connect(user1).setCustodian(user1.address)
+        ).to.be.revertedWith(OwnableError);
+
+        // set with non-owner, should fail
+        await expect(
+            agent.connect(admin).setCustodian(user1.address)
+        ).to.emit(agent, "CustodianSet").withArgs(
+            custodian.address, user1.address
         );
     });
 });
