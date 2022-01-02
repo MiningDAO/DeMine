@@ -6,17 +6,18 @@ ERC2981:
  - [x] setRoyaltyInfo from non-owner should fail
  - [x] setRoyaltyInfo, getRoyaltyInfo should updated
 
-DeMineNFT Specific:
+DeMineNFT Create Pool
  - [x] create new pool from non owner, should fail
  - [x] create new pool with wrong supply array, should fail
  - [x] create new pool with start cycle too late, should fail
  - [x] create new pool from rewarded cycles, should fail
  - [x] create new pool
-  - event TransferBatch from address(0) should be emitted
-  - event NewPool should be emitted
-  - DeMineAgent should with pool set
-  - balanceOf issuer for ids should be same with supplies
+    - event TransferBatch from address(0) should be emitted
+    - event NewPool should be emitted
+    - DeMineAgent should with pool set
+    - balanceOf issuer for ids should be same with supplies
 
+DeMineNFT Reward
  - [x] reward from non-owner should fail
  - [x] reward with insufficient allowance, should fail
  - [x] reward with insufficient balance, should fail
@@ -24,18 +25,19 @@ DeMineNFT Specific:
  - [x] reward with reward divisible by cycle supply
  - [x] reward with reward not divisible by cycle supply
 
+DeMineNFT Cashout
  - [x] cashout unrewarded cycle, should fail
  - [x] cashout insufficient balance, should fail
  - [x] cashout insufficient allowance, should fail
  - [x] cashout with id and amounts array length mismatch, should fail
  - [x] cashout rewarded cycle with approved operator
-  - tokens should be burned
-  - recipient should receive reward tokens
-  - reward token balance of nft contract should decrease
+    - tokens should be burned
+    - recipient should receive reward tokens
+    - reward token balance of nft contract should decrease
  - [x] cashout rewarded cycle with account owner
-  - tokens should be burned
-  - recipient should receive reward tokens
-  - reward token balance of nft contract should decrease
+    - tokens should be burned
+    - recipient should receive reward tokens
+    - reward token balance of nft contract should decrease
 
 ERC1155:
  - [x] check uri
