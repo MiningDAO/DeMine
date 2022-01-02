@@ -90,11 +90,39 @@ async function checkBalances(users, ids, amounts) {
     }
 }
 
+async function signers() {
+    [
+        user1,
+        user2,
+        user3,
+        admin,
+        costRecipient1,
+        costRecipient2,
+        costRecipient3,
+        rewarder,
+        rewardRecipient,
+        royaltyRecipient
+    ] = await ethers.getSigners();
+    return {
+        admin: admin,
+        rewarder: rewarder,
+        royaltyRecipient: royaltyRecipient,
+        rewardRecipient: rewardRecipient,
+        costRecipients: [
+            costRecipient1,
+            costRecipient2,
+            costRecipient3
+        ],
+        users: [user1, user2, user3]
+    };
+}
+
 module.exports = {
     setupRewardToken,
     setupPaymentTokens,
     setupDeMine,
     id,
     ids,
-    checkBalances
+    checkBalances,
+    signers
 };

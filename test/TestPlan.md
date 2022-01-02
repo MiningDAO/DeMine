@@ -41,10 +41,14 @@ ERC1155:
 [x] check uri
 [x] SetApprovedForAll
 [x] isApprovedForAll
-- transfer/transferBatch with account owner
-  - balanceOf/balanceOfBatch should be updated
-- transfer/transferBatch with authorized operator
-  - balanceOf/balanceOfBatch should be updated
+[x] transferBatch with insufficient balance, should fail
+[x] transferBatch with nor approved, should fail
+[x] transferBatch with owner
+[x] transferBatch with approved user
+[x] transfer with insufficient balance, should fail
+[x] transfer with nor approved, should fail
+[x] transfer with owner
+[x] transfer with approved user
 
 ## DeMineAgent
 

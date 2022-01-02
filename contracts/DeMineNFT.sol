@@ -108,7 +108,7 @@ contract DeMineNFT is
         address to,
         uint256[] calldata ids,
         uint256[] calldata amounts
-    ) external returns(uint256) {
+    ) external {
         require(
             from == _msgSender() || isApprovedForAll(from, _msgSender()),
             "ERC1155: transfer caller is not owner nor approved"
@@ -122,7 +122,7 @@ contract DeMineNFT is
         if (totalReward > 0) {
             IERC20(_rewardToken).safeTransfer(to, totalReward);
         }
-        return totalReward;
+        emit Cashout(_msgSender(), from, to, totalReward);
     }
 
     // ERC 2981
