@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./DeMineNFT.sol";
@@ -12,6 +12,8 @@ contract DeMineAgent is
     OwnableUpgradeable,
     IERC1155Receiver
 {
+    using SafeERC20 for IERC20;
+
     event PoolTransfer(uint128 indexed, address indexed, address indexed);
     event List(address indexed, address indexed, uint256[], uint256[], uint256[]);
     event Unlist(address indexed, address indexed, uint256[]);
@@ -185,14 +187,12 @@ contract DeMineAgent is
             totalPrice += price;
             _income[_pools[pool].owner][payment] += (price - cost);
         }
-        safeTransferFrom(
-            IERC20(payment),
+        IERC20(payment).safeTransferFrom(
             sender,
             _payments[payment],
             totalCost
         );
-        safeTransferFrom(
-            IERC20(payment),
+        IERC20(payment).safeTransferFrom(
             sender,
             address(this),
             totalPrice - totalCost
@@ -233,8 +233,7 @@ contract DeMineAgent is
             _stats[id].liquidized += amounts[i];
             totalCost += _pools[pool].costPerToken * amounts[i];
         }
-        safeTransferFrom(
-            IERC20(payment),
+        IERC20(payment).safeTransferFrom(
             _msgSender(),
             _payments[payment],
             totalCost
@@ -368,7 +367,7 @@ contract DeMineAgent is
                 _income[sender][payment] > amounts[i],
                 "DeMineAgent: insufficient balance"
             );
-            safeTransfer(IERC20(payment), sender, amounts[i]);
+            IERC20(payment).safeTransfer(sender, amounts[i]);
             _income[sender][payment] -= amounts[i];
         }
         emit Withdraw(sender, payments, amounts);

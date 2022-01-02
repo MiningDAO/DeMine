@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
@@ -14,6 +14,8 @@ contract DeMineNFT is
     OwnableUpgradeable,
     IERC2981Upgradeable
 {
+    using SafeERC20 for IERC20;
+
     // Events
     event NewPool(uint128 indexed, address indexed, uint256, string);
     event Reward(uint128 indexed, address indexed, uint256, uint256);
@@ -87,8 +89,7 @@ contract DeMineNFT is
         _cycle += 1;
         if (_cycles[_cycle].supply > 0) {
             _cycles[_cycle].rewardPerToken = rewarded / _cycles[_cycle].supply;
-            safeTransferFrom(
-                IERC20(_rewardToken),
+            IERC20(_rewardToken).safeTransferFrom(
                 rewarder,
                 address(this),
                 _cycles[_cycle].rewardPerToken * _cycles[_cycle].supply
@@ -120,7 +121,7 @@ contract DeMineNFT is
             totalReward += amounts[i] * _cycles[cycle].rewardPerToken;
         }
         if (totalReward > 0) {
-            safeTransfer(IERC20(_rewardToken), to, totalReward);
+            IERC20(_rewardToken).safeTransfer(to, totalReward);
         }
         return totalReward;
     }

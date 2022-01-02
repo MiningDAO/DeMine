@@ -108,11 +108,11 @@ describe("DeMine", function () {
             ],
             users: [user1, user2, user3]
         };
-        rewardToken = await utils.setupRewardToken(signers.admin);
-        costTokens = await utils.setupPaymentTokens(signers.admin, 3);
     });
 
     beforeEach(async function() {
+        rewardToken = await utils.setupRewardToken(signers.admin);
+        costTokens = await utils.setupPaymentTokens(signers.admin, 3);
         const value = await utils.setupDeMine(
             rewardToken,
             costTokens,
@@ -197,7 +197,6 @@ describe("DeMine", function () {
 
     it("nft: reward test", async function() {
         const admin = signers.admin;
-        const rewarder = signers.rewarder;
         const [user1, user2, _] = signers.users;
 
         let startCycle = 10;
@@ -212,33 +211,20 @@ describe("DeMine", function () {
             user1.address
         );
 
-        // reward cycle with 0 supply
-        for (let i = 1; i < startCycle; i++) {
-            await reward(i, 0, 0);
-        }
-
         // reward with non-owner, should revert
         await expect(
             nft.connect(user1).reward(rewarder.address, 1000)
         ).to.be.revertedWith(OwnableError);
 
-        // reward with insufficient allowance
-        await rewardToken.connect(admin).mint(rewarder.address, 1000);
-        await expect(
-            nft.connect(admin).reward(rewarder.address, 1000)
-        ).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+        // reward cycle with 0 supply
+        for (let i = 1; i < startCycle; i++) {
+            await reward(i, 0, 0);
+        }
 
-        // reward with insufficient balances
-        await rewardToken.connect(rewarder).approve(nft.address, 10000);
         await expect(
-            nft.connect(admin).reward(rewarder.address, 10000)
+            await nft.connect(admin).reward(rewarder.address, 1000);
         ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
-
-        // reset rewardToken
-        await rewardToken.connect(admin).burn(rewarder.address, 1000);
-        await rewardToken.connect(
-            rewarder
-        ).decreaseAllowance(nft.address, 10000);
+        console.log(await tx.wait());
 
         // reward with total reward divisiable by supply
         for (let i = startCycle; i < 20; i++) {
