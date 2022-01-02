@@ -2,6 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./DeMineNFT.sol";
@@ -184,8 +185,18 @@ contract DeMineAgent is
             totalPrice += price;
             _income[_pools[pool].owner][payment] += (price - cost);
         }
-        pay(payment, sender, _payments[payment], totalCost);
-        pay(payment, sender, address(this), totalPrice - totalCost);
+        safeTransferFrom(
+            IERC20(payment),
+            sender,
+            _payments[payment],
+            totalCost
+        );
+        safeTransferFrom(
+            IERC20(payment),
+            sender,
+            address(this),
+            totalPrice - totalCost
+        );
         DeMineNFT(_nft).safeBatchTransferFrom(
             address(this), sender, ids, amounts, ""
         );
@@ -222,7 +233,12 @@ contract DeMineAgent is
             _stats[id].liquidized += amounts[i];
             totalCost += _pools[pool].costPerToken * amounts[i];
         }
-        pay(payment, _msgSender(), _payments[payment], totalCost);
+        safeTransferFrom(
+            IERC20(payment),
+            _msgSender(),
+            _payments[payment],
+            totalCost
+        );
         DeMineNFT(_nft).safeBatchTransferFrom(
             address(this), _msgSender(), ids, amounts, ""
         );
@@ -352,24 +368,10 @@ contract DeMineAgent is
                 _income[sender][payment] > amounts[i],
                 "DeMineAgent: insufficient balance"
             );
-            pay(payment, address(this), sender, amounts[i]);
+            safeTransfer(IERC20(payment), sender, amounts[i]);
             _income[sender][payment] -= amounts[i];
         }
         emit Withdraw(sender, payments, amounts);
-    }
-
-    function pay(
-        address payment,
-        address payer,
-        address payee,
-        uint256 value
-    ) private {
-        if (value > 0) {
-            bool success = IERC20(payment).transferFrom(
-                payer, payee, value
-            );
-            require(success, "failed to pay cost");
-        }
     }
 
     function isPaymentSupported(

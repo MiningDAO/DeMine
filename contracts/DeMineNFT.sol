@@ -2,10 +2,9 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/interfaces/IERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
 import "./DeMineAgent.sol";
 
@@ -17,8 +16,7 @@ contract DeMineNFT is
 {
     // Events
     event NewPool(uint128 indexed, address indexed, uint256, string);
-    event RewardSet(uint128 indexed, address indexed, uint256, uint256);
-    event RewarderSet(address indexed, address indexed);
+    event Reward(uint128 indexed, address indexed, uint256, uint256);
     event Cashout(address indexed, address indexed, address indexed, uint256);
     event TokenRoyaltySet(address indexed, uint256);
 
@@ -87,16 +85,16 @@ contract DeMineNFT is
         uint256 rewarded
     ) external onlyOwner {
         _cycle += 1;
-        _cycles[_cycle].rewardPerToken = rewarded / _cycles[_cycle].supply;
-        bool success = IERC20(
-            _rewardToken
-        ).transferFrom(
-            rewarder,
-            address(this),
-            _cycles[_cycle].rewardPerToken * _cycles[_cycle].supply
-        );
-        require(success, "DeMineNFT: failed to transfer reward");
-        emit RewardSet(
+        if (_cycles[_cycle].supply > 0) {
+            _cycles[_cycle].rewardPerToken = rewarded / _cycles[_cycle].supply;
+            safeTransferFrom(
+                IERC20(_rewardToken),
+                rewarder,
+                address(this),
+                _cycles[_cycle].rewardPerToken * _cycles[_cycle].supply
+            );
+        }
+        emit Reward(
             _cycle,
             rewarder,
             _cycles[_cycle].rewardPerToken,
@@ -122,10 +120,7 @@ contract DeMineNFT is
             totalReward += amounts[i] * _cycles[cycle].rewardPerToken;
         }
         if (totalReward > 0) {
-            bool success = IERC20(_rewardToken).transfer(
-                to, totalReward
-            );
-            require(success, "DeMineNFT: failed to withdraw reward");
+            safeTransfer(IERC20(_rewardToken), to, totalReward);
         }
         return totalReward;
     }

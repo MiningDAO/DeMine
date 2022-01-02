@@ -7,19 +7,22 @@ ERC2981:
 [x] setRoyaltyInfo, getRoyaltyInfo should updated
 
 DeMineNFT Specific:
-- create new pool from non owner, should fail
-- create new pool with wrong supply array, should fail
-- create new pool from rewarded cycles, should fail
-- create new pool
+[x] create new pool from non owner, should fail
+[x] create new pool with wrong supply array, should fail
+[] create new pool with start cycle too late, should fail
+[x] create new pool
   - event TransferBatch from address(0) should be emitted
   - event NewPool should be emitted
   - DeMineAgent should with pool set
   - balanceOf issuer for ids should be same with supplies
+[x] create new pool from rewarded cycles, should fail
 
-- reward from non-owner should fail
-- reward with unauthorized rewarder, should fail
-- reward with reward divisible by cycle supply
-- reward with reward not divisible by cycle supply
+[x] reward from non-owner should fail
+[x] reward with insufficient allowance, should fail
+[x] reward with insufficient balance, should fail
+[x] reward with cycle with 0 supply
+[x] reward with reward divisible by cycle supply
+[x] reward with reward not divisible by cycle supply
 
 - cashout unrewarded cycle, should fail
 - cashout rewarded cycle with approved operator
