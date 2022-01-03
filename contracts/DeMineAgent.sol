@@ -350,7 +350,7 @@ contract DeMineAgent is
     function withdraw(
         address[] calldata payments,
         uint256[] calldata amounts
-    ) external {
+    ) external whenNotPaused {
         address sender = _msgSender();
         require(
             payments.length == amounts.length,
@@ -415,11 +415,11 @@ contract DeMineAgent is
         return interfaceId == type(IERC1155ReceiverUpgradeable).interfaceId;
     }
 
-    function pause() external onlyOwner whenNotPaused {
+    function pause() external onlyOwner {
         _pause();
     }
 
-    function unpause() external onlyOwner whenPaused {
+    function unpause() external onlyOwner {
         _unpause();
     }
 }
