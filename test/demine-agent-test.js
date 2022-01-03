@@ -507,7 +507,7 @@ describe("DeMine Agent", function () {
 
     it("withdraw", async function () {
         // setup
-        const { admin, custodian, users: [user1, user2, user3] } = signers;
+        const { admin, users: [user1, user2, user3] } = signers;
         const { nft, agent, payments: [p1, p2, p3] } = contracts;
         let ids = [utils.id(1, 10), utils.id(2, 20), utils.id(3, 30)];
         let amounts = [10, 20, 20];
@@ -572,5 +572,60 @@ describe("DeMine Agent", function () {
         expect(au2.sub(bu2)).to.equal(income12);
         expect(ba1.sub(aa1)).to.equal(income11);
         expect(ba2.sub(aa2)).to.equal(income12);
+    });
+
+    it("cashout", async function () {
+        const { admin, custodian, users: [user1, user2, user3] } = signers;
+        const { nft, agent, rewardToken, payments: [p1, _] } = contracts;
+        await mint(user1, user2);
+
+        // reward cycle 1-40, 0 per nft
+        for (let i = 1; i < 10; i++) {
+            await utils.reward(contracts, signers, i, 0, 0);
+        }
+        for (let i = 10; i < 20; i++) {
+            await utils.reward(contracts, signers, i, 300, 300);
+        }
+
+        let ids = [utils.id(1, 10), utils.id(2, 20)];
+        await expect(
+            agent.connect(user1).cashout(ids)
+        ).to.be.revertedWith(OwnableError);
+
+        await expect(
+            agent.connect(admin).cashout(ids)
+        ).to.be.revertedWith("DeMineNFT: unrewarded cycle");
+
+        // redeem some tokens out
+        ids = [utils.id(1, 10), utils.id(2, 19)];
+        await utils.airdrop(p1, admin, user1, agent, 10000000000);
+        await agent.connect(user1).redeem(p1.address, ids, [30, 40])
+        await agent.connect(user1).list(
+            user3.address, ids, [2000, 2000], [30, 40]
+        );
+
+        await checkTokenInfo(ids[0], [false, 30, 40, 30]);
+        await checkTokenInfo(ids[1], [false, 40, 20, 40]);
+
+        let before = await rewardToken.balanceOf(custodian.address);
+        let totalReward = 70 + 60;
+        await expect(
+            agent.connect(admin).cashout(ids)
+        ).to.emit(nft, "Cashout").withArgs(
+            agent.address, agent.address, custodian.address, totalReward
+        ).to.emit(nft, "TransferBatch").withArgs(
+            agent.address, agent.address, address0, ids, [70, 60]
+        );
+
+        let after = await rewardToken.balanceOf(custodian.address);
+        expect(after.sub(before)).to.equal(totalReward);
+        await checkTokenInfo(ids[0], [true, 100, 0, 0]);
+        await checkTokenInfo(ids[1], [true, 100, 0, 0]);
+
+        // token already cashed out, should fail
+        ids = [utils.id(1, 10), utils.id(2, 18)];
+        await expect(
+            agent.connect(admin).cashout(ids)
+        ).to.be.revertedWith("DeMineAgent: already cashed out");
     });
 });

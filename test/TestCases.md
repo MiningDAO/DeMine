@@ -150,9 +150,10 @@ DeMineAgent Withdraw Action
     - incomeInfo covered
 
 DeMineAgent Cashout Action
- - [ ] with token already cashedout, should fail
- - [ ] with tokens with unrewarded cycle, should fail
- - [ ] with proper tokens to cashout
+ - [x] with non owner, should fail
+ - [x] with token already cashedout, should fail
+ - [x] with nft.cashout failed, should fail
+ - [x] with proper tokens to cashout
     - token stats should be updated
     - owner should receive reward tokens
     - tokens should be burned
