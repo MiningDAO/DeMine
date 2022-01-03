@@ -140,9 +140,9 @@ DeMineAgent Claim Action
     - tokenInfo covered
 
 DeMineAgent Withdraw Action
- - [ ] with payments/amounts array mismatch, should fail
- - [ ] with amount exceeding income, should fail
- - [ ] with correct input
+ - [x] with payments/amounts array mismatch, should fail
+ - [x] with amount exceeding income, should fail
+ - [x] with correct input
     - income info of sender should decrease
     - balance of sender should increase
     - balance of agent contract should decrease

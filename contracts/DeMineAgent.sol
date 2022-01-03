@@ -356,7 +356,7 @@ contract DeMineAgent is
         for (uint256 i = 0; i < amounts.length; i++) {
             address payment = payments[i];
             require(
-                _income[sender][payment] > amounts[i],
+                _income[sender][payment] >= amounts[i],
                 "DeMineAgent: insufficient balance"
             );
             IERC20(payment).safeTransfer(sender, amounts[i]);
