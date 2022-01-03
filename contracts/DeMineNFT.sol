@@ -112,7 +112,7 @@ contract DeMineNFT is
         address to,
         uint256[] calldata ids,
         uint256[] calldata amounts
-    ) external whenNotPaused {
+    ) external {
         require(
             from == _msgSender() || isApprovedForAll(from, _msgSender()),
             "ERC1155: transfer caller is not owner nor approved"
@@ -160,11 +160,11 @@ contract DeMineNFT is
             super.supportsInterface(interfaceId);
     }
 
-    function pause() external onlyOwner whenNotPaused {
+    function pause() external onlyOwner {
         _pause();
     }
 
-    function unpause() external onlyOwner whenPaused {
+    function unpause() external onlyOwner {
         _unpause();
     }
 }

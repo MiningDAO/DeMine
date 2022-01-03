@@ -2,6 +2,20 @@
 
 ## DeMineNFT
 
+Pausable
+ - [x] pause with non owner, should fail
+ - [x] pause with owner, paused should be updated
+ - [x] transfer when pause, should fail
+ - [x] transfer batch when pause, should fail
+ - [x] new pool when pause, should fail
+ - [x] cashout when pause, should fail
+ - [x] unpause with non owner, should fail
+ - [x] unpause with owner, paused should be updated
+ - [x] new pool after unpause, should success
+ - [x] transfer after unause, should success
+ - [x] transfer batch after unause, should success
+ - [x] cashout after unause, should success
+
 ERC2981:
  - [x] setRoyaltyInfo from non-owner should fail
  - [x] setRoyaltyInfo, getRoyaltyInfo should updated

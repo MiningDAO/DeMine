@@ -7,12 +7,158 @@ describe("DeMine NFT", function () {
     var signers;
     var contracts;
 
+    let mintRedeemAndReward = async function(...args) {
+        let result = await utils.mintAndRedeem(...args);
+
+        // reward cycle 1-40, 0 per nft
+        for (let i = 1; i < 10; i++) {
+            await utils.reward(contracts, signers, i, 0, 0);
+        }
+        for (let i = 10; i < 20; i++) {
+            await utils.reward(contracts, signers, i, 100, 300);
+        }
+        for (let i = 20; i < 30; i++) {
+            await utils.reward(contracts, signers, i, 300, 600);
+        }
+        for (let i = 30; i < 40; i++) {
+            await utils.reward(contracts, signers, i, 600, 600);
+        }
+        return result;
+    }
+
     before(async function() {
         signers = await utils.signers();
     });
 
     beforeEach(async function() {
         contracts = await utils.setupDeMine(signers);
+    });
+
+    it("Pausable", async function () {
+        let { nft } = contracts;
+        expect(await nft.paused()).to.be.false;
+
+        // setup
+        let { admin, users: [user1, user2, _] } = signers;
+        let { ids, amounts } = await mintRedeemAndReward(
+            contracts, admin, user1
+        );
+
+        await expect(
+            nft.connect(user1).pause()
+        ).to.be.revertedWith(OwnableError);
+
+        await expect(
+            nft.connect(admin).pause()
+        ).to.emit(nft, "Paused").withArgs(admin.address);
+        expect(await nft.paused()).to.be.true;
+
+        await expect(
+            nft.connect(admin).newPool(
+                "pool4",
+                60,
+                120,
+                Array(120).fill(100),
+                1000,
+                user1.address
+            )
+        ).to.be.revertedWith("ERC1155Pausable: token transfer while paused");
+
+        await expect(
+            nft.connect(user1).safeTransferFrom(
+                user1.address,
+                user2.address,
+                ids[0],
+                amounts[0],
+                []
+            )
+        ).to.be.revertedWith("ERC1155Pausable: token transfer while paused");
+
+        await expect(
+            nft.connect(user1).safeBatchTransferFrom(
+                user1.address,
+                user2.address,
+                ids,
+                amounts,
+                []
+            )
+        ).to.be.revertedWith("ERC1155Pausable: token transfer while paused");
+
+        await expect(
+            nft.connect(user1).cashout(
+                user1.address,
+                user2.address,
+                ids,
+                amounts
+            )
+        ).to.be.revertedWith("ERC1155Pausable: token transfer while paused");
+
+        // unpause
+        await expect(
+            nft.connect(user1).unpause()
+        ).to.be.revertedWith(OwnableError);
+
+        await expect(
+            nft.connect(admin).unpause()
+        ).to.emit(nft, "Unpaused").withArgs(admin.address);
+        expect(await nft.paused()).to.be.false;
+
+        await expect(
+            nft.connect(admin).newPool(
+                "pool4",
+                60,
+                120,
+                Array(120).fill(100),
+                1000,
+                user1.address
+            )
+        ).to.emit(nft, "NewPool").withArgs(
+            4, user1.address, 1000, "pool4"
+        );
+
+        await expect(
+            nft.connect(user1).safeTransferFrom(
+                user1.address,
+                user2.address,
+                ids[0],
+                amounts[0],
+                []
+            )
+        ).to.emit(nft, "TransferSingle").withArgs(
+            user1.address,
+            user1.address,
+            user2.address,
+            ids[0],
+            amounts[0]
+        );
+
+        await expect(
+            nft.connect(user1).safeBatchTransferFrom(
+                user1.address,
+                user2.address,
+                ids.slice(1),
+                amounts.slice(1),
+                []
+            )
+        ).to.emit(nft, "TransferBatch").withArgs(
+            user1.address,
+            user1.address,
+            user2.address,
+            ids.slice(1),
+            amounts.slice(1)
+        );
+
+        let delta = 10 * 3 * 10 + 20 * 2 * 10 + 30 * 1 * 10;
+        expect(
+            await nft.connect(user2).cashout(
+                user2.address,
+                user1.address,
+                ids,
+                amounts
+            )
+        ).to.emit(nft, "Cashout").withArgs(
+            user2.address, user2.address, user1.address, delta
+        );
     });
 
     it("ERC2981", async function () {
@@ -153,24 +299,8 @@ describe("DeMine NFT", function () {
 
     it("cashout test", async function () {
         let { nft, agent, rewardToken, payments } = contracts;
-        const [user1, user2, _] = signers.users;
-        let { ids, amounts } = await utils.mintAndRedeem(
-            contracts, signers.admin, user1
-        );
-
-        // reward cycle 1-40, 0 per nft
-        for (let i = 1; i < 10; i++) {
-            await utils.reward(contracts, signers, i, 0, 0);
-        }
-        for (let i = 10; i < 20; i++) {
-            await utils.reward(contracts, signers, i, 100, 300);
-        }
-        for (let i = 20; i < 30; i++) {
-            await utils.reward(contracts, signers, i, 300, 600);
-        }
-        for (let i = 30; i < 40; i++) {
-            await utils.reward(contracts, signers, i, 600, 600);
-        }
+        let { admin, users: [user1, user2, _] } = signers;
+        let { ids, amounts } = await mintRedeemAndReward(contracts, admin, user1);
 
         // cashout with insufficient balance, should fail
         await expect(
