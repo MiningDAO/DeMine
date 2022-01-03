@@ -73,11 +73,11 @@ contract DeMineAgent is
     function list(
         address to,
         uint256[] calldata ids,
-        uint256[] calldata amounts,
-        uint256[] calldata prices
+        uint256[] calldata prices,
+        uint256[] calldata amounts
     ) external {
         require(
-            ids.length == amounts.length && amounts.length == prices.length,
+            ids.length == prices.length && prices.length == amounts.length,
             "DeMineAgent: array length mismatch"
         );
         address sender = _msgSender();

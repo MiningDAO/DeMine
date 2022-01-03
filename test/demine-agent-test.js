@@ -7,13 +7,33 @@ describe("DeMine Agent", function () {
     var signers;
     var contracts;
 
-    let checkBalances = async function(user, ids, expected)  {
+    let compareArray = async function(a, b) {
+        expect(a.length).to.equal(b.length);
+        for (let i = 0; i < a.length; i++) {
+            expect(a[i]).to.equal(b[i]);
+        }
+    };
+
+    let checkListingInfo = async function(
+        to, ids, expectedPrices, expectedAmounts
+    ) {
+        let [prices, amounts] = await agent.listingInfo(to, ids);
+        compareArray(prices, expectedPrices);
+        compareArray(amounts, expectedAmounts);
+    }
+
+    let checkTokenInfo = async function(id, expected) {
+        let tokenInfo = await agent.tokenInfo(id);
+        compareArray(tokenInfo, expected);
+    };
+
+    let checkBalances = async function(user, ids, expected) {
         let users = Array(ids.length).fill(user.address);
         let balances = await nft.balanceOfBatch(users, ids);
         for (var i = 0; i < ids.length; i++) {
             expect(balances[i]).to.equal(expected[i]);
         }
-    }
+    };
 
     before(async function() {
         signers = await utils.signers();
@@ -145,7 +165,6 @@ describe("DeMine Agent", function () {
     });
 
     it("redeem", async function () {
-        // setup
         const { admin, custodian, users: [user1, _] } = signers;
         const { nft, agent, payments: [p1, p2, p3] } = contracts;
         let numCycles = 120;
@@ -163,7 +182,6 @@ describe("DeMine Agent", function () {
         await utils.airdrop(p2, admin, user1, agent, 100000000);
         await agent.connect(admin).setPayment(p2.address, false);
 
-        // test start
         let ids = [utils.id(1, 10), utils.id(2, 10)];
         await expect(
             agent.connect(user1).redeem(p1.address, ids, [100, 100, 100])
@@ -194,8 +212,7 @@ describe("DeMine Agent", function () {
         let b1 = await p1.balanceOf(user1.address);
         let bc = await p1.balanceOf(custodian.address);
         for (let i = 0; i < ids; i++) {
-            let tokeninfo = await agent.tokeninfo(ids[i]);
-            expect(tokeninfo).to.deep.equal([false, 0, 100, 0]);
+            await checkTokenInfo(ids[i], [false, 0, 100, 0]);
         }
 
         let totalCost = 1000 * 50 * 2;
@@ -213,11 +230,138 @@ describe("DeMine Agent", function () {
         expect(bc2.sub(bc)).to.equal(totalCost);
 
         for (let i = 0; i < ids; i++) {
-            let tokeninfo = await agent.tokeninfo(ids[i]);
-            expect(tokeninfo).to.deep.equal([false, 50, 50, 0]);
+            await checkTokenInfo(ids[i], [false, 50, 50, 0]);
         }
     });
 
     it("list and unlist", async function () {
+        // setup
+        const { admin, custodian, users: [user1, _] } = signers;
+        const { nft, agent, payments: [p1, p2, p3] } = contracts;
+        let numCycles = 120;
+        let supplies = Array(numCycles).fill(100);
+        await nft.connect(admin).newPool(
+            "pool", 10, 120, supplies, 1000, user1.address
+        ); // pool 1
+        await nft.connect(admin).newPool(
+            "pool", 10, 120, supplies, 1000, user1.address
+        ); // pool 2
+        await nft.connect(admin).newPool(
+            "pool", 10, 120, supplies, 1000, user2.address
+        ); // pool 3
+        await utils.airdrop(p1, admin, user1, agent, 100000000);
+        await utils.airdrop(p2, admin, user1, agent, 100000000);
+        await agent.connect(admin).setPayment(p2.address, false);
+
+        let ids = [utils.id(1, 10), utils.id(2, 20)];
+        let amounts = [50, 50];
+        let prices = [2000, 2000];
+        await expect(
+            agent.connect(user1).list(user2.address, ids, [2000], [100])
+        ).to.be.revertedWith("DeMineAgent: array length mismatch");
+
+        await expect(
+            agent.connect(user1).list(user1.address, ids, prices, amounts)
+        ).to.be.revertedWith("DeMineAgent: cannot set owner as recipient");
+
+        await expect(
+            agent.connect(user1).list(
+                user2.address,
+                ids.concat([utils.id(3, 10)]),
+                [2000, 2000, 2000],
+                [50, 50, 50]
+            )
+        ).to.be.revertedWith("DeMineAgent: only token owner allowed");
+
+        await expect(
+            agent.connect(user1).list(user2.address, ids, [500, 500], amounts)
+        ).to.be.revertedWith("DeMineAgent: price too low to cover cost");
+
+        await expect(
+            agent.connect(user1).list(user2.address, ids, prices, [200, 100])
+        ).to.be.revertedWith("DeMineAgent: insufficient balance to sale");
+
+        await checkTokenInfo(ids[0], [false, 0, 100, 0]);
+        await checkTokenInfo(ids[1], [false, 0, 100, 0]);
+        await expect(
+            agent.connect(user1).list(user2.address, ids, prices, amounts)
+        ).to.emit(agent, "List").withArgs(
+            user1.address,
+            user2.address,
+            ids,
+            amounts,
+            prices
+        );
+        checkListingInfo(user2.address, ids, prices, amounts);
+        await checkTokenInfo(ids[0], [false, 0, 50, 50]);
+        await checkTokenInfo(ids[1], [false, 0, 50, 50]);
+
+        await expect(
+            agent.connect(user1).list(user2.address, ids, prices, [110, 100])
+        ).to.be.revertedWith("DeMineAgent: insufficient balance to sale");
+
+        // reset list, should success
+        await expect(
+            agent.connect(user1).list(user2.address, ids, prices, [40, 30])
+        ).to.emit(agent, "List").withArgs(
+            user1.address,
+            user2.address,
+            ids,
+            [40, 30],
+            prices
+        );
+        checkListingInfo(user2.address, ids, prices, [40, 30]);
+        await checkTokenInfo(ids[0], [false, 0, 60, 40]);
+        await checkTokenInfo(ids[1], [false, 0, 70, 30]);
+
+        // list more to address(0) with insufficient supply, should fail
+        let address0 = ethers.utils.getAddress(
+            "0x0000000000000000000000000000000000000000"
+        );
+        await expect(
+            agent.connect(user1).list(address0, ids, prices, [70, 50])
+        ).to.be.revertedWith("DeMineAgent: insufficient balance to sale");
+
+        // list more to address(0) should success
+        await expect(
+            agent.connect(user1).list(address0, ids, prices, [30, 40])
+        ).to.emit(agent, "List").withArgs(
+            user1.address,
+            address0,
+            ids,
+            [30, 40],
+            prices
+        );
+        checkListingInfo(address0, ids, prices, [30, 40]);
+        await checkTokenInfo(ids[0], [false, 0, 30, 70]);
+        await checkTokenInfo(ids[1], [false, 0, 30, 70]);
+
+        // list more to address(0) should success
+        await expect(
+            agent.connect(user1).list(address0, ids, prices, [40, 30])
+        ).to.emit(agent, "List").withArgs(
+            user1.address,
+            address0,
+            ids,
+            [40, 30],
+            prices
+        );
+        checkListingInfo(address0, ids, prices, [40, 30]);
+        await checkTokenInfo(ids[0], [false, 0, 20, 80]);
+        await checkTokenInfo(ids[1], [false, 0, 40, 60]);
+
+        // reward and cashout
+        for (let i = 1; i < 10; i++) {
+            await utils.reward(contracts, signers, i, 0, 0);
+        }
+        for (let i = 10; i < 20; i++) {
+            await utils.reward(contracts, signers, i, 300, 900);
+        }
+        await agent.connect(admin).cashout([ids[0]]);
+
+        // should fail to list cashed out tokens
+        await expect(
+            agent.connect(user1).list(user2.address, ids, prices, amounts)
+        ).to.be.revertedWith("DeMineAgent: already cashed out");
     });
 });

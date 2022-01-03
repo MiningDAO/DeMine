@@ -78,7 +78,7 @@ DeMineAgent Redeem Action
  - [x] with non token issuer, should fail
  - [x] with unsupported payment method, should fail
  - [x] with amount larger than total locked, should fail
- - [x] with not enough tokens to pay, should fail
+ - [x] with payment failed, should fail
  - [x] with correct ids and amounts
     - token stats should be updated(tokenInfo covered)
     - custodian should be paid with proper payment method
@@ -86,23 +86,23 @@ DeMineAgent Redeem Action
     - Redeem event should be emitted
 
 DeMineAgent List Action
- - [ ] with sender as non token issuer, should fail
- - [ ] with token issuer as recipient, should fail
- - [ ] with cashedout token, should fail
- - [ ] with price lower than cost, should fail
- - [ ] with amount exceeding locked + listed, should fail
- - [ ] to address(0)
+ - [x] with sender as non token issuer, should fail
+ - [x] with token issuer as recipient, should fail
+ - [x] with cashedout token, should fail
+ - [x] with price lower than cost, should fail
+ - [x] with amount exceeding locked + listed, should fail
+ - [x] to address(0)
      - token stats should be updated
      - check listing result is set
      - listingInfo covered
- - [ ] to address(0) again
+ - [x] to address(0) again
      - token stats should be updated
      - listing should be updated
- - [ ] to one recipient
+ - [x] to one recipient
      - token stats should be updated
      - check listing result is set
      - list event should be emitted
- - [ ] to one recipient again
+ - [x] to one recipient again
      - token stats should be updated
      - listing should be updated
      - list event should be emitted
