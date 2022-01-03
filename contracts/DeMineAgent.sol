@@ -3,13 +3,15 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC1155/IERC1155ReceiverUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/IERC1155ReceiverUpgradeable.sol";
 import "./DeMineNFT.sol";
 
 /// @author Shu Dong
 contract DeMineAgent is
     OwnableUpgradeable,
+    PausableUpgradeable,
     IERC1155ReceiverUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -61,6 +63,7 @@ contract DeMineAgent is
         address nftContract
     ) public initializer {
         __Ownable_init();
+        __Pausable_init();
         for (uint256 i = 0; i < payments.length; i++) {
             _payments[payments[i]] = true;
         }
@@ -75,7 +78,7 @@ contract DeMineAgent is
         uint256[] calldata ids,
         uint256[] calldata prices,
         uint256[] calldata amounts
-    ) external {
+    ) external whenNotPaused {
         require(
             ids.length == prices.length && prices.length == amounts.length,
             "DeMineAgent: array length mismatch"
@@ -117,7 +120,7 @@ contract DeMineAgent is
     function unlist(
         address to,
         uint256[] calldata ids
-    ) external {
+    ) external whenNotPaused {
         address sender = _msgSender();
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
@@ -141,7 +144,7 @@ contract DeMineAgent is
         address payment,
         uint256[] calldata ids,
         uint256[] calldata amounts
-    ) external {
+    ) external whenNotPaused {
         require(
             ids.length == amounts.length,
             "DeMineAgent: array length mismatch"
@@ -208,7 +211,7 @@ contract DeMineAgent is
         address payment,
         uint256[] calldata ids,
         uint256[] calldata amounts
-    ) external {
+    ) external whenNotPaused {
         require(
             ids.length == amounts.length,
             "DeMineAgent: array length mismatch"
@@ -245,7 +248,7 @@ contract DeMineAgent is
     function transferPool(
         uint128 pool,
         address newOwner
-    ) external {
+    ) external whenNotPaused {
         require (
             _msgSender() == _pools[pool].owner,
             "DeMineAgent: only pool owner is allowed"
@@ -410,5 +413,13 @@ contract DeMineAgent is
         returns (bool)
     {
         return interfaceId == type(IERC1155ReceiverUpgradeable).interfaceId;
+    }
+
+    function pause() external onlyOwner whenNotPaused {
+        _pause();
+    }
+
+    function unpause() external onlyOwner whenPaused {
+        _unpause();
     }
 }

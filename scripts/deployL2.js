@@ -1,19 +1,38 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-  const tokenUri = "https://token-cdn-domain/{id}.json";
+  const tokenUri = "invalid_uri";
   const wbtc = address(0x65058d7081fcdc3cd8727dbb7f8f9d52cefdd291);
   const usdt = address(0x6ee856ae55b6e1a249f04cd3b947141bc146273c);
 
   // deploy implementation
-  const DeMineNFT = await ethers.getContractFactory("DeMineNFT");
-  const deMineNFT = await DeMineNFT.deploy();
-  await deMineNFT.deployed();
+  const DeMineFactory = await ethers.getContractFactory("DeMineCloneFactory");
+  const deMineFactory = await DeMineFactory.deploy();
+  await deMineFactory.deployed();
+
+  const NFT = await ethers.getContractFactory("DeMineNFT");
+  const Agent = await ethers.getContractFactory("DeMineAgent");
 
   // deploy clone factory
-  const DeMineNFTCloneFactory = await ethers.getContractFactory("DeMineNFTCloneFactory");
-  const deMineNFTCloneFactory = await DeMineNFTCloneFactory.deploy(deMineNFT.address);
-  await deMineNFTCloneFactory.deployed();
+  const tx = await deMineFactory.create(
+    // nft
+    tokenUri,
+    royaltyRecipient,
+    royaltyBps,
+    rewardToken,
+    // admin
+    payments,
+    custodian,
+    // owner
+    owner
+  );
+
+  const { events: events } = await tx.wait();
+  const { args: [nftAddr, agentAddr] } = events.find(
+    function(e) { return e.event === 'NewContract'; }
+  );
+  const nft = await NFT.attach(nftAddr);
+  const agent = await Agent.attach(agentAddr);
 
   // deploy clones for btc
   const btcAddress = await deMineNFTCloneFactory.create(tokenUri, wbtc, usdt, 100);

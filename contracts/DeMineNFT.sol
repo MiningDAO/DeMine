@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
 import "./DeMineAgent.sol";
@@ -12,6 +13,7 @@ import "./DeMineAgent.sol";
 contract DeMineNFT is
     ERC1155Upgradeable,
     OwnableUpgradeable,
+    PausableUpgradeable,
     IERC2981Upgradeable
 {
     using SafeERC20 for IERC20;
@@ -44,6 +46,7 @@ contract DeMineNFT is
         address agentContract
     ) public initializer {
         __Ownable_init();
+        __Pausable_init();
         __ERC1155_init(uri);
         _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
@@ -110,7 +113,7 @@ contract DeMineNFT is
         address to,
         uint256[] calldata ids,
         uint256[] calldata amounts
-    ) external {
+    ) external whenNotPaused {
         require(
             from == _msgSender() || isApprovedForAll(from, _msgSender()),
             "ERC1155: transfer caller is not owner nor approved"
@@ -156,5 +159,13 @@ contract DeMineNFT is
         return
             interfaceId == type(IERC2981Upgradeable).interfaceId ||
             super.supportsInterface(interfaceId);
+    }
+
+    function pause() external onlyOwner whenNotPaused {
+        _pause();
+    }
+
+    function unpause() external onlyOwner whenPaused {
+        _unpause();
     }
 }
