@@ -138,9 +138,9 @@ contract DeMineAgent is
     }
 
     function claim(
+        address payment,
         uint256[] calldata ids,
-        uint256[] calldata amounts,
-        address payment
+        uint256[] calldata amounts
     ) external {
         require(
             ids.length == amounts.length,
@@ -159,30 +159,11 @@ contract DeMineAgent is
                 !_stats[id].cashedout,
                 "DeMineAgent: already cashed out"
             );
-            uint256 v1 = _stats[id].listing[sender].amount;
-            uint256 v2 = _stats[id].listing[address(0)].amount;
-            require(
-                v1 + v2 >= amounts[i],
-                "DeMineAgent: insufficient allowance"
-            );
-            uint256 senderPrice = _stats[id].listing[sender].price;
-            uint256 basePrice = _stats[id].listing[address(0)].price;
-            uint256 price;
-            if (v1 >= amounts[i]) {
-                _stats[id].listing[sender].amount = v1 - amounts[i];
-                price = amounts[i] * senderPrice;
-            } else {
-                _stats[id].listing[sender].amount = 0;
-                _stats[id].listing[address(0)].amount = v1 + v2 - amounts[i];
-                price = basePrice * (amounts[i] - v1) + senderPrice * v1;
-            }
-            _stats[id].listed -= amounts[i];
-            _stats[id].liquidized += amounts[i];
-            uint128 pool = uint128(id >> 128);
-            uint256 cost = _pools[pool].costPerToken * amounts[i];
+            (uint256 price, uint256 cost) = claimOne(sender, id, amounts[i]);
             totalCost += cost;
             totalPrice += price;
-            _income[_pools[pool].owner][payment] += (price - cost);
+            address owner = _pools[uint128(id >> 128)].owner;
+            _income[owner][payment] += (price - cost);
         }
         IERC20(payment).safeTransferFrom(sender, _custodian, totalCost);
         IERC20(payment).safeTransferFrom(
@@ -194,6 +175,33 @@ contract DeMineAgent is
             address(this), sender, ids, amounts, ""
         );
         emit Claim(sender, totalCost, totalPrice, ids, amounts);
+    }
+
+    function claimOne(
+        address sender,
+        uint256 id,
+        uint256 amount
+    ) private returns(uint256, uint256) {
+        uint256 v1 = _stats[id].listing[sender].amount;
+        uint256 v2 = _stats[id].listing[address(0)].amount;
+        require(
+            v1 + v2 >= amount,
+            "DeMineAgent: insufficient allowance"
+        );
+        uint256 senderPrice = _stats[id].listing[sender].price;
+        uint256 basePrice = _stats[id].listing[address(0)].price;
+        uint256 price;
+        if (v1 >= amount) {
+            _stats[id].listing[sender].amount = v1 - amount;
+            price = amount * senderPrice;
+        } else {
+            _stats[id].listing[sender].amount = 0;
+            _stats[id].listing[address(0)].amount = v1 + v2 - amount;
+            price = basePrice * (amount - v1) + senderPrice * v1;
+        }
+        _stats[id].listed -= amount;
+        _stats[id].liquidized += amount;
+        return (price, _pools[uint128(id >> 128)].costPerToken * amount);
     }
 
     function redeem(

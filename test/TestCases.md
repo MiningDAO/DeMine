@@ -108,28 +108,28 @@ DeMineAgent List Action
      - list event should be emitted
 
 DeMineAgent Unlist Action
- - [ ] with sender as non token issuer, should fail
- - [ ] with cashedout token, should fail
- - [ ] to address(0)
+ - [x] with sender as non token issuer, should fail
+ - [x] with cashedout token, should fail
+ - [x] to address(0)
     - token stats should be updated
     - tokens should be unlisted
     - Unlist event should be emitted
- - [ ] to normal recipient
+ - [x] to normal recipient
     - token stats should be updated
     - tokens should be unlisted
     - Unlist event should be emitted
 
 DeMineAgent Claim Action
- - [ ] with cashedout token, should fail
- - [ ] with unsupported payment method, should fail
- - [ ] with amount exceeding listed, should fail
- - [ ] with not enough cost tokens to pay, should fail
- - [ ] with amount lower than listed for recipient
+ - [x] with cashedout token, should fail
+ - [x] with unsupported payment method, should fail
+ - [x] with amount exceeding listed, should fail
+ - [x] with payment failed, should fail
+ - [x] with amount lower than listed for recipient
     - token stats should be updated
     - custodian should be paid
     - income of token issuer should increase
     - token should be transferred to claimer
- - [ ] with amount larger than listed for recipient but lower than total listed
+ - [x] with amount larger than listed for recipient but lower than total listed
     - token stats should be updated
       - check listingInfo for address(0)
     - cost token balance of payment recipient should increase

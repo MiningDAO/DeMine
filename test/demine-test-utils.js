@@ -193,6 +193,12 @@ async function mintAndRedeem(contracts, admin, user) {
         return { ids, amounts };
     };
 
+async function compareArray(a, b) {
+    expect(a.length).to.equal(b.length);
+    for (let i = 0; i < a.length; i++) {
+        expect(a[i]).to.equal(b[i]);
+    }
+}
 
 module.exports = {
     setupDeMine,
@@ -203,4 +209,5 @@ module.exports = {
     checkBalances,
     signers,
     reward,
+    compareArray
 };
