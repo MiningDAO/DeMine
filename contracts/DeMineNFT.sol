@@ -5,15 +5,14 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
 import "./DeMineAgent.sol";
 
 /// @author Shu Dong
 contract DeMineNFT is
-    ERC1155Upgradeable,
+    ERC1155PausableUpgradeable,
     OwnableUpgradeable,
-    PausableUpgradeable,
     IERC2981Upgradeable
 {
     using SafeERC20 for IERC20;
@@ -46,8 +45,8 @@ contract DeMineNFT is
         address agentContract
     ) public initializer {
         __Ownable_init();
-        __Pausable_init();
-        __ERC1155_init(uri);
+        __ERC1155Pausable_init();
+        __ERC1155_init_unchained(uri);
         _royaltyRecipient = royaltyRecipient;
         _royaltyBps = royaltyBps;
         _agent = agentContract;
