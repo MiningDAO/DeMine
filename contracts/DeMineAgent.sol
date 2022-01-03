@@ -114,7 +114,7 @@ contract DeMineAgent is
             _stats[id].listing[to].amount = amounts[i];
             _stats[id].listing[to].price = prices[i];
         }
-        emit List(sender, to, ids, amounts, prices);
+        emit List(sender, to, ids, prices, amounts);
     }
 
     function unlist(

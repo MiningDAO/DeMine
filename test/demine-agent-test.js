@@ -89,6 +89,119 @@ describe("DeMine Agent", function () {
         contracts = await utils.setupDeMine(signers);
     });
 
+    it("Pausable", async function () {
+        let { agent, payments: [p1, p2, _] } = contracts;
+        let { admin, users: [user1, user2, _user3] } = signers;
+
+        // setup
+        let numCycles = 120;
+        let ids = utils.ids(1, 10, numCycles);
+        let supplies = Array(numCycles).fill(100);
+        nft.connect(admin).newPool(
+            "pool", 10, 120, supplies, 1000, user1.address
+        );
+        await utils.airdrop(p1, admin, user1, agent, 10000000000);
+        await utils.airdrop(p1, admin, user2, agent, 10000000000);
+        expect(await agent.paused()).to.be.false;
+        const PausableError = "Pausable: paused";
+
+        // pause
+        await expect(
+            agent.connect(user1).pause()
+        ).to.be.revertedWith(OwnableError);
+
+        await expect(
+            agent.connect(admin).pause()
+        ).to.emit(agent, "Paused").withArgs(admin.address);
+        expect(await agent.paused()).to.be.true;
+
+        await expect(
+            agent.connect(user1).transferPool(1, user2.address)
+        ).to.be.revertedWith(PausableError);
+
+        await expect(
+            agent.connect(user1).redeem(p1.address, ids, supplies)
+        ).to.be.revertedWith(PausableError);
+
+        let prices = Array(numCycles).fill(2000);
+        await expect(
+            agent.connect(user1).list(address0, ids, prices, supplies)
+        ).to.be.revertedWith(PausableError);
+
+        await expect(
+            agent.connect(user1).unlist(address0, ids)
+        ).to.be.revertedWith(PausableError);
+
+        await expect(
+            agent.connect(user2).claim(p1.address, ids, supplies)
+        ).to.be.revertedWith(PausableError);
+
+        await expect(
+            agent.connect(user1).withdraw([p1.address, p2.address], [1, 1])
+        ).to.be.revertedWith(PausableError);
+
+        // unpause
+        await expect(
+            agent.connect(user1).unpause()
+        ).to.be.revertedWith(OwnableError);
+
+        await expect(
+            agent.connect(admin).unpause()
+        ).to.emit(agent, "Unpaused").withArgs(admin.address);
+
+        expect(await agent.paused()).to.be.false;
+
+        let half = supplies.map(s => s / 2);
+        let totalCost = 120 * 50 * 1000;
+        let totalPrice = 120 * 50 * 2000;
+        await expect(
+            agent.connect(user1).redeem(p1.address, ids, half)
+        ).to.emit(agent, "Redeem").withArgs(
+            user1.address, totalCost, ids, half
+        );
+
+        await expect(
+            agent.connect(user1).list(address0, ids, prices, half)
+        ).to.emit(agent, "List").withArgs(
+            user1.address, address0, ids, prices, half
+        );
+
+        await expect(
+            agent.connect(user1).unlist(address0, ids)
+        ).to.emit(agent, "Unlist").withArgs(
+            user1.address, address0, ids
+        );
+
+        await expect(
+            agent.connect(user1).list(address0, ids, prices, half)
+        ).to.emit(agent, "List").withArgs(
+            user1.address, address0, ids, prices, half
+        );
+
+        await expect(
+            agent.connect(user2).claim(p1.address, ids, half)
+        ).to.emit(agent, "Claim").withArgs(
+            user2.address, totalCost, totalPrice, ids, half
+        );
+
+        await expect(
+            agent.connect(user1).withdraw(
+                [p1.address, p2.address],
+                [totalPrice - totalCost, 0]
+            )
+        ).to.emit(agent, "Withdraw").withArgs(
+            user1.address,
+            [p1.address, p2.address],
+            [totalPrice - totalCost, 0]
+        );
+
+        await expect(
+            agent.connect(user1).transferPool(1, user2.address)
+        ).to.emit(agent, "PoolTransfer").withArgs(
+            1, user1.address, user2.address
+        );
+    });
+
     it("ERC1155 Receiver", async function () {
         const { admin, users: [user1, user2, _] } = signers;
         const { nft, payments, agent } = contracts;
@@ -320,8 +433,8 @@ describe("DeMine Agent", function () {
             user1.address,
             user2.address,
             ids,
-            amounts,
-            prices
+            prices,
+            amounts
         );
         await checkListingInfo(user2.address, ids, prices, amounts);
         await checkTokenInfo(ids[0], [false, 0, 50, 50]);
@@ -338,8 +451,8 @@ describe("DeMine Agent", function () {
             user1.address,
             user2.address,
             ids,
-            [40, 30],
-            prices
+            prices,
+            [40, 30]
         );
         await checkListingInfo(user2.address, ids, prices, [40, 30]);
         await checkTokenInfo(ids[0], [false, 0, 60, 40]);
@@ -357,8 +470,8 @@ describe("DeMine Agent", function () {
             user1.address,
             address0,
             ids,
-            [30, 40],
-            prices
+            prices,
+            [30, 40]
         );
         await checkListingInfo(address0, ids, prices, [30, 40]);
         await checkTokenInfo(ids[0], [false, 0, 30, 70]);
@@ -371,8 +484,8 @@ describe("DeMine Agent", function () {
             user1.address,
             address0,
             ids,
-            [40, 30],
-            prices
+            prices,
+            [40, 30]
         );
         await checkListingInfo(address0, ids, prices, [40, 30]);
         await checkTokenInfo(ids[0], [false, 0, 20, 80]);

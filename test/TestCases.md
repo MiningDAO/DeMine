@@ -68,6 +68,24 @@ ERC1155:
 
 ## DeMineAgent
 
+Pausable
+ - [x] pause with non owner, should fail
+ - [x] pause with owner, paused should be updated
+ - [x] transfer pool when pause, should fail
+ - [x] redeem when pause, should fail
+ - [x] list when pause, should fail
+ - [x] unlist when pause, should fail
+ - [x] claim when pause, should fail
+ - [x] withdraw when pause, should fail
+ - [x] unpause with non owner, should fail
+ - [x] unpause with owner, paused should be updated
+ - [x] transfer pool after unpause, should success
+ - [x] redeem after unpause, should success
+ - [x] list after unpause, should success
+ - [x] unlist after unpause, should success
+ - [x] claim after unpause, should success
+ - [x] withdraw after unpause, should success
+
 Pool
  - [x] transferPool with non-owner, should fail
  - [x] transferPool with owner, should success
