@@ -292,7 +292,7 @@ describe("DeMine Agent", function () {
             amounts,
             prices
         );
-        checkListingInfo(user2.address, ids, prices, amounts);
+        await checkListingInfo(user2.address, ids, prices, amounts);
         await checkTokenInfo(ids[0], [false, 0, 50, 50]);
         await checkTokenInfo(ids[1], [false, 0, 50, 50]);
 
@@ -310,7 +310,7 @@ describe("DeMine Agent", function () {
             [40, 30],
             prices
         );
-        checkListingInfo(user2.address, ids, prices, [40, 30]);
+        await checkListingInfo(user2.address, ids, prices, [40, 30]);
         await checkTokenInfo(ids[0], [false, 0, 60, 40]);
         await checkTokenInfo(ids[1], [false, 0, 70, 30]);
 
@@ -332,7 +332,7 @@ describe("DeMine Agent", function () {
             [30, 40],
             prices
         );
-        checkListingInfo(address0, ids, prices, [30, 40]);
+        await checkListingInfo(address0, ids, prices, [30, 40]);
         await checkTokenInfo(ids[0], [false, 0, 30, 70]);
         await checkTokenInfo(ids[1], [false, 0, 30, 70]);
 
@@ -346,9 +346,37 @@ describe("DeMine Agent", function () {
             [40, 30],
             prices
         );
-        checkListingInfo(address0, ids, prices, [40, 30]);
+        await checkListingInfo(address0, ids, prices, [40, 30]);
         await checkTokenInfo(ids[0], [false, 0, 20, 80]);
         await checkTokenInfo(ids[1], [false, 0, 40, 60]);
+
+        // unlist with non-owner, should fail
+        await expect(
+            agent.connect(user1).unlist(
+                user2.address,
+                ids.concat([utils.id(3, 10)])
+            )
+        ).to.be.revertedWith("DeMineAgent: only token owner allowed");
+
+        // unlist user2 success
+        await expect(
+            agent.connect(user1).unlist(user2.address, ids)
+        ).to.emit(agent, "Unlist").withArgs(
+            user1.address, user2.address, ids
+        );
+        await checkListingInfo(user2.address, ids, prices, [0, 0]);
+        await checkTokenInfo(ids[0], [false, 0, 60, 40]);
+        await checkTokenInfo(ids[1], [false, 0, 70, 30]);
+
+        // unlist address0 success
+        await expect(
+            agent.connect(user1).unlist(address0, ids)
+        ).to.emit(agent, "Unlist").withArgs(
+            user1.address, address0, ids
+        );
+        checkListingInfo(address0, ids, prices, [0, 0]);
+        await checkTokenInfo(ids[0], [false, 0, 100, 0]);
+        await checkTokenInfo(ids[1], [false, 0, 100, 0]);
 
         // reward and cashout
         for (let i = 1; i < 10; i++) {
@@ -362,6 +390,10 @@ describe("DeMine Agent", function () {
         // should fail to list cashed out tokens
         await expect(
             agent.connect(user1).list(user2.address, ids, prices, amounts)
+        ).to.be.revertedWith("DeMineAgent: already cashed out");
+
+        await expect(
+            agent.connect(user1).unlist(user2.address, ids)
         ).to.be.revertedWith("DeMineAgent: already cashed out");
     });
 });

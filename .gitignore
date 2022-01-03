@@ -115,4 +115,4 @@ cache
 artifacts
 
 #vim temp file
-*.swap
+*.swp
