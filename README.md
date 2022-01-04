@@ -37,9 +37,11 @@ We need receive cost of tokens to pay billing of mining farm, including electric
 # Account System
 
 - Admin: owner of DeMineAgent and DeMineNFT contract
-- Rewarder: account holding all mined coins to reward DeMineNFT contract, could be same with admin
-- Cost Recipient: recipient of cost paid by liqudizing tokens, could be same with admin
+- Custodian: account holding assets of
+    - income of pool owner
+    - reserved cost for billing
+    - cashed out reward for billing
 - Royalty Recipient: recipient of royalty of token transfer, could be same with admin
-- Reward Recipient: recipient of cashed out reward to pay billing, could be same with admin
 - DeMineNFT: the nft contract, holding nft tokens and reward tokens mined
 - DeMineAgent: the agent contract, holding income from selling tokens for token issuer
+- Rewarder: account holding all mined coins to reward DeMineNFT contract, could be same with admin
