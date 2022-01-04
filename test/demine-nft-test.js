@@ -59,6 +59,7 @@ describe("DeMine NFT", function () {
                 120,
                 Array(120).fill(100),
                 1000,
+                2000,
                 user1.address
             )
         ).to.be.revertedWith("ERC1155Pausable: token transfer while paused");
@@ -102,13 +103,18 @@ describe("DeMine NFT", function () {
         ).to.emit(nft, "Unpaused").withArgs(admin.address);
         expect(await nft.paused()).to.be.false;
 
-        nft.connect(admin).newPool(
-            60,
-            120,
-            Array(120).fill(100),
-            1000,
-            user1.address
-        )
+        await expect(
+            await nft.connect(admin).newPool(
+                60,
+                120,
+                Array(120).fill(100),
+                1000,
+                2000,
+                user1.address
+            )
+        ).to.emit(agent, "NewPool").withArgs(
+            1, user1.address, 1000, 2000
+        );
 
         await expect(
             nft.connect(user1).safeTransferFrom(
@@ -189,7 +195,7 @@ describe("DeMine NFT", function () {
         // create new pool with non owner, should revert
         await expect(
             nft.connect(user1).newPool(
-                10, 120, supplies, 100, user2.address
+                10, 120, supplies, 100, 200, user2.address
             )
         ).to.be.revertedWith(OwnableError);
 
@@ -199,14 +205,14 @@ describe("DeMine NFT", function () {
         );
         await expect(
             nft.connect(admin).newPool(
-                10, 120, supplies.concat([1000]), 100, address0
+                10, 120, supplies.concat([1000]), 100, 200, address0
             )
         ).to.be.revertedWith("DeMineNFT: pool owner is zero address");
 
         // create new pool with wrong supplies, should revert
         await expect(
             nft.connect(admin).newPool(
-                10, 120, supplies.concat([1000]), 100, user2.address
+                10, 120, supplies.concat([1000]), 100, 200, user2.address
             )
         ).to.be.revertedWith("DeMineNFT: supply array length mismatch");
 
@@ -218,7 +224,7 @@ describe("DeMine NFT", function () {
         // create new pool with invalid start cycle
         await expect(
             nft.connect(admin).newPool(
-                12, 120, supplies, 100, user2.address
+                12, 120, supplies, 100, 200, user2.address
             )
         ).to.be.revertedWith("DeMineNFT: startCycle too early");
 
@@ -228,7 +234,7 @@ describe("DeMine NFT", function () {
         let before = await nft.balanceOfBatch(users, ids);
         await expect(
             nft.connect(admin).newPool(
-                13, 120, supplies, 3000, user1.address
+                13, 120, supplies, 3000, 6000, user1.address
             )
         ).to.emit(nft, "TransferBatch").withArgs(
             admin.address,
@@ -255,7 +261,7 @@ describe("DeMine NFT", function () {
         ).to.be.revertedWith("DeMineNFT: pool doesn't exsit");
 
         await nft.connect(admin).newPool(
-            10, 120, supplies, 3000, user1.address
+            10, 120, supplies, 3000, 6000, user1.address
         );
 
         // reward 9 cycle with 0 supply
@@ -309,7 +315,7 @@ describe("DeMine NFT", function () {
         let startCycle = 10;
         // create new pool successfully
         await nft.connect(signers.admin).newPool(
-            startCycle, 120, Array(120).fill(100), 3000, user1.address
+            startCycle, 120, Array(120).fill(100), 3000, 6000, user1.address
         )
 
         // reward cycle with 0 supply

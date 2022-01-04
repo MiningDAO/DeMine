@@ -30,10 +30,10 @@ describe("DeMine Agent", function () {
         let numCycles = 120;
         let supplies = Array(numCycles).fill(100);
         await nft.connect(admin).newPool(
-            10, numCycles, supplies, 1000, user1.address
+            10, numCycles, supplies, 1000, 2000, user1.address
         ); // pool 1
         await nft.connect(admin).newPool(
-            10, numCycles, supplies, 1000, user2.address
+            10, numCycles, supplies, 1000, 2000, user2.address
         ); // pool 2
         return supplies;
     };
@@ -56,7 +56,7 @@ describe("DeMine Agent", function () {
         let cycles = utils.range(10, 130);
         let supplies = Array(numCycles).fill(100);
         await nft.connect(admin).newPool(
-            10, 120, supplies, 1000, user1.address
+            10, 120, supplies, 1000, 2000, user1.address
         );
         await utils.airdrop(p1, admin, user1, agent, 10000000000);
         await utils.airdrop(p1, admin, user2, agent, 10000000000);
@@ -275,10 +275,10 @@ describe("DeMine Agent", function () {
         let half = supplies.map(s => s / 2);
         await expect(
             nft.connect(admin).newPool(
-                10, 120, half, 1000, user1.address
+                10, 120, half, 1000, 2000, user1.address
             )
         ).to.emit(agent, "NewPool").withArgs(
-            1, user1.address, 1000
+            1, user1.address, 1000, 2000
         ).to.emit(nft, "TransferBatch").withArgs(
             admin.address, address0, agent.address, ids, half
         );
@@ -332,10 +332,10 @@ describe("DeMine Agent", function () {
         let numCycles = 120;
         let supplies = Array(numCycles).fill(100);
         await nft.connect(admin).newPool(
-            10, numCycles, supplies, 1000, user1.address
+            10, numCycles, supplies, 1000, 2000, user1.address
         ); // pool 1
         await nft.connect(admin).newPool(
-            10, numCycles, supplies, 1000, user2.address
+            10, numCycles, supplies, 1000, 2000, user2.address
         ); // pool 2
         await utils.airdrop(p1, admin, user1, agent, 100000000);
         await utils.airdrop(p2, admin, user1, agent, 100000000);

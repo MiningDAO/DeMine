@@ -57,17 +57,22 @@ contract DeMineNFT is
         uint128 startCycle,
         uint128 numCycles,
         uint256[] calldata supplies,
-        uint256 costPerToken,
+        uint256 tokenCost,
+        uint256 tokenPrice,
         address owner
     ) external onlyOwner {
         require(owner != address(0), "DeMineNFT: pool owner is zero address");
+        require(
+            tokenPrice >= tokenCost,
+            "DeMineNFT: token price lower than cost"
+        );
         _pool += 1;
         _expandPool(
             _pool,
             startCycle,
             numCycles,
             supplies,
-            abi.encode(_pool, owner, costPerToken)
+            abi.encode(_pool, owner, tokenCost, tokenPrice)
         );
     }
 
@@ -83,7 +88,7 @@ contract DeMineNFT is
             startCycle,
             numCycles,
             supplies,
-            abi.encode(0, 0, 0)
+            abi.encode(0, 0, 0, 0)
         );
     }
 

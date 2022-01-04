@@ -164,6 +164,7 @@ async function mintAndRedeem(contracts, admin, user) {
             120,
             Array(120).fill(100 * i),
             1000 * i,
+            2000 * i,
             user.address
         )
     }

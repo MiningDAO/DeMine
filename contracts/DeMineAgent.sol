@@ -16,7 +16,7 @@ contract DeMineAgent is
 {
     using SafeERC20 for IERC20;
 
-    event NewPool(uint128 indexed, address indexed, uint256);
+    event NewPool(uint128 indexed, address indexed, uint256, uint256);
     event PoolTransfer(uint128 indexed, address indexed, address indexed);
     event PaymentSet(address indexed, bool);
     event CustodianSet(address indexed, address indexed);
@@ -44,7 +44,8 @@ contract DeMineAgent is
 
     struct Pool {
         address owner;
-        uint256 costPerToken;
+        uint256 tokenCost;
+        uint256 tokenPrice;
     }
     mapping(uint128 => Pool) private _pools;
     mapping(uint256 => uint256) private _prices;
@@ -104,11 +105,11 @@ contract DeMineAgent is
             cycles.length == newPrices.length,
             "DeMineAgent: array length mismatch"
         );
-        uint256 costPerToken = _pools[pool].costPerToken;
+        uint256 tokenCost = _pools[pool].tokenCost;
         for (uint256 i = 0; i < cycles.length; i++) {
             uint256 id = (uint256(pool) << 128) + cycles[i];
             require(
-                newPrices[i] >= costPerToken,
+                newPrices[i] >= tokenCost,
                 "DeMineAgent: price too low to cover cost"
             );
             _prices[id] = newPrices[i];
@@ -170,12 +171,12 @@ contract DeMineAgent is
             cycles.length == amounts.length,
             "DeMineAgent: array length mismatch"
         );
-        uint256 costPerToken = _pools[pool].costPerToken;
+        uint256 tokenCost = _pools[pool].tokenCost;
         uint256 totalCost;
         uint256[] memory ids = new uint256[](cycles.length);
         for (uint256 i = 0; i < cycles.length; i++) {
             ids[i] = (uint256(pool) << 128) + cycles[i];
-            totalCost += costPerToken * amounts[i];
+            totalCost += tokenCost * amounts[i];
         }
         DeMineNFT(_nft).safeBatchTransferFrom(
             address(this), _msgSender(), ids, amounts, ""
@@ -227,6 +228,7 @@ contract DeMineAgent is
             cycles.length == amounts.length,
             "DeMineAgent: array length mismatch"
         );
+        uint256 basePrice = _pools[pool].tokenPrice;
         uint256 totalToPay;
         uint256[] memory ids = new uint256[](cycles.length);
         for (uint256 i = 0; i < cycles.length; i++) {
@@ -237,7 +239,8 @@ contract DeMineAgent is
                 "DeMineAgent: insufficient allowance"
             );
             _allowances[id][claimer] = allowance - amounts[i];
-            totalToPay += _prices[id] * amounts[i];
+            uint256 price = _prices[id];
+            totalToPay += (price > 0 ? price : basePrice) * amounts[i];
             ids[i] = id;
         }
         DeMineNFT(_nft).safeBatchTransferFrom(
@@ -275,12 +278,14 @@ contract DeMineAgent is
         (
             uint128 newPool,
             address owner,
-            uint256 costPerToken
-        ) = abi.decode(data, (uint128, address, uint256));
+            uint256 tokenCost,
+            uint256 tokenPrice
+        ) = abi.decode(data, (uint128, address, uint256, uint256));
         if (newPool > 0) {
             _pools[newPool].owner = owner;
-            _pools[newPool].costPerToken = costPerToken;
-            emit NewPool(newPool, owner, costPerToken);
+            _pools[newPool].tokenCost = tokenCost;
+            _pools[newPool].tokenPrice = tokenPrice;
+            emit NewPool(newPool, owner, tokenCost, tokenPrice);
         }
     }
 
@@ -343,10 +348,11 @@ contract DeMineAgent is
 
     function poolInfo(
         uint128 pool
-    ) external view returns(address, uint256) {
+    ) external view returns(address, uint256, uint256) {
         return (
             _pools[pool].owner,
-            _pools[pool].costPerToken
+            _pools[pool].tokenCost,
+            _pools[pool].tokenPrice
         );
     }
 
