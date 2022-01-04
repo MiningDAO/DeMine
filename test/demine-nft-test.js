@@ -113,7 +113,7 @@ describe("DeMine NFT", function () {
                 user1.address
             )
         ).to.emit(agent, "NewPool").withArgs(
-            1, user1.address, 1000, 2000
+            4, user1.address, 1000, 2000
         );
 
         await expect(

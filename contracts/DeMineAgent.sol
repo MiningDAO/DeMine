@@ -239,8 +239,9 @@ contract DeMineAgent is
                 "DeMineAgent: insufficient allowance"
             );
             _allowances[id][claimer] = allowance - amounts[i];
-            uint256 price = _prices[id];
-            totalToPay += (price > 0 ? price : basePrice) * amounts[i];
+            totalToPay += (
+                _prices[id] > 0 ? _prices[id] : basePrice
+            ) * amounts[i];
             ids[i] = id;
         }
         DeMineNFT(_nft).safeBatchTransferFrom(
@@ -341,7 +342,10 @@ contract DeMineAgent is
     ) external view returns(uint256[] memory) {
         uint256[] memory result = new uint256[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
-            result[i] = _prices[ids[i]];
+            uint256 id = ids[i];
+            uint128 pool = uint128(id >> 128);
+            uint256 basePrice = _pools[pool].tokenPrice;
+            result[i] = _prices[id] > 0 ? _prices[id] : basePrice;
         }
         return result;
     }

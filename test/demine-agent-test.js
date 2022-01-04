@@ -243,7 +243,9 @@ describe("DeMine Agent", function () {
         let pool = 1;
         let cycles = utils.range(10, 60);
         let ids = cycles.map(c => utils.id(pool, c));
-        let prices = Array(50).fill(1000);
+        utils.compareArray(await agent.prices(ids), Array(50).fill(2000));
+
+        let prices = Array(50).fill(3000);
         await expect(
             agent.connect(user2).setPrices(pool, cycles, prices)
         ).to.be.revertedWith("DeMineAgent: only pool owner allowed");
@@ -493,7 +495,7 @@ describe("DeMine Agent", function () {
         );
         await checkAllowances(user2.address, ids, allowances);
         await checkAllowances(address0, ids, allowances);
-        await agent.connect(user1).setPrices(pool, cycles, [2000, 2000, 2000]);
+        await agent.connect(user1).setPrices(pool, [10, 20], [4000, 3000]);
 
         // test start
         let half = allowances.map(a => a / 2);
@@ -525,7 +527,7 @@ describe("DeMine Agent", function () {
             agent.connect(user2).claimUnnamed(p1.address, pool, cycles, half)
         ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
 
-        let totalPrice = 2000 * 50 * 3;
+        let totalPrice = (4000 + 3000 + 2000) * 50;
         await utils.airdrop(p1, admin, user2, agent, 10000000000);
 
         await expect(
@@ -537,6 +539,7 @@ describe("DeMine Agent", function () {
         ).to.emit(p1, "Transfer").withArgs(
             user2.address, custodian.address, totalPrice
         );
+        await checkAllowances(user2.address, ids, half);
 
         await expect(
             agent.connect(user2).claimUnnamed(p1.address, pool, cycles, half)
@@ -547,6 +550,7 @@ describe("DeMine Agent", function () {
         ).to.emit(p1, "Transfer").withArgs(
             user2.address, custodian.address, totalPrice
         );
+        await checkAllowances(address0, ids, half);
 
         await expect(
             agent.connect(user2).claim(p1.address, pool, cycles, half)

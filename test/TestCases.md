@@ -25,6 +25,7 @@ DeMineNFT Create Pool
  - [x] create new pool with wrong supply array, should fail
  - [x] create new pool from invalid start cycles, should fail
  - [x] create new pool with pool owner as 0, should fail
+ - [x] create new pool with base price lower than cost, should fail
  - [x] create new pool
     - event TransferBatch from address(0) should be emitted
     - DeMineAgent should with pool set and token stats updated
@@ -93,11 +94,11 @@ Pausable
  - [x] increase/decrease allowance when pause, should fail
  - [x] unlist when pause, should fail
  - [x] claim/claimUnamed when pause, should fail
- - [x] setPrice when pause, should fail
+ - [x] setPrices when pause, should fail
  - [x] unpause with non owner, should fail
  - [x] unpause with owner, paused should be updated
  - [x] transfer pool after unpause, should success
- - [x] setPrice after unpause, should success
+ - [x] setPrices after unpause, should success
  - [x] increase/decrease allowance after pause, should success
  - [x] redeem after unpause, should success
  - [x] claim/claimUnamed after unpause, should success
@@ -107,6 +108,7 @@ Pool
  - [x] setPrice with non-owner, should fail
  - [x] setPrice with price lower than cost, should fail
  - [x] setPrice with pool owner, should success
+    - use prices(ids) to confirm price info, tokens with without price set should use base price
  - [x] transferPool with non-owner, should fail
  - [x] transferPool to address(0), should fail
  - [x] transferPool with pool owner, should success
@@ -163,15 +165,15 @@ DeMineAgent Claim Action
  - [x] with payment failed, should fail
  - [x] claimUnnamed, success
  - [x] claim, success
-    - token stats should be updated
-    - custodian should be paid
-    - income of token issuer should increase
+    - allowance should be updated
+    - custodian should be paid with proper price
     - token should be transferred to claimer
 
 DeMineAgent Cashout Action
  - [x] with non owner, should fail
- - [x] with token already cashedout, should fail
- - [x] with nft.cashout failed, should fail
+ - [x] with token already burned, should fail
+ - [x] with unrewarded cycle, should fail
+ - [x] with tokens exceeding supply, should fail
  - [x] with proper tokens to cashout
     - token stats should be updated
     - owner should receive reward tokens
