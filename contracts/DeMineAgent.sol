@@ -16,7 +16,7 @@ contract DeMineAgent is
 {
     using SafeERC20 for IERC20;
 
-    event PoolSet(uint128 indexed, address indexed, uint256);
+    event NewPool(uint128 indexed, address indexed, uint256);
     event PoolTransfer(uint128 indexed, address indexed, address indexed);
     event PaymentSet(address indexed, bool);
     event CustodianSet(address indexed, address indexed);
@@ -69,7 +69,7 @@ contract DeMineAgent is
     mapping(uint256 => mapping(address => uint256)) _allowance;
     mapping(address => bool) private _payments;
 
-    modifier onlyNFT(address from) {
+    modifier onlyMint(address from) {
         require(
             _msgSender() == _nft,
             "DeMineAgent: only nft contract allowed"
@@ -210,6 +210,10 @@ contract DeMineAgent is
         uint128 pool,
         address newOwner
     ) external whenNotPaused onlyPoolOwner(pool) {
+        require(
+            newOwner != address(0),
+            "DeMineAgent: new pool owner is zero address"
+        );
         _pools[pool].owner = newOwner;
         emit PoolTransfer(pool, _msgSender(), newOwner);
     }
@@ -289,7 +293,7 @@ contract DeMineAgent is
         uint256 id,
         uint256 amount,
         bytes memory data
-    ) external onlyNFT(from) override returns (bytes4) {
+    ) external onlyMint(from) override returns (bytes4) {
         _setPool(data);
         _tokens[id].supply += amount;
         return IERC1155ReceiverUpgradeable.onERC1155Received.selector;
@@ -301,7 +305,7 @@ contract DeMineAgent is
         uint256[] calldata ids,
         uint256[] calldata amounts,
         bytes memory data
-    ) external onlyNFT(from) override returns (bytes4) {
+    ) external onlyMint(from) override returns (bytes4) {
         _setPool(data);
         for (uint256 i = 0; i < ids.length; i++) {
             _tokens[ids[i]].supply += amounts[i];
@@ -313,23 +317,13 @@ contract DeMineAgent is
         (
             uint128 pool,
             address owner,
-            uint256 costPerToken,
-            bool isNewPool
-        ) = abi.decode(data, (uint128, address, uint256, bool));
-        if (isNewPool) {
-            require(
-                _pools[pool].owner == address(0),
-                "DeMineAgent: pool already exists"
-            );
+            uint256 costPerToken
+        ) = abi.decode(data, (uint128, address, uint256));
+        if (pool > 0) {
             _pools[pool].owner = owner;
             _pools[pool].costPerToken = costPerToken;
-        } else {
-            require(
-                _pools[pool].owner != address(0),
-                "DeMineAgent: pool not found"
-            );
+            emit NewPool(pool, owner, costPerToken);
         }
-        emit PoolSet(pool, owner, costPerToken);
     }
 
     function setPayment(address payment, bool supported) external onlyOwner {

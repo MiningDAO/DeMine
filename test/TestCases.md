@@ -23,13 +23,22 @@ ERC2981:
 DeMineNFT Create Pool
  - [x] create new pool from non owner, should fail
  - [x] create new pool with wrong supply array, should fail
- - [x] create new pool with start cycle too late, should fail
- - [x] create new pool from rewarded cycles, should fail
+ - [x] create new pool from invalid start cycles, should fail
+ - [x] create new pool with pool owner as 0, should fail
  - [x] create new pool
     - event TransferBatch from address(0) should be emitted
-    - event NewPool should be emitted
-    - DeMineAgent should with pool set
-    - balanceOf issuer for ids should be same with supplies
+    - DeMineAgent should with pool set and token stats updated
+    - balance of agent should increase
+
+DeMineNFT Expand Pool
+ - [x] expand pool from non owner, should fail
+ - [x] expand pool with wrong supply array, should fail
+ - [x] expand pool with start cycle too late, should fail
+ - [x] expand pool with non-exist pool, should fail
+ - [x] expand new pool
+    - event TransferBatch from address(0) should be emitted
+    - DeMineAgent should with pool set and token stats updated
+    - balance of agent should increase
 
 DeMineNFT Reward
  - [x] reward from non-owner should fail
@@ -89,6 +98,7 @@ Pool
  - [x] setPrice with non-owner, should fail
  - [x] setPrice with pool owner, should success
  - [x] transferPool with non-owner, should fail
+ - [ ] transferPool to address(0), should fail
  - [x] transferPool with pool owner, should success
 
 NFT Interaction
@@ -96,8 +106,10 @@ NFT Interaction
  - [x] [transfer batch]receive nft, from not minted tokens should fail
  - [x] [transfer]receive nft, from non-nft should fail
  - [x] [transfer batch]receive nft, from non-nft should fail
- - [x] [transfer]receive nft, token stats should be updated
- - [x] [transfer batch]receive nft, token stats should be updated
+ - [x] [transfer]receive nft with new pool, token and pool stats should be updated
+ - [x] [transfer batch]receive nft with new pool, token and pool stats should be updated
+ - [ ] [transfer]receive nft with expanding pool, only token stats should be updated
+ - [ ] [transfer batch]receive nft with expanding pool, only token stats should be updated
 
 DeMineAgent State Update:
  - [x] set custodian, from non owner should fail

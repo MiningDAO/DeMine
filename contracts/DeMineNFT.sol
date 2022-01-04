@@ -17,7 +17,6 @@ contract DeMineNFT is
     using SafeERC20 for IERC20;
 
     // Events
-    event NewPool(uint128 indexed, address indexed, uint256, string);
     event Reward(uint128 indexed, address indexed, uint256, uint256);
     event Cashout(address indexed, address indexed, address indexed, uint256);
     event TokenRoyaltySet(address indexed, uint256);
@@ -55,26 +54,21 @@ contract DeMineNFT is
     constructor() initializer {}
 
     function newPool(
-        string calldata info,
         uint128 startCycle,
         uint128 numCycles,
         uint256[] calldata supplies,
         uint256 costPerToken,
         address owner
     ) external onlyOwner {
-        require(
-            owner != address(0),
-            "DeMineNFT: pool owner is address(0)"
-        );
+        require(owner != address(0), "DeMineNFT: pool owner is zero address");
         _pool += 1;
         _expandPool(
             _pool,
             startCycle,
             numCycles,
             supplies,
-            abi.encode(_pool, owner, costPerToken, true)
+            abi.encode(_pool, owner, costPerToken)
         );
-        emit NewPool(_pool, owner, costPerToken, info);
     }
 
     function expandPool(
@@ -83,12 +77,13 @@ contract DeMineNFT is
         uint128 numCycles,
         uint256[] calldata supplies
     ) public onlyOwner {
+        require(pool <= _pool, "DeMineNFT: pool doesn't exsit");
         _expandPool(
             pool,
             startCycle,
             numCycles,
             supplies,
-            abi.encode(pool, 0, 0, false)
+            abi.encode(0, 0, 0)
         );
     }
 

@@ -55,7 +55,6 @@ describe("DeMine NFT", function () {
 
         await expect(
             nft.connect(admin).newPool(
-                "pool4",
                 60,
                 120,
                 Array(120).fill(100),
@@ -103,18 +102,13 @@ describe("DeMine NFT", function () {
         ).to.emit(nft, "Unpaused").withArgs(admin.address);
         expect(await nft.paused()).to.be.false;
 
-        await expect(
-            nft.connect(admin).newPool(
-                "pool4",
-                60,
-                120,
-                Array(120).fill(100),
-                1000,
-                user1.address
-            )
-        ).to.emit(nft, "NewPool").withArgs(
-            4, user1.address, 1000, "pool4"
-        );
+        nft.connect(admin).newPool(
+            60,
+            120,
+            Array(120).fill(100),
+            1000,
+            user1.address
+        )
 
         await expect(
             nft.connect(user1).safeTransferFrom(
@@ -189,21 +183,30 @@ describe("DeMine NFT", function () {
 
     it("create pool tests", async function () {
         let { nft, agent } = contracts;
-        const admin = signers.admin;
-        const [user1, user2, _] = signers.users;
+        let { admin, users: [user1, user2, _] } = signers;
 
         let supplies = Array(120).fill(1000);
         // create new pool with non owner, should revert
         await expect(
             nft.connect(user1).newPool(
-                "pool1", 10, 120, supplies, 100, user2.address
+                10, 120, supplies, 100, user2.address
             )
         ).to.be.revertedWith(OwnableError);
 
         // create new pool with wrong supplies, should revert
+        const address0 = ethers.utils.getAddress(
+            "0x0000000000000000000000000000000000000000"
+        );
         await expect(
             nft.connect(admin).newPool(
-                "pool1", 10, 120, supplies.concat([1000]), 100, user2.address
+                10, 120, supplies.concat([1000]), 100, address0
+            )
+        ).to.be.revertedWith("DeMineNFT: pool owner is zero address");
+
+        // create new pool with wrong supplies, should revert
+        await expect(
+            nft.connect(admin).newPool(
+                10, 120, supplies.concat([1000]), 100, user2.address
             )
         ).to.be.revertedWith("DeMineNFT: supply array length mismatch");
 
@@ -212,17 +215,10 @@ describe("DeMine NFT", function () {
             await utils.reward(contracts, signers, i, 0, 0);
         }
 
-        // create new pool with rewarded start cycle
+        // create new pool with invalid start cycle
         await expect(
             nft.connect(admin).newPool(
-                "pool1", 9, 120, supplies, 100, user2.address
-            )
-        ).to.be.revertedWith("DeMineNFT: startCycle too early");
-
-        // create new pool with unrewarded but invalid start cycle
-        await expect(
-            nft.connect(admin).newPool(
-                "pool1", 12, 120, supplies, 100, user2.address
+                12, 120, supplies, 100, user2.address
             )
         ).to.be.revertedWith("DeMineNFT: startCycle too early");
 
@@ -231,17 +227,74 @@ describe("DeMine NFT", function () {
         let users = Array(ids.length).fill(agent.address);
         let before = await nft.balanceOfBatch(users, ids);
         await expect(
-            nft.connect(signers.admin).newPool(
-                "pool1", 13, 120, supplies, 3000, user1.address
+            nft.connect(admin).newPool(
+                13, 120, supplies, 3000, user1.address
             )
         ).to.emit(nft, "TransferBatch").withArgs(
-            signers.admin.address,
+            admin.address,
             '0x0000000000000000000000000000000000000000',
             agent.address,
             ids,
             supplies
-        ).to.emit(nft, "NewPool").withArgs(
-            1, user1.address, 3000, "pool1"
+        );
+        let after = await nft.balanceOfBatch(users, ids);
+        for (var i = 0; i < ids.length; i++) {
+            expect(after[i].sub(before[i]).eq(supplies[i])).to.be.true;
+        }
+    });
+
+    it("expand pool tests", async function () {
+        let { nft, agent } = contracts;
+        let { admin, users: [user1, _] } = signers;
+        let supplies = Array(120).fill(1000);
+
+        await expect(
+            nft.connect(admin).expandPool(
+                1, 10, 120, supplies
+            )
+        ).to.be.revertedWith("DeMineNFT: pool doesn't exsit");
+
+        await nft.connect(admin).newPool(
+            10, 120, supplies, 3000, user1.address
+        );
+
+        // reward 9 cycle with 0 supply
+        for (let i = 1; i < 10; i++) {
+            await utils.reward(contracts, signers, i, 0, 0);
+        }
+
+        await expect(
+            nft.connect(user1).expandPool(
+                1, 10, 120, supplies
+            )
+        ).to.be.revertedWith(OwnableError);
+
+
+        await expect(
+            nft.connect(admin).expandPool(
+                1, 12, 120, supplies
+            )
+        ).to.be.revertedWith("DeMineNFT: startCycle too early");
+
+        await expect(
+            nft.connect(admin).expandPool(
+                1, 15, 119, supplies
+            )
+        ).to.be.revertedWith("DeMineNFT: supply array length mismatch");
+
+        let ids = utils.ids(1, 15, 120);
+        let users = Array(ids.length).fill(agent.address);
+        let before = await nft.balanceOfBatch(users, ids);
+        await expect(
+            nft.connect(admin).expandPool(
+                1, 15, 120, supplies
+            )
+        ).to.emit(nft, "TransferBatch").withArgs(
+            admin.address,
+            '0x0000000000000000000000000000000000000000',
+            agent.address,
+            ids,
+            supplies
         );
         let after = await nft.balanceOfBatch(users, ids);
         for (var i = 0; i < ids.length; i++) {
@@ -256,7 +309,7 @@ describe("DeMine NFT", function () {
         let startCycle = 10;
         // create new pool successfully
         await nft.connect(signers.admin).newPool(
-            "pool1", startCycle, 120, Array(120).fill(100), 3000, user1.address
+            startCycle, 120, Array(120).fill(100), 3000, user1.address
         )
 
         // reward cycle with 0 supply

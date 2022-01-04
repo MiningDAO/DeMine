@@ -159,7 +159,6 @@ async function mintAndRedeem(contracts, admin, user) {
     // create pools
     for (let i = 1; i <= 3; i++) {
         await nft.connect(admin).newPool(
-            "pool",
             10 * i,
             120,
             Array(120).fill(100 * i),
