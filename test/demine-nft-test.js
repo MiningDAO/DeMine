@@ -12,16 +12,16 @@ describe("DeMine NFT", function () {
 
         // reward cycle 1-40, 0 per nft
         for (let i = 1; i < 10; i++) {
-            await utils.reward(contracts, signers, i, 0, 0);
+            await utils.rewardNext(contracts, signers, i, 0, 0);
         }
         for (let i = 10; i < 20; i++) {
-            await utils.reward(contracts, signers, i, 100, 300);
+            await utils.rewardNext(contracts, signers, i, 100, 300);
         }
         for (let i = 20; i < 30; i++) {
-            await utils.reward(contracts, signers, i, 300, 600);
+            await utils.rewardNext(contracts, signers, i, 300, 600);
         }
         for (let i = 30; i < 40; i++) {
-            await utils.reward(contracts, signers, i, 600, 600);
+            await utils.rewardNext(contracts, signers, i, 600, 600);
         }
         return result;
     }
@@ -212,7 +212,7 @@ describe("DeMine NFT", function () {
 
         // reward 9 cycle with 0 supply
         for (let i = 1; i < 10; i++) {
-            await utils.reward(contracts, signers, i, 0, 0);
+            await utils.rewardNext(contracts, signers, i, 0, 0);
         }
 
         // create new pool with invalid start cycle
@@ -260,7 +260,7 @@ describe("DeMine NFT", function () {
 
         // reward 9 cycle with 0 supply
         for (let i = 1; i < 10; i++) {
-            await utils.reward(contracts, signers, i, 0, 0);
+            await utils.rewardNext(contracts, signers, i, 0, 0);
         }
 
         await expect(
@@ -314,40 +314,72 @@ describe("DeMine NFT", function () {
 
         // reward cycle with 0 supply
         for (let i = 1; i < startCycle; i++) {
-            await utils.reward(contracts, signers, i, 0, 0);
+            await utils.rewardNext(contracts, signers, i, 0, 0);
         }
+
+        await expect(
+            await nft.connect(admin).rewardCurrent(rewarder.address, 100)
+        ).to.emit(nft, "Reward").withArgs(
+            startCycle - 1, rewarder.address, 0, 0
+        );
 
         // reward with non-owner, should revert
         await expect(
-            nft.connect(user1).reward(rewarder.address, 1000)
+            nft.connect(user1).rewardNext(rewarder.address, 1000)
         ).to.be.revertedWith(OwnableError);
 
         // reward with insufficient allowance
         await rewardToken.connect(admin).mint(rewarder.address, 1000);
         await expect(
-            nft.connect(admin).reward(rewarder.address, 1000)
+            nft.connect(admin).rewardNext(rewarder.address, 1000)
         ).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
 
         // reward with insufficient balances
         await rewardToken.connect(rewarder).approve(nft.address, 10000);
         await expect(
-            nft.connect(admin).reward(rewarder.address, 10000)
+            nft.connect(admin).rewardNext(rewarder.address, 10000)
         ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
-
-        // reset rewardToken
-        await rewardToken.connect(admin).burn(rewarder.address, 1000);
-        await rewardToken.connect(
-            rewarder
-        ).decreaseAllowance(nft.address, 10000);
 
         // reward with total reward divisiable by supply
         for (let i = startCycle; i < 20; i++) {
-            await utils.reward(contracts, signers, i, 100, 1000);
+            await utils.rewardNext(contracts, signers, i, 100, 1000);
         }
+
         // reward with total reward not divisiable by supply
         for (let i = 20; i < 40; i++) {
-            await utils.reward(contracts, signers, i, 100, 910);
+            await utils.rewardNext(contracts, signers, i, 100, 910);
         }
+
+        // rewardCurrent tests
+        let balance = await rewardToken.balanceOf(rewarder.address);
+        await rewardToken.connect(admin).burn(rewarder.address, balance);
+
+        await expect(
+            nft.connect(user1).rewardCurrent(rewarder.address, 1000)
+        ).to.be.revertedWith(OwnableError);
+
+        await rewardToken.connect(rewarder).approve(nft.address, 5000);
+        await expect(
+            nft.connect(admin).rewardCurrent(rewarder.address, 1000)
+        ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+
+        await rewardToken.connect(admin).mint(rewarder.address, 5000);
+        await rewardToken.connect(rewarder).approve(nft.address, 2000);
+        await expect(
+            nft.connect(admin).rewardCurrent(rewarder.address, 5000)
+        ).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+
+        await expect(
+            nft.connect(admin).rewardCurrent(rewarder.address, 1000)
+        ).to.emit(nft, "Reward").withArgs(
+            39, rewarder.address, 19, 100
+        );
+
+        await expect(
+            nft.connect(admin).rewardCurrent(rewarder.address, 910)
+        ).to.emit(nft, "Reward").withArgs(
+            39, rewarder.address, 28, 100
+        );
     });
 
     it("cashout test", async function () {

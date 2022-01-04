@@ -111,7 +111,7 @@ async function signers() {
     };
 }
 
-async function reward(contracts, signers, cycle, supply, totalReward) {
+async function rewardNext(contracts, signers, cycle, supply, totalReward) {
     let { nft, rewardToken} = contracts;
     let { rewarder, admin } = signers;
     let rewarderBalance = await rewardToken.balanceOf(rewarder.address);
@@ -132,7 +132,7 @@ async function reward(contracts, signers, cycle, supply, totalReward) {
         rewardPerToken = Math.floor(totalReward / supply);
     }
     await expect(
-        nft.connect(admin).reward(rewarder.address, totalReward)
+        nft.connect(admin).rewardNext(rewarder.address, totalReward)
     ).to.emit(nft, "Reward").withArgs(
         cycle,
         rewarder.address,
@@ -234,7 +234,7 @@ module.exports = {
     ids,
     checkBalances,
     signers,
-    reward,
+    rewardNext,
     compareArray,
     redeem
 };

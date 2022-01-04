@@ -115,17 +115,25 @@ contract DeMineNFT is
         );
     }
 
-    function reward(
+    function rewardNext(
         address rewarder,
-        uint256 rewarded
+        uint256 reward
     ) external onlyOwner {
         _cycle += 1;
+        rewardCurrent(rewarder, reward);
+    }
+
+    function rewardCurrent(
+        address rewarder,
+        uint256 reward
+    ) public onlyOwner {
         if (_cycles[_cycle].supply > 0) {
-            _cycles[_cycle].rewardPerToken = rewarded / _cycles[_cycle].supply;
+            uint256 added = reward / _cycles[_cycle].supply;
+            _cycles[_cycle].rewardPerToken += added;
             IERC20(_rewardToken).safeTransferFrom(
                 rewarder,
                 address(this),
-                _cycles[_cycle].rewardPerToken * _cycles[_cycle].supply
+                added * _cycles[_cycle].supply
             );
         }
         emit Reward(

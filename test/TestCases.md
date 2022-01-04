@@ -40,7 +40,15 @@ DeMineNFT Expand Pool
     - DeMineAgent should with pool set and token stats updated
     - balance of agent should increase
 
-DeMineNFT Reward
+DeMineNFT RewardNext
+ - [x] reward from non-owner should fail
+ - [x] reward with insufficient allowance, should fail
+ - [x] reward with insufficient balance, should fail
+ - [x] reward with cycle with 0 supply
+ - [x] reward with reward divisible by cycle supply
+ - [x] reward with reward not divisible by cycle supply
+
+DeMineNFT RewardCurrent
  - [x] reward from non-owner should fail
  - [x] reward with insufficient allowance, should fail
  - [x] reward with insufficient balance, should fail
