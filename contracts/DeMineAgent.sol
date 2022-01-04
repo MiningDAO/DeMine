@@ -18,13 +18,39 @@ contract DeMineAgent is
 
     event PoolSet(uint128 indexed, address indexed, uint256);
     event PoolTransfer(uint128 indexed, address indexed, address indexed);
-    event List(address indexed, address indexed, uint256[], uint256[], uint256[]);
-    event Unlist(address indexed, address indexed, uint256[]);
-    event Claim(address indexed, uint256, uint256, uint256[], uint256[]);
-    event Redeem(address indexed, uint256, uint256[], uint256[]);
-    event Withdraw(address indexed, address[], uint256[]);
     event PaymentSet(address indexed, bool);
     event CustodianSet(address indexed, address indexed);
+    event PriceSet(address indexed, uint128 indexed, uint128[], uint256[]);
+
+    event IncreaseAllowance(
+        address indexed,
+        address indexed,
+        uint128 indexed,
+        uint128[],
+        uint256[]
+    );
+    event DecreaseAllowance(
+        address indexed,
+        address indexed,
+        uint128 indexed,
+        uint128[],
+        uint256[]
+    );
+    event Claim(
+        address indexed,
+        address indexed,
+        uint256[],
+        uint256[],
+        address,
+        uint256
+    );
+    event Redeem(
+        address indexed,
+        uint256[],
+        uint256[],
+        address,
+        uint256
+    );
 
     address private _nft;
     address private _custodian;
@@ -34,25 +60,40 @@ contract DeMineAgent is
         uint256 costPerToken;
     }
     mapping(uint128 => Pool) private _pools;
-    struct ListingInfo {
-        uint256 amount;
+
+    struct TokenInfo {
+        uint256 locked;
         uint256 price;
     }
-    struct TokenInfo {
-        bool cashedout;
-        uint256 liquidized;
-        uint256 locked;
-        uint256 listed;
-        mapping(address => ListingInfo) listing;
-    }
-    mapping(uint256 => TokenInfo) private _stats;
-    mapping(address => bool) private _payments;
-    mapping(address => mapping(address => uint256)) private _income;
+    mapping(uint256 => TokenInfo) private _tokens;
 
-    modifier onlyNFT {
+    mapping(uint256 => mapping(address => uint256)) _allowance;
+    mapping(address => bool) private _payments;
+
+    modifier onlyNFT(address from) {
         require(
-            _nft == _msgSender(),
+            _msgSender() == _nft,
             "DeMineAgent: only nft contract allowed"
+        );
+        require(
+            from == address(0),
+            "DeMineAgent: only newly minted token allowed"
+        );
+        _;
+    }
+
+    modifier onlyPoolOwner(uint128 pool) {
+        require(
+            _msgSender() == _pools[pool].owner,
+            "DeMineAgent: only pool owner allowed"
+        );
+        _;
+    }
+
+    modifier onlySupportedPayment(address payment) {
+        require(
+            isPaymentSupported(payment),
+            "DeMineAgent: payment not supported"
         );
         _;
     }
@@ -73,197 +114,169 @@ contract DeMineAgent is
 
     constructor() initializer {}
 
-    function list(
-        address to,
-        uint256[] calldata ids,
-        uint256[] calldata prices,
-        uint256[] calldata amounts
-    ) external whenNotPaused {
+    function setPrice(
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata prices
+    ) external whenNotPaused onlyPoolOwner(pool) {
         require(
-            ids.length == prices.length && prices.length == amounts.length,
+            cycles.length == prices.length,
             "DeMineAgent: array length mismatch"
         );
-        address sender = _msgSender();
-        require(
-            sender != to,
-            "DeMineAgent: cannot set owner as recipient"
-        );
-        for (uint256 i = 0; i < ids.length; i++) {
-            uint256 id = ids[i];
-            require(
-                !_stats[id].cashedout,
-                "DeMineAgent: already cashed out"
-            );
-            uint128 pool = uint128(id >> 128);
-            require(
-                sender == _pools[pool].owner,
-                "DeMineAgent: only token owner allowed"
-            );
-            require(
-                prices[i] >= _pools[pool].costPerToken,
-                "DeMineAgent: price too low to cover cost"
-            );
-            uint256 selling = _stats[id].listing[to].amount;
-            uint256 locked = _stats[id].locked;
-            require(
-                locked + selling >= amounts[i],
-                "DeMineAgent: insufficient balance to sale"
-            );
-            _stats[id].locked = locked + selling - amounts[i];
-            _stats[id].listed = _stats[id].listed - selling + amounts[i];
-            _stats[id].listing[to].amount = amounts[i];
-            _stats[id].listing[to].price = prices[i];
+        for (uint256 i = 0; i < cycles.length; i++) {
+            uint256 id = (uint256(pool) << 128) + cycles[i];
+            _tokens[id].price = prices[i];
         }
-        emit List(sender, to, ids, prices, amounts);
+        emit PriceSet(_msgSender(), pool, cycles, prices);
     }
 
-    function unlist(
+    function increaseAllowance(
         address to,
-        uint256[] calldata ids
-    ) external whenNotPaused {
-        address sender = _msgSender();
-        for (uint256 i = 0; i < ids.length; i++) {
-            uint256 id = ids[i];
-            require(
-                sender == _pools[uint128(id >> 128)].owner,
-                "DeMineAgent: only token owner allowed"
-            );
-            require(
-                !_stats[id].cashedout,
-                "DeMineAgent: already cashed out"
-            );
-            uint256 amount = _stats[id].listing[to].amount;
-            _stats[id].locked += amount;
-            _stats[id].listed -= amount;
-            _stats[id].listing[to].amount = 0;
-        }
-        emit Unlist(sender, to, ids);
-    }
-
-    function claim(
-        address payment,
-        uint256[] calldata ids,
-        uint256[] calldata amounts
-    ) external whenNotPaused {
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata allowances
+    ) external whenNotPaused onlyPoolOwner(pool) {
         require(
-            ids.length == amounts.length,
+            cycles.length == allowances.length,
             "DeMineAgent: array length mismatch"
         );
-        require(
-            isPaymentSupported(payment),
-            "DeMineAgent: payment method not supported"
-        );
-        address sender = _msgSender();
-        uint256 totalCost;
-        uint256 totalPrice;
-        for (uint256 i = 0; i < ids.length; i++) {
-            uint256 id = ids[i];
-            require(
-                !_stats[id].cashedout,
-                "DeMineAgent: already cashed out"
-            );
-            (uint256 price, uint256 cost) = claimOne(sender, id, amounts[i]);
-            totalCost += cost;
-            totalPrice += price;
-            address owner = _pools[uint128(id >> 128)].owner;
-            _income[owner][payment] += (price - cost);
+        for (uint256 i = 0; i < cycles.length; i++) {
+            uint256 id = (uint256(pool) << 128) + cycles[i];
+            _allowance[id][to] -= allowances[i];
         }
-        IERC20(payment).safeTransferFrom(sender, _custodian, totalCost);
-        IERC20(payment).safeTransferFrom(
-            sender,
-            address(this),
-            totalPrice - totalCost
-        );
-        DeMineNFT(_nft).safeBatchTransferFrom(
-            address(this), sender, ids, amounts, ""
-        );
-        emit Claim(sender, totalCost, totalPrice, ids, amounts);
+        emit IncreaseAllowance(_msgSender(), to, pool, cycles, allowances);
     }
 
-    function claimOne(
-        address sender,
-        uint256 id,
-        uint256 amount
-    ) private returns(uint256, uint256) {
-        uint256 v1 = _stats[id].listing[sender].amount;
-        uint256 v2 = _stats[id].listing[address(0)].amount;
+    function decreaseAllowance(
+        address to,
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata allowances
+    ) external whenNotPaused onlyPoolOwner(pool) {
         require(
-            v1 + v2 >= amount,
-            "DeMineAgent: insufficient allowance"
+            cycles.length == allowances.length,
+            "DeMineAgent: array length mismatch"
         );
-        uint256 senderPrice = _stats[id].listing[sender].price;
-        uint256 basePrice = _stats[id].listing[address(0)].price;
-        uint256 price;
-        if (v1 >= amount) {
-            _stats[id].listing[sender].amount = v1 - amount;
-            price = amount * senderPrice;
-        } else {
-            _stats[id].listing[sender].amount = 0;
-            _stats[id].listing[address(0)].amount = v1 + v2 - amount;
-            price = basePrice * (amount - v1) + senderPrice * v1;
+        for (uint256 i = 0; i < cycles.length; i++) {
+            uint256 id = (uint256(pool) << 128) + cycles[i];
+            uint256 allowance = _allowance[id][to];
+            require(
+                allowance > allowances[i],
+                "DeMineAgent: decreased allowance below zero"
+            );
+            _allowance[id][to] = allowance - allowances[i];
         }
-        _stats[id].listed -= amount;
-        _stats[id].liquidized += amount;
-        return (price, _pools[uint128(id >> 128)].costPerToken * amount);
+        emit DecreaseAllowance(_msgSender(), to, pool, cycles, allowances);
     }
 
     function redeem(
         address payment,
-        uint256[] calldata ids,
+        uint128 pool,
+        uint128[] calldata cycles,
         uint256[] calldata amounts
-    ) external whenNotPaused {
+    ) external whenNotPaused onlyPoolOwner(pool) onlySupportedPayment(payment) {
         require(
-            ids.length == amounts.length,
+            cycles.length == amounts.length,
             "DeMineAgent: array length mismatch"
         );
-        require(
-            isPaymentSupported(payment),
-            "DeMineAgent: payment method not supported"
-        );
+        uint256 costPerToken = _pools[pool].costPerToken;
         uint256 totalCost;
-        address sender = _msgSender();
-        for (uint256 i = 0; i < ids.length; i++) {
-            uint256 id = ids[i];
-            uint128 pool = uint128(id >> 128);
-            require(
-                sender == _pools[pool].owner,
-                "DeMineAgent: only token owner allowed"
-            );
-            uint256 locked = _stats[id].locked;
+        uint256[] memory ids = new uint256[](cycles.length);
+        for (uint256 i = 0; i < cycles.length; i++) {
+            uint256 id = (uint256(pool) << 128) + cycles[i];
+            uint256 locked = _tokens[id].locked;
             require(
                 locked >= amounts[i],
-                "DeMineAgent: insufficient balance to liquidize"
+                "DeMineAgent: insufficient balance to redeem"
             );
-            _stats[id].locked = locked - amounts[i];
-            _stats[id].liquidized += amounts[i];
-            totalCost += _pools[pool].costPerToken * amounts[i];
+            _tokens[id].locked = locked - amounts[i];
+            totalCost += costPerToken * amounts[i];
+            ids[i] = id;
         }
-        IERC20(payment).safeTransferFrom(sender, _custodian, totalCost);
-        DeMineNFT(_nft).safeBatchTransferFrom(
-            address(this), sender, ids, amounts, ""
+        IERC20(payment).safeTransferFrom(
+            _msgSender(), _custodian, totalCost
         );
-        emit Redeem(sender, totalCost, ids, amounts);
+        DeMineNFT(_nft).safeBatchTransferFrom(
+            address(this), _msgSender(), ids, amounts, ""
+        );
+        emit Redeem(_msgSender(), ids, amounts, payment, totalCost);
     }
 
     function transferPool(
         uint128 pool,
         address newOwner
-    ) external whenNotPaused {
-        require (
-            _msgSender() == _pools[pool].owner,
-            "DeMineAgent: only pool owner is allowed"
-        );
+    ) external whenNotPaused onlyPoolOwner(pool) {
         _pools[pool].owner = newOwner;
         emit PoolTransfer(pool, _msgSender(), newOwner);
     }
 
-    function poolInfo(
-        uint128 pool
-    ) external view returns(address, uint256) {
-        return (
-            _pools[pool].owner,
-            _pools[pool].costPerToken
+    function claimUnnamed(
+        address payment,
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata amounts
+    ) external whenNotPaused onlySupportedPayment(payment) {
+        _claim(address(0), payment, pool, cycles, amounts);
+    }
+
+    function claim(
+        address payment,
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata amounts
+    ) external whenNotPaused onlySupportedPayment(payment) {
+        _claim(_msgSender(), payment, pool, cycles, amounts);
+    }
+
+    function _claim(
+        address claimer,
+        address payment,
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata amounts
+    ) private {
+        require(
+            cycles.length == amounts.length,
+            "DeMineAgent: array length mismatch"
         );
+        uint256 costPerToken = _pools[pool].costPerToken;
+        uint256 totalToPay;
+        uint256 totalCost;
+        uint256[] memory ids = new uint256[](cycles.length);
+        for (uint256 i = 0; i < cycles.length; i++) {
+            uint256 id = (uint256(pool) << 128) + cycles[i];
+            totalToPay += _claimOne(claimer, id, amounts[i]);
+            totalCost += costPerToken * amounts[i];
+            ids[i] = id;
+        }
+        DeMineNFT(_nft).safeBatchTransferFrom(
+            address(this), _msgSender(), ids, amounts, ""
+        );
+        IERC20(payment).safeTransferFrom(
+            _msgSender(), _custodian, totalCost
+        );
+        IERC20(payment).safeTransferFrom(
+            _msgSender(),
+            _pools[pool].owner,
+            totalToPay - totalCost
+        );
+        emit Claim(_msgSender(), claimer, ids, amounts, payment, totalCost);
+    }
+
+    function _claimOne(
+        address claimer,
+        uint256 id,
+        uint256 amount
+    ) private returns(uint256) {
+        uint256 locked = _tokens[id].locked;
+        uint256 allowance = _allowance[id][claimer];
+        require(
+            locked >= amount && allowance >= amount,
+            "DeMineAgent: insufficient inventory or allowance"
+        );
+        _allowance[id][claimer] = allowance - amount;
+        _tokens[id].locked = locked - amount;
+        return _tokens[id].price * amount;
     }
 
     function onERC1155Received(
@@ -272,13 +285,9 @@ contract DeMineAgent is
         uint256 id,
         uint256 amount,
         bytes memory data
-    ) external onlyNFT override returns (bytes4) {
-        require(
-            from == address(0),
-            "DeMineAgent: only newly minted token allowed"
-        );
-        setPool(data);
-        _stats[id].locked += amount;
+    ) external onlyNFT(from) override returns (bytes4) {
+        _setPool(data);
+        _tokens[id].locked += amount;
         return IERC1155ReceiverUpgradeable.onERC1155Received.selector;
     }
 
@@ -288,19 +297,15 @@ contract DeMineAgent is
         uint256[] calldata ids,
         uint256[] calldata amounts,
         bytes memory data
-    ) external onlyNFT override returns (bytes4) {
-        require(
-            from == address(0),
-            "DeMineAgent: only newly minted token allowed"
-        );
-        setPool(data);
+    ) external onlyNFT(from) override returns (bytes4) {
+        _setPool(data);
         for (uint256 i = 0; i < ids.length; i++) {
-            _stats[ids[i]].locked += amounts[i];
+            _tokens[ids[i]].locked += amounts[i];
         }
         return IERC1155ReceiverUpgradeable.onERC1155BatchReceived.selector;
     }
 
-    function setPool(bytes memory data) private {
+    function _setPool(bytes memory data) private {
         (
             uint128 pool,
             address owner,
@@ -316,23 +321,11 @@ contract DeMineAgent is
         emit PaymentSet(payment, supported);
     }
 
-    function isPaymentSupported(address payment) public view returns(bool) {
-        return _payments[payment];
-    }
-
     function cashout(uint256[] calldata ids) external onlyOwner {
         uint256[] memory amounts = new uint256[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
-            uint256 id = ids[i];
-            require(
-                !_stats[id].cashedout,
-                "DeMineAgent: already cashed out"
-            );
-            _stats[id].cashedout = true;
-            amounts[i] = _stats[id].locked + _stats[id].listed;
-            _stats[id].liquidized += amounts[i];
-            _stats[id].listed = 0;
-            _stats[id].locked = 0;
+            amounts[i] = _tokens[ids[i]].locked;
+            _tokens[ids[i]].locked = 0;
         }
         DeMineNFT(_nft).cashout(
             address(this),
@@ -347,63 +340,45 @@ contract DeMineAgent is
         _custodian = newCustodian;
     }
 
-    function withdraw(
-        address[] calldata payments,
-        uint256[] calldata amounts
-    ) external whenNotPaused {
-        address sender = _msgSender();
-        require(
-            payments.length == amounts.length,
-            "DeMineAgent: array length mismatch"
-        );
-        for (uint256 i = 0; i < amounts.length; i++) {
-            address payment = payments[i];
-            require(
-                _income[sender][payment] >= amounts[i],
-                "DeMineAgent: insufficient balance"
-            );
-            IERC20(payment).safeTransfer(sender, amounts[i]);
-            _income[sender][payment] -= amounts[i];
-        }
-        emit Withdraw(sender, payments, amounts);
+    function pause() external onlyOwner {
+        _pause();
     }
 
-    function listingInfo(
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function isPaymentSupported(
+        address payment
+    ) public view returns(bool) {
+        return _payments[payment];
+    }
+
+    function checkAllowance(
         address recipient,
         uint256[] calldata ids
-    ) external view returns(
-        uint256[] memory, uint256[] memory
-    ) {
-        uint256[] memory prices = new uint256[](ids.length);
+    ) external view returns(uint256[] memory) {
         uint256[] memory amounts = new uint256[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
-            prices[i] = _stats[id].listing[recipient].price;
-            amounts[i] = _stats[id].listing[recipient].amount;
+            amounts[i] = _allowance[id][recipient];
         }
-        return (prices, amounts);
+        return amounts;
     }
 
-    function tokenInfo(
-        uint256 id
-    ) external view returns(bool, uint256, uint256, uint256) {
+    function checkPool(
+        uint128 pool
+    ) external view returns(address, uint256) {
         return (
-            _stats[id].cashedout,
-            _stats[id].liquidized,
-            _stats[id].locked,
-            _stats[id].listed
+            _pools[pool].owner,
+            _pools[pool].costPerToken
         );
     }
 
-    function incomeInfo(
-        address who,
-        address[] calldata payments
-    ) external view returns(uint256[] memory) {
-        uint256[] memory amounts = new uint256[](payments.length);
-        for (uint256 i = 0; i < payments.length; i++) {
-            amounts[i] = _income[who][payments[i]];
-        }
-        return amounts;
+    function checkToken(
+        uint256 id
+    ) external view returns(uint256, uint256) {
+        return (_tokens[id].locked, _tokens[id].price);
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -413,13 +388,5 @@ contract DeMineAgent is
         returns (bool)
     {
         return interfaceId == type(IERC1155ReceiverUpgradeable).interfaceId;
-    }
-
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
     }
 }
