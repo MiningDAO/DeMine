@@ -85,7 +85,8 @@ function ids(pool, startCycle, numCycles) {
     return ids;
 }
 
-async function checkBalances(users, ids, amounts) {
+async function checkBalances(user, ids, amounts) {
+    let users = Array(ids.length).fill(user.address);
     let balances = await nft.balanceOfBatch(users, ids);
     for (let i = 0; i < balances.length; i++) {
         expect(balances[i]).to.equal(amounts[i]);
@@ -226,6 +227,10 @@ async function compareArray(a, b) {
     }
 }
 
+function range(start, end) {
+  return Array(end - start).fill().map((_, idx) => start + idx)
+}
+
 module.exports = {
     setupDeMine,
     airdrop,
@@ -236,5 +241,6 @@ module.exports = {
     signers,
     rewardNext,
     compareArray,
-    redeem
+    redeem,
+    range
 };

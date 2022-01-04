@@ -103,10 +103,12 @@ Pausable
  - [x] claim/claimUnamed after unpause, should success
 
 Pool
+ - [x] setPrice with array mismatch, should fail
  - [x] setPrice with non-owner, should fail
+ - [x] setPrice with price lower than cost, should fail
  - [x] setPrice with pool owner, should success
  - [x] transferPool with non-owner, should fail
- - [ ] transferPool to address(0), should fail
+ - [x] transferPool to address(0), should fail
  - [x] transferPool with pool owner, should success
 
 NFT Interaction
@@ -124,13 +126,13 @@ DeMineAgent State Update:
  - [x] set custodian, recipient should be updated
  - [x] set payment from non owner should fail
  - [x] set payment, payment info should be updated
-  - check isPaymentSupported()
+    - check isPaymentSupported()
 
 DeMineAgent Redeem Action
  - [x] with array length not match, should fail
- - [x] with non token issuer, should fail
+ - [x] with non pool owner, should fail
+ - [x] with insufficient supply, should fail
  - [x] with unsupported payment method, should fail
- - [x] with amount larger than total locked, should fail
  - [x] with payment failed, should fail
  - [x] with correct ids and amounts
     - token stats should be updated(tokenInfo covered)
@@ -138,59 +140,33 @@ DeMineAgent Redeem Action
     - nft token should be transferred from agent to token issuer
     - Redeem event should be emitted
 
-DeMineAgent List Action
- - [x] with sender as non token issuer, should fail
- - [x] with token issuer as recipient, should fail
- - [x] with cashedout token, should fail
- - [x] with price lower than cost, should fail
- - [x] with amount exceeding locked + listed, should fail
- - [x] to address(0)
-     - token stats should be updated
-     - check listing result is set
-     - listingInfo covered
- - [x] to address(0) again
-     - token stats should be updated
-     - listing should be updated
- - [x] to one recipient
-     - token stats should be updated
-     - check listing result is set
-     - list event should be emitted
- - [x] to one recipient again
-     - token stats should be updated
-     - listing should be updated
-     - list event should be emitted
-
-DeMineAgent Unlist Action
- - [x] with sender as non token issuer, should fail
- - [x] with cashedout token, should fail
- - [x] to address(0)
-    - token stats should be updated
-    - tokens should be unlisted
-    - Unlist event should be emitted
- - [x] to normal recipient
-    - token stats should be updated
-    - tokens should be unlisted
-    - Unlist event should be emitted
+DeMineAgent Allowance Update Action
+ - [x] increase with non pool owner, should fail
+ - [x] increase with array mismatch, should fail
+ - [x] increase allowance for address0, should success
+ - [x] increase allowance for address0 again, should success
+ - [x] increase allowance for normal user, should success
+ - [x] increase allowance for normal user again, should success
+ - [x] decrease with non pool owner, should fail
+ - [x] decrease with array mismatch, should fail
+ - [x] decrease with allowance below 0, should fail
+ - [x] decrease allowance for address0, should success
+ - [x] decrease allowance for address0 again to 0, should success
+ - [x] decrease allowance for normal user, should success
+ - [x] decrease allowance for normal user again to 0, should success
 
 DeMineAgent Claim Action
- - [x] with cashedout token, should fail
  - [x] with unsupported payment method, should fail
- - [x] with amount exceeding listed, should fail
+ - [x] with array length mismatch, should fail
+ - [x] with amount exceeding allowance, should fail
+ - [x] with amount exceeding supply, should fail
  - [x] with payment failed, should fail
- - [x] with amount lower than listed for recipient
+ - [x] claimUnnamed, success
+ - [x] claim, success
     - token stats should be updated
     - custodian should be paid
     - income of token issuer should increase
     - token should be transferred to claimer
- - [x] with amount larger than listed for recipient but lower than total listed
-    - token stats should be updated
-      - check listingInfo for address(0)
-    - cost token balance of payment recipient should increase
-    - income info of token issuer should increase
-    - cost token balance of agent should increase
-    - nft tokens should be transferred from agent to claimer
-    - Claim event should be emitted
-    - tokenInfo covered
 
 DeMineAgent Cashout Action
  - [x] with non owner, should fail

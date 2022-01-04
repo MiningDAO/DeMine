@@ -437,8 +437,7 @@ describe("DeMine NFT", function () {
         ).to.be.revertedWith("DeMineNFT: unrewarded cycle");
 
         // redeem and cashout properly
-        let users = Array(ids.length).fill(user1.address);
-        await utils.checkBalances(users, ids, amounts);
+        await utils.checkBalances(user1, ids, amounts);
         let nftBefore = await rewardToken.balanceOf(nft.address);
         let user2Before = await rewardToken.balanceOf(user2.address);
         let delta = 10 * 3 * 10 + 20 * 2 * 10 + 30 * 1 * 10;
@@ -460,7 +459,7 @@ describe("DeMine NFT", function () {
             amounts
         );
 
-        await utils.checkBalances(users, ids, Array(ids.length).fill(0));
+        await utils.checkBalances(user1, ids, Array(ids.length).fill(0));
         let nftAfter = await rewardToken.balanceOf(nft.address);
         let user2After = await rewardToken.balanceOf(user2.address);
         expect(user2After.sub(user2Before).eq(delta)).to.be.true;
@@ -469,7 +468,7 @@ describe("DeMine NFT", function () {
         // redeem more and cashout with approved user
         await utils.redeem(agent, user1, payments[0], ids, amounts);
         await nft.connect(user1).setApprovalForAll(user2.address, true);
-        await utils.checkBalances(users, ids, amounts);
+        await utils.checkBalances(user1, ids, amounts);
         nftBefore = await rewardToken.balanceOf(nft.address);
         user2Before = await rewardToken.balanceOf(user2.address);
 
@@ -490,7 +489,7 @@ describe("DeMine NFT", function () {
             amounts
         );
 
-        await utils.checkBalances(users, ids, Array(ids.length).fill(0));
+        await utils.checkBalances(user1, ids, Array(ids.length).fill(0));
         nftAfter = await rewardToken.balanceOf(nft.address);
         user2After = await rewardToken.balanceOf(user2.address);
         delta = 10 * 3 * 10 + 20 * 2 * 10 + 30 * 1 * 10;

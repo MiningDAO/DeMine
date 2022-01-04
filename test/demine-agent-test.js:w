@@ -48,7 +48,7 @@ contract DeMineAgent is
     }
     mapping(uint128 => Pool) private _pools;
     mapping(uint256 => uint256) private _prices;
-    mapping(uint256 => mapping(address => uint256)) _allowances;
+    mapping(uint256 => mapping(address => uint256)) _allowance;
     mapping(address => bool) private _payments;
 
     modifier onlyMint(address from) {
@@ -128,7 +128,7 @@ contract DeMineAgent is
         );
         for (uint256 i = 0; i < cycles.length; i++) {
             uint256 id = (uint256(pool) << 128) + cycles[i];
-            _allowances[id][to] += increment[i];
+            _allowance[id][to] += increment[i];
         }
         emit IncreaseAllowance(_msgSender(), to, pool, cycles, increment);
     }
@@ -145,12 +145,12 @@ contract DeMineAgent is
         );
         for (uint256 i = 0; i < cycles.length; i++) {
             uint256 id = (uint256(pool) << 128) + cycles[i];
-            uint256 allowance = _allowances[id][to];
+            uint256 allowance = _allowance[id][to];
             require(
                 allowance >= decrement[i],
                 "DeMineAgent: decreased allowance below zero"
             );
-            _allowances[id][to] = allowance - decrement[i];
+            _allowance[id][to] = allowance - decrement[i];
         }
         emit DecreaseAllowance(_msgSender(), to, pool, cycles, decrement);
     }
@@ -177,11 +177,11 @@ contract DeMineAgent is
             ids[i] = (uint256(pool) << 128) + cycles[i];
             totalCost += costPerToken * amounts[i];
         }
-        DeMineNFT(_nft).safeBatchTransferFrom(
-            address(this), _msgSender(), ids, amounts, ""
-        );
         IERC20(payment).safeTransferFrom(
             _msgSender(), _custodian, totalCost
+        );
+        DeMineNFT(_nft).safeBatchTransferFrom(
+            address(this), _msgSender(), ids, amounts, ""
         );
         emit Redeem(_msgSender(), pool, payment);
     }
@@ -227,33 +227,49 @@ contract DeMineAgent is
             cycles.length == amounts.length,
             "DeMineAgent: array length mismatch"
         );
+        uint256 costPerToken = _pools[pool].costPerToken;
         uint256 totalToPay;
+        uint256 totalCost;
         uint256[] memory ids = new uint256[](cycles.length);
         for (uint256 i = 0; i < cycles.length; i++) {
             uint256 id = (uint256(pool) << 128) + cycles[i];
-            uint256 allowance = _allowances[id][claimer];
+            uint256 allowance = _allowance[id][claimer];
             require(
-                allowance >= amounts[i],
-                "DeMineAgent: insufficient allowance"
+                allowance >= amount,
+                "DeMineAgent: insufficient inventory or allowance"
             );
-            _allowances[id][claimer] = allowance - amounts[i];
-            totalToPay += _prices[id] * amounts[i];
+            _allowance[id][claimer] = allowance - amount;
+            totalToPay += _prices[id] * amount;
+            totalCost += costPerToken * amounts[i];
             ids[i] = id;
         }
+        IERC20(payment).safeTransferFrom(
+            _msgSender(), _custodian, totalCost
+        );
+        IERC20(payment).safeTransferFrom(
+            _msgSender(),
+            _pools[pool].owner,
+            totalToPay - totalCost
+        );
         DeMineNFT(_nft).safeBatchTransferFrom(
             address(this), _msgSender(), ids, amounts, ""
         );
-        IERC20(payment).safeTransferFrom(
-            _msgSender(), _custodian, totalToPay
-        );
         emit Claim(_msgSender(), claimer, pool, payment);
+    }
+
+    function _claimOne(
+        address claimer,
+        uint256 id,
+        uint256 amount
+    ) private returns(uint256) {
+        return ;
     }
 
     function onERC1155Received(
         address,
         address from,
-        uint256,
-        uint256,
+        uint256 id,
+        uint256 amount,
         bytes memory data
     ) external onlyMint(from) override returns (bytes4) {
         _setPool(data);
@@ -263,8 +279,8 @@ contract DeMineAgent is
     function onERC1155BatchReceived(
         address,
         address from,
-        uint256[] calldata,
-        uint256[] calldata,
+        uint256[] calldata ids,
+        uint256[] calldata amounts,
         bytes memory data
     ) external onlyMint(from) override returns (bytes4) {
         _setPool(data);
@@ -273,14 +289,14 @@ contract DeMineAgent is
 
     function _setPool(bytes memory data) private {
         (
-            uint128 newPool,
+            uint128 pool,
             address owner,
             uint256 costPerToken
         ) = abi.decode(data, (uint128, address, uint256));
-        if (newPool > 0) {
-            _pools[newPool].owner = owner;
-            _pools[newPool].costPerToken = costPerToken;
-            emit NewPool(newPool, owner, costPerToken);
+        if (pool > 0) {
+            _pools[pool].owner = owner;
+            _pools[pool].costPerToken = costPerToken;
+            emit NewPool(pool, owner, costPerToken);
         }
     }
 
@@ -320,25 +336,15 @@ contract DeMineAgent is
         return _payments[payment];
     }
 
-    function allowances(
+    function allowance(
         address recipient,
         uint256[] calldata ids
     ) external view returns(uint256[] memory) {
-        uint256[] memory result = new uint256[](ids.length);
+        uint256[] memory amounts = new uint256[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
-            result[i] = _allowances[ids[i]][recipient];
+            amounts[i] = _allowance[ids[i]][recipient];
         }
-        return result;
-    }
-
-    function prices(
-        uint256[] calldata ids
-    ) external view returns(uint256[] memory) {
-        uint256[] memory result = new uint256[](ids.length);
-        for (uint256 i = 0; i < ids.length; i++) {
-            result[i] = _prices[ids[i]];
-        }
-        return result;
+        return amounts;
     }
 
     function poolInfo(
@@ -348,6 +354,16 @@ contract DeMineAgent is
             _pools[pool].owner,
             _pools[pool].costPerToken
         );
+    }
+
+    function prices(
+        uint256[] calldata ids
+    ) external view returns(uint256[] memory) {
+        uint256[] memory prices = new uint256[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            prices[i] = _prices[ids[i]];
+        }
+        return prices;
     }
 
     function supportsInterface(bytes4 interfaceId)
