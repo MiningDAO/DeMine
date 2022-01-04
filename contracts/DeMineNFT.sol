@@ -64,6 +64,43 @@ contract DeMineNFT is
         address owner
     ) external onlyOwner {
         require(
+            owner != address(0),
+            "DeMineNFT: pool owner is address(0)"
+        );
+        _pool += 1;
+        _expandPool(
+            _pool,
+            startCycle,
+            numCycles,
+            supplies,
+            abi.encode(_pool, owner, costPerToken, true)
+        );
+        emit NewPool(_pool, owner, costPerToken, info);
+    }
+
+    function expandPool(
+        uint128 pool,
+        uint128 startCycle,
+        uint128 numCycles,
+        uint256[] calldata supplies
+    ) public onlyOwner {
+        _expandPool(
+            pool,
+            startCycle,
+            numCycles,
+            supplies,
+            abi.encode(pool, 0, 0, false)
+        );
+    }
+
+    function _expandPool(
+        uint128 pool,
+        uint128 startCycle,
+        uint128 numCycles,
+        uint256[] calldata supplies,
+        bytes memory data
+    ) private {
+        require(
             supplies.length == numCycles,
             "DeMineNFT: supply array length mismatch"
         );
@@ -71,7 +108,6 @@ contract DeMineNFT is
             startCycle > _cycle + 3,
             "DeMineNFT: startCycle too early"
         );
-        _pool += 1;
         uint256[] memory ids = new uint256[](numCycles);
         for (uint128 i = 0; i < numCycles; i++) {
             ids[i] = (uint256(_pool) << 128) + startCycle + i;
@@ -81,9 +117,8 @@ contract DeMineNFT is
             _agent,
             ids,
             supplies,
-            abi.encode(_pool, owner, costPerToken)
+            data
         );
-        emit NewPool(_pool, owner, costPerToken, info);
     }
 
     function reward(

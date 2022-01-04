@@ -60,13 +60,11 @@ contract DeMineAgent is
         uint256 costPerToken;
     }
     mapping(uint128 => Pool) private _pools;
-
-    struct TokenInfo {
+    struct Token {
         uint256 locked;
         uint256 price;
     }
-    mapping(uint256 => TokenInfo) private _tokens;
-
+    mapping(uint256 => Token) private _tokens;
     mapping(uint256 => mapping(address => uint256)) _allowance;
     mapping(address => bool) private _payments;
 
@@ -309,10 +307,22 @@ contract DeMineAgent is
         (
             uint128 pool,
             address owner,
-            uint256 costPerToken
-        ) = abi.decode(data, (uint128, address, uint256));
-        _pools[pool].owner = owner;
-        _pools[pool].costPerToken = costPerToken;
+            uint256 costPerToken,
+            bool isNewPool
+        ) = abi.decode(data, (uint128, address, uint256, bool));
+        if (isNewPool) {
+            require(
+                _pools[pool].owner == address(0),
+                "DeMineAgent: pool already exists"
+            );
+            _pools[pool].owner = owner;
+            _pools[pool].costPerToken = costPerToken;
+        } else {
+            require(
+                _pools[pool].owner != address(0),
+                "DeMineAgent: pool not found"
+            );
+        }
         emit PoolSet(pool, owner, costPerToken);
     }
 

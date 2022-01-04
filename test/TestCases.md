@@ -73,22 +73,23 @@ Pausable
  - [x] pause with owner, paused should be updated
  - [x] transfer pool when pause, should fail
  - [x] redeem when pause, should fail
- - [x] list when pause, should fail
+ - [x] increase/decrease allowance when pause, should fail
  - [x] unlist when pause, should fail
- - [x] claim when pause, should fail
- - [x] withdraw when pause, should fail
+ - [x] claim/claimUnamed when pause, should fail
+ - [x] setPrice when pause, should fail
  - [x] unpause with non owner, should fail
  - [x] unpause with owner, paused should be updated
  - [x] transfer pool after unpause, should success
+ - [x] setPrice after unpause, should success
+ - [x] increase/decrease allowance after pause, should success
  - [x] redeem after unpause, should success
- - [x] list after unpause, should success
- - [x] unlist after unpause, should success
- - [x] claim after unpause, should success
- - [x] withdraw after unpause, should success
+ - [x] claim/claimUnamed after unpause, should success
 
 Pool
+ - [x] setPrice with non-owner, should fail
+ - [x] setPrice with pool owner, should success
  - [x] transferPool with non-owner, should fail
- - [x] transferPool with owner, should success
+ - [x] transferPool with pool owner, should success
 
 NFT Interaction
  - [x] [transfer]receive nft, from not minted tokens should fail
@@ -170,16 +171,6 @@ DeMineAgent Claim Action
     - nft tokens should be transferred from agent to claimer
     - Claim event should be emitted
     - tokenInfo covered
-
-DeMineAgent Withdraw Action
- - [x] with payments/amounts array mismatch, should fail
- - [x] with amount exceeding income, should fail
- - [x] with correct input
-    - income info of sender should decrease
-    - balance of sender should increase
-    - balance of agent contract should decrease
-    - Withdraw event should be emitted
-    - incomeInfo covered
 
 DeMineAgent Cashout Action
  - [x] with non owner, should fail
