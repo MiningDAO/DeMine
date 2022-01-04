@@ -42,6 +42,7 @@ contract DeMineAgent is
         uint256[],
         uint256[],
         address,
+        uint256,
         uint256
     );
     event Redeem(
@@ -61,7 +62,7 @@ contract DeMineAgent is
     }
     mapping(uint128 => Pool) private _pools;
     struct Token {
-        uint256 locked;
+        uint256 supply;
         uint256 price;
     }
     mapping(uint256 => Token) private _tokens;
@@ -172,7 +173,12 @@ contract DeMineAgent is
         uint128 pool,
         uint128[] calldata cycles,
         uint256[] calldata amounts
-    ) external whenNotPaused onlyPoolOwner(pool) onlySupportedPayment(payment) {
+    )
+        external
+        whenNotPaused
+        onlyPoolOwner(pool)
+        onlySupportedPayment(payment)
+    {
         require(
             cycles.length == amounts.length,
             "DeMineAgent: array length mismatch"
@@ -182,12 +188,12 @@ contract DeMineAgent is
         uint256[] memory ids = new uint256[](cycles.length);
         for (uint256 i = 0; i < cycles.length; i++) {
             uint256 id = (uint256(pool) << 128) + cycles[i];
-            uint256 locked = _tokens[id].locked;
+            uint256 supply = _tokens[id].supply;
             require(
-                locked >= amounts[i],
+                supply >= amounts[i],
                 "DeMineAgent: insufficient balance to redeem"
             );
-            _tokens[id].locked = locked - amounts[i];
+            _tokens[id].supply = supply - amounts[i];
             totalCost += costPerToken * amounts[i];
             ids[i] = id;
         }
@@ -247,9 +253,6 @@ contract DeMineAgent is
             totalCost += costPerToken * amounts[i];
             ids[i] = id;
         }
-        DeMineNFT(_nft).safeBatchTransferFrom(
-            address(this), _msgSender(), ids, amounts, ""
-        );
         IERC20(payment).safeTransferFrom(
             _msgSender(), _custodian, totalCost
         );
@@ -258,7 +261,10 @@ contract DeMineAgent is
             _pools[pool].owner,
             totalToPay - totalCost
         );
-        emit Claim(_msgSender(), claimer, ids, amounts, payment, totalCost);
+        DeMineNFT(_nft).safeBatchTransferFrom(
+            address(this), _msgSender(), ids, amounts, ""
+        );
+        emit Claim(_msgSender(), claimer, ids, amounts, payment, totalCost, totalToPay);
     }
 
     function _claimOne(
@@ -266,14 +272,14 @@ contract DeMineAgent is
         uint256 id,
         uint256 amount
     ) private returns(uint256) {
-        uint256 locked = _tokens[id].locked;
+        uint256 supply = _tokens[id].supply;
         uint256 allowance = _allowance[id][claimer];
         require(
-            locked >= amount && allowance >= amount,
+            supply >= amount && allowance >= amount,
             "DeMineAgent: insufficient inventory or allowance"
         );
         _allowance[id][claimer] = allowance - amount;
-        _tokens[id].locked = locked - amount;
+        _tokens[id].supply = supply - amount;
         return _tokens[id].price * amount;
     }
 
@@ -285,7 +291,7 @@ contract DeMineAgent is
         bytes memory data
     ) external onlyNFT(from) override returns (bytes4) {
         _setPool(data);
-        _tokens[id].locked += amount;
+        _tokens[id].supply += amount;
         return IERC1155ReceiverUpgradeable.onERC1155Received.selector;
     }
 
@@ -298,7 +304,7 @@ contract DeMineAgent is
     ) external onlyNFT(from) override returns (bytes4) {
         _setPool(data);
         for (uint256 i = 0; i < ids.length; i++) {
-            _tokens[ids[i]].locked += amounts[i];
+            _tokens[ids[i]].supply += amounts[i];
         }
         return IERC1155ReceiverUpgradeable.onERC1155BatchReceived.selector;
     }
@@ -334,8 +340,8 @@ contract DeMineAgent is
     function cashout(uint256[] calldata ids) external onlyOwner {
         uint256[] memory amounts = new uint256[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
-            amounts[i] = _tokens[ids[i]].locked;
-            _tokens[ids[i]].locked = 0;
+            amounts[i] = _tokens[ids[i]].supply;
+            _tokens[ids[i]].supply = 0;
         }
         DeMineNFT(_nft).cashout(
             address(this),
@@ -385,10 +391,8 @@ contract DeMineAgent is
         );
     }
 
-    function checkToken(
-        uint256 id
-    ) external view returns(uint256, uint256) {
-        return (_tokens[id].locked, _tokens[id].price);
+    function checkToken(uint256 id) external view returns(uint256, uint256) {
+        return (_tokens[id].supply, _tokens[id].price);
     }
 
     function supportsInterface(bytes4 interfaceId)

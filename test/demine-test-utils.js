@@ -88,7 +88,7 @@ function ids(pool, startCycle, numCycles) {
 async function checkBalances(users, ids, amounts) {
     let balances = await nft.balanceOfBatch(users, ids);
     for (let i = 0; i < balances.length; i++) {
-        expect(balances[i].eq(amounts[i])).to.be.true;
+        expect(balances[i]).to.equal(amounts[i]);
     }
 }
 
@@ -150,48 +150,75 @@ async function reward(contracts, signers, cycle, supply, totalReward) {
 }
 
 async function airdrop(token, admin, owner, spender, value) {
-        await token.connect(admin).mint(owner.address, value);
-        await token.connect(owner).approve(spender.address, value);
+    await token.connect(admin).mint(owner.address, value);
+    await token.connect(owner).approve(spender.address, value);
 }
 
 async function mintAndRedeem(contracts, admin, user) {
-        let { nft, agent, payments } = contracts;
-        // create pools
-        for (let i = 1; i <= 3; i++) {
-            await nft.connect(admin).newPool(
-                "pool",
-                10 * i,
-                120,
-                Array(120).fill(100 * i),
-                1000 * i,
-                user.address
-            )
-        }
+    let { nft, agent, payments: [p1, _] } = contracts;
+    // create pools
+    for (let i = 1; i <= 3; i++) {
+        await nft.connect(admin).newPool(
+            "pool",
+            10 * i,
+            120,
+            Array(120).fill(100 * i),
+            1000 * i,
+            user.address
+        )
+    }
 
-        //tokens to redeem
-        let ids = [];
-        let amounts = [];
-        for (let i = 10; i < 40; i++) {
-            if (i < 20) {
-                ids.push(id(1, i));
-                amounts.push(10);
-            } else if (i < 30) {
-                ids.push(id(2, i));
-                amounts.push(20);
-            } else if (i < 40) {
-                ids.push(id(3, i));
-                amounts.push(30);
-            }
+    //tokens to redeem
+    let ids = [];
+    let amounts = [];
+    for (let i = 10; i < 40; i++) {
+        if (i < 20) {
+            ids.push(id(1, i));
+            amounts.push(10);
+        } else if (i < 30) {
+            ids.push(id(2, i));
+            amounts.push(20);
+        } else {
+            ids.push(id(3, i));
+            amounts.push(30);
         }
+    }
 
-        // get cost tokens to redeem
-        await payments[0].connect(
-            admin
-        ).mint(user.address, 10000000);
-        await payments[0].connect(user).approve(agent.address, 10000000);
-        await agent.connect(user).redeem(payments[0].address, ids, amounts);
-        return { ids, amounts };
-    };
+    await airdrop(p1, admin, user, agent, 100000000);
+    await redeem(agent, user, p1, ids, amounts);
+    return { ids, amounts };
+};
+
+async function redeem(agent, user, payment, ids, amounts) {
+    let result = {};
+    for (let i = 0; i < ids.length; i++) {
+        let cycle = ids[i].mod(base);
+        let pool = ids[i].sub(cycle).div(base);
+
+        setDefault(result, pool, {});
+        setDefault(result[pool], 'cycles', []);
+        setDefault(result[pool], 'amounts', []);
+
+        result[pool]['cycles'].push(cycle.toNumber());
+        result[pool]['amounts'].push(amounts[i]);
+    }
+    let pools = Object.keys(result);
+    for (let i = 0; i < pools.length; i++) {
+        let pool = pools[i];
+        await agent.connect(user).redeem(
+            payment.address,
+            pool,
+            result[pool]['cycles'],
+            result[pool]['amounts']
+        );
+    }
+}
+
+function setDefault(obj, key, value) {
+    if (obj[key] === undefined) {
+        obj[key] = value;
+    }
+}
 
 async function compareArray(a, b) {
     expect(a.length).to.equal(b.length);
@@ -209,5 +236,6 @@ module.exports = {
     checkBalances,
     signers,
     reward,
-    compareArray
+    compareArray,
+    redeem
 };

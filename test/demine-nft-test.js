@@ -338,7 +338,8 @@ describe("DeMine NFT", function () {
         let unrewarded = utils.id(3, 41);
         await agent.connect(user1).redeem(
             payments[0].address,
-            [unrewarded],
+            3,
+            [41],
             [30]
         );
         await expect(
@@ -381,7 +382,7 @@ describe("DeMine NFT", function () {
         expect(nftBefore.sub(nftAfter).eq(delta)).to.be.true;
 
         // redeem more and cashout with approved user
-        await agent.connect(user1).redeem(payments[0].address, ids, amounts);
+        await utils.redeem(agent, user1, payments[0], ids, amounts);
         await nft.connect(user1).setApprovalForAll(user2.address, true);
         await utils.checkBalances(users, ids, amounts);
         nftBefore = await rewardToken.balanceOf(nft.address);

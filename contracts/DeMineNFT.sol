@@ -7,7 +7,6 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
-import "./DeMineAgent.sol";
 
 /// @author Shu Dong
 contract DeMineNFT is
@@ -110,7 +109,7 @@ contract DeMineNFT is
         );
         uint256[] memory ids = new uint256[](numCycles);
         for (uint128 i = 0; i < numCycles; i++) {
-            ids[i] = (uint256(_pool) << 128) + startCycle + i;
+            ids[i] = (uint256(pool) << 128) + startCycle + i;
             _cycles[startCycle + i].supply += supplies[i];
         }
         _mintBatch(
