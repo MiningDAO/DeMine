@@ -1,19 +1,11 @@
 const { expect } = require("chai");
-const { ethers } = require("hardhat");
+const { ethers, deployments } = require("hardhat");
 
 const base = ethers.BigNumber.from(2).pow(128);
 
-async function setupERC20() {
-    // setup token factory
-    const TokenFactory = await ethers.getContractFactory("WrappedTokenCloneFactory");
-    tokenFactory = await TokenFactory.deploy();
-    await tokenFactory.deployed();
-    const Token = await ethers.getContractFactory("WrappedToken");
-    return [tokenFactory, Token];
-}
-
 async function setupRewardToken(admin) {
-    const [tokenFactory, Token] = await setupERC20();
+    const tokenFactory = await ethers.getContract("WrappedTokenCloneFactory");
+    const Token = await ethers.getContractFactory("WrappedToken");
     const tx = await tokenFactory.create("Reward", "REWARD", 8, admin.address);
     const { events: events } = await tx.wait();
     const { address: address } = events.find(Boolean);
@@ -21,7 +13,8 @@ async function setupRewardToken(admin) {
 }
 
 async function setupPaymentTokens(admin, num) {
-    const [tokenFactory, Token] = await setupERC20();
+    const tokenFactory = await ethers.getContract("WrappedTokenCloneFactory");
+    const Token = await ethers.getContractFactory("WrappedToken");
     let payments = [];
     for (let i = 0; i < num; i++) {
         const tx = await tokenFactory.create(
@@ -34,7 +27,6 @@ async function setupPaymentTokens(admin, num) {
         const { address: address } = events.find(Boolean);
         payments.push(await Token.attach(address));
     }
-
     return payments;
 }
 
@@ -43,13 +35,11 @@ function toAddresses(values) {
 }
 
 async function setupDeMine(signers) {
+    await deployments.fixture(["DeMineCloneFactory", "WrappedTokenCloneFactory"]);
     const rewardToken = await setupRewardToken(signers.admin);
     const payments = await setupPaymentTokens(signers.admin, 3);
 
-    const DeMineFactory = await ethers.getContractFactory("DeMineCloneFactory");
-    demineFactory = await DeMineFactory.deploy();
-    await demineFactory.deployed();
-
+    const demineFactory = await ethers.getContract("DeMineCloneFactory");
     const NFT = await ethers.getContractFactory("DeMineNFT");
     const Agent = await ethers.getContractFactory("DeMineAgent");
     const tx = await demineFactory.create(

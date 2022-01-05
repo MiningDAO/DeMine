@@ -1,12 +1,11 @@
-module.exports = async ({ethers}) => {
-    const [deployer] = await ethers.getSigners();
-    const Factory = await ethers.getContractFactory("WrappedTokenCloneFactory");
-    const factory = await Factory.deploy({
+module.exports = async ({ getNamedAccounts, deployments }) => {
+    const { deployer } = await getNamedAccounts();
+    const { deploy } = deployments;
+
+    await deploy('WrappedTokenCloneFactory', {
         from: deployer,
         log: true
     });
-    await factory.deployed();
-    console.log("Wrapped Token Clone Factory: " + factory.address);
 };
 
 module.exports.tags = ['WrappedTokenCloneFactory'];

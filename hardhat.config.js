@@ -10,17 +10,19 @@ extendEnvironment((hre) => {
     hre.localConfig = config;
 });
 
-task('accounts', 'Prints the list of accounts', async (taskArgs, hre) => {
-    const accounts = await hre.ethers.getSigners();
-    for (const account of accounts) {
-      console.log(account.address);
-    }
-});
+task('accounts', 'Prints the list of accounts')
+    .setAction(async (taskArgs, { ethers }) => {
+        const signers = await ethers.getNamedSigners();
+        for (const name of Object.keys(signers)) {
+          formatted = (name + ": ").padEnd(15, " ");
+          console.log(formatted + signers[name].address);
+        }
+    });
 
 task('abi', 'Prints abi of contract')
     .addParam('contract', 'contract name')
-    .setAction(async (taskArgs, hre) => {
-        let artifact = await hre.artifacts.readArtifact(taskArgs.contract);
+    .setAction(async (taskArgs, { artifacts }) => {
+        let artifact = await artifacts.readArtifact(taskArgs.contract);
         console.log(artifact.abi);
     });
 
