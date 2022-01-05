@@ -6,7 +6,7 @@ import "./DeMineNFT.sol";
 import "./DeMineAgent.sol";
 
 contract DeMineCloneFactory {
-    event NewContract(address indexed, address indexed);
+    event Clone(address indexed, address indexed);
 
     address immutable nftImpl;
     address immutable agentImpl;
@@ -22,7 +22,7 @@ contract DeMineCloneFactory {
         address royaltyRecipient,
         uint16 royaltyBps,
         address rewardToken,
-        // admin
+        // agent
         address[] memory payments,
         address custodian,
         // owner
@@ -44,7 +44,7 @@ contract DeMineCloneFactory {
         );
         DeMineNFT(nftCloned).transferOwnership(owner);
         DeMineAgent(agentCloned).transferOwnership(owner);
-        emit NewContract(nftCloned, agentCloned);
+        emit Clone(nftCloned, agentCloned);
         return (nftCloned, agentCloned);
     }
 }

@@ -7,6 +7,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 contract WrappedTokenCloneFactory {
+    event Clone(address indexed);
+
     address immutable implementation;
 
     constructor() {
@@ -22,6 +24,7 @@ contract WrappedTokenCloneFactory {
         address clone = ClonesUpgradeable.clone(implementation);
         WrappedToken(clone).initialize(name, symbol, decimals);
         WrappedToken(clone).transferOwnership(owner);
+        emit Clone(clone);
         return clone;
     }
 }
@@ -46,18 +49,20 @@ contract WrappedToken is
 
     constructor() initializer {}
 
-    function burn(
-        address _account,
-        uint256 _amount
-    ) external onlyOwner {
-        _burn(_account, _amount);
+    function burn(address from, uint256 amount) external onlyOwner {
+        _burn(from, amount);
     }
 
-    function mint(
-        address _to,
-        uint256 _amount
-    ) external onlyOwner {
-        _mint(_to, _amount);
+    function mint(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     function decimals()

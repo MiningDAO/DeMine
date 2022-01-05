@@ -66,7 +66,7 @@ async function setupDeMine(signers) {
     );
     const { events: events } = await tx.wait();
     const { args: [nftAddr, agentAddr] } = events.find(
-        function(e) { return e.event === 'NewContract'; }
+        function(e) { return e.event === 'Clone'; }
     );
     nft = await NFT.attach(nftAddr);
     agent = await Agent.attach(agentAddr);
