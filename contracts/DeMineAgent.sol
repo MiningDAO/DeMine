@@ -178,11 +178,11 @@ contract DeMineAgent is
             ids[i] = (uint256(pool) << 128) + cycles[i];
             totalCost += tokenCost * amounts[i];
         }
-        DeMineNFT(_nft).safeBatchTransferFrom(
-            address(this), _msgSender(), ids, amounts, ""
-        );
         IERC20(payment).safeTransferFrom(
             _msgSender(), _custodian, totalCost
+        );
+        DeMineNFT(_nft).safeBatchTransferFrom(
+            address(this), _msgSender(), ids, amounts, ""
         );
         emit Redeem(_msgSender(), pool, payment);
     }
@@ -244,11 +244,11 @@ contract DeMineAgent is
             ) * amounts[i];
             ids[i] = id;
         }
-        DeMineNFT(_nft).safeBatchTransferFrom(
-            address(this), _msgSender(), ids, amounts, ""
-        );
         IERC20(payment).safeTransferFrom(
             _msgSender(), _custodian, totalToPay
+        );
+        DeMineNFT(_nft).safeBatchTransferFrom(
+            address(this), _msgSender(), ids, amounts, ""
         );
         emit Claim(_msgSender(), claimer, pool, payment);
     }

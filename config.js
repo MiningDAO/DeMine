@@ -1,8 +1,6 @@
 require('dotenv').config();
 
-const env = process.env.NODE_ENV;
-
-const dev = {
+const config = {
     tokenUri: 'demine_nft_token',
     royaltyBps: 100,
     accounts: [
@@ -10,22 +8,21 @@ const dev = {
         process.env.ADMIN_DEV,
         process.env.CUSTODIAN_DEV
     ],
+    enableGasReporter: (process.env.REPORT_GAS) ? true : false,
     maticdev: {
-        alchemy: process.env.POLYGON_DEV_ALCHEMY_API_KEY,
-        usdt: process.env.USDT_POLYGON_DEV,
-        usdc: process.env.USDC_POLYGON_DEV,
-        wbtc: process.env.WBTC_POLYGON_DEV
+        alchemy: process.env.ALCHEMY_API_KEY_POLYGON_DEV,
+        scan: process.env.POLYGON_SCAN_API_KEY,
+        reward: process.env.DMDR_POLYGON_DEV,
+        payments: [
+            process.env.DMTU_POLYGON_DEV,
+            process.env.DMTD_POLYGON_DEV
+        ],
+        factory: process.env.DEMINE_FACTORY_POLYGON_DEV,
+        tokenFactory: process.env.TOKEN_FACTORY_POLYGON_DEV
     },
     arbitrumdev: {
-        alchemy: process.env.ARBITRUM_DEV_ALCHEMY_API_KEY
-    }
+        alchemy: process.env.ALCHEMY_API_KEY_ARBITRUM_DEV
+    },
 };
 
-const test = dev;
-
-const config = {
-    dev,
-    test
-};
-
-module.exports = config[env ? env : 'test'];
+module.exports = config;
