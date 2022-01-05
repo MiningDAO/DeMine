@@ -1,6 +1,7 @@
 require('@nomiclabs/hardhat-waffle');
 require('hardhat-contract-sizer');
 require('hardhat-gas-reporter');
+require('hardhat-deploy');
 require('hardhat-deploy-ethers');
 require('./tasks/clone.js');
 
