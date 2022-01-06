@@ -1,43 +1,21 @@
-const { network, localConfig } = require('hardhat');
+const { ethers, deployments, network, localConfig } = require('hardhat');
+
+async function clone(meta) {
+    await hre.run('clone-wrapped-token', {
+        name: meta.name,
+        symbol: meta.symbol,
+        decimals: meta.decimals
+    });
+}
 
 async function main() {
-    if (localConfig[network.name]) {
-        const { tokenFactory } = localConfig[network.name];
-        await hre.run("clone-token", {
-            factory: tokenFactory.address,
-            name: 'DeMine Test USD Token',
-            symbol: 'DMTU',
-            decimals: 6
-        });
-        await hre.run("clone-token", {
-            factory: tokenFactory.address,
-            name: 'DeMine Test DAI Token',
-            symbol: 'DMTD',
-            decimals: 6
-        });
-        await hre.run("clone-token", {
-            factory: tokenFactory.address,
-            name: 'DeMine Test Reward Token',
-            symbol: 'DMTR',
-            decimals: 6
-        });
-    } else {
-        await hre.run("clone-token", {
-            name: 'DeMine Test USD Token',
-            symbol: 'DMTU',
-            decimals: 6
-        });
-        await hre.run("clone-token", {
-            name: 'DeMine Test DAI Token',
-            symbol: 'DMTD',
-            decimals: 6
-        });
-        await hre.run("clone-token", {
-            name: 'DeMine Test Reward Token',
-            symbol: 'DMTR',
-            decimals: 6
-        });
-    }
+    const config = localConfig[network.name] || {};
+    const rewardMeta = localConfig.wrappedTokenMeta.reward;
+    const paymentMetas = localConfig.wrappedTokenMeta.payments;
+    config.wrappedToken?.reward || await clone(rewardMeta)
+    config.wrappedToken?.payments || await Promise.all(
+        paymentMetas.map(p => clone(p))
+    );
 }
 
 main()

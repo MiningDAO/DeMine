@@ -32,9 +32,7 @@ const config = {
     maticdev: {
         alchemy: process.env.ALCHEMY_API_KEY_POLYGON_DEV,
         scan: process.env.POLYGON_SCAN_API_KEY,
-        factory: process.env.DEMINE_FACTORY_POLYGON_DEV,
         wrappedToken: {
-            factory: process.env.TOKEN_FACTORY_POLYGON_DEV,
             reward: process.env.DMTR_POLYGON_DEV,
             payments: [
                 process.env.DMTU_POLYGON_DEV,

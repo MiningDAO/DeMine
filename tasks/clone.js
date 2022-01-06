@@ -6,32 +6,22 @@ function gas(txReceipt) {
     return gas.toNumber();
 }
 
-async function deployFactory(ethers, name) {
-    const { deployer } = await ethers.getNamedSigners();
-    const Factory = await ethers.getContractFactory(name, deployer);
-    const factory = await Factory.deploy();
-    await factory.deployed();
-    const gasUsed = gas(await factory.deployTransaction.wait());
-    console.log(
-        'Deploying ' + name + ' at ' + factory.address +
-        ' with ' + gasUsed + ' gas'
-    );
-    return factory.address;
+async function getDeployment(deployer, deployments, name) {
+    var factory = await deployments.getOrNull(name);
+    if (factory === undefined) {
+        // for hardhat network
+        await deployments.run([name]);
+        factory = await deployments.getOrNull(name);
+    }
+    return await ethers.getContractAt(name, factory.address, deployer);
 }
 
-async function cloneWrappedToken(ethers, factory, meta) {
+async function cloneWrappedToken(ethers, deployments, meta) {
     const { deployer, admin } = await ethers.getNamedSigners();
-
-    // ensure wrapped token clone factory is deployed
-    factory = factory || await deployFactory(
-        ethers, 'WrappedTokenCloneFactory'
+    const factory = await getDeployment(
+        deployer, deployments, 'WrappedTokenCloneFactory'
     );
-    const factoryContract = await ethers.getContractAt(
-        'WrappedTokenCloneFactory', factory, deployer
-    );
-
-    // clone wrapped token
-    const tx = await factoryContract.create(
+    const tx = await factory.create(
         meta.name,
         meta.symbol,
         meta.decimals,
@@ -49,39 +39,30 @@ async function cloneWrappedToken(ethers, factory, meta) {
 }
 
 task('clone-demine', 'Deploy clone of demine nft and agent')
-    .addOptionalParam('factory', 'contract address of demine clone factory')
-    .setAction(async (args, { ehters, network, localConfig }) => {
+    .setAction(async (args, { ehters, network, deployments, localConfig }) => {
         const { deployer, admin, custodian } = await ethers.getNamedSigners();
         let localNetworkConfig = localConfig[network.name] || {};
 
         // ensure wrapped tokens are deployed
         const tokens = localNetworkConfig.wrappedToken?.tokens || {};
-        const tokenFactory = tokens.factory || await deployFactory(
-            ethers, 'WrappedTokenCloneFactory'
-        );
         const tokenMeta = localConfig.wrappedTokenMeta;
         const reward = tokens.reward || await cloneWrappedToken(
-            ethers, tokenFactory, tokenMeta.reward
+            ethers, deployments, tokenMeta.reward
         );
         const payments = tokens.payments || await Promise.all(
             tokenMeta.payments.map(
-                p => cloneWrappedToken(ethers, tokenFactory, p)
+                p => cloneWrappedToken(ethers, deployments, p)
             )
         );
 
-        // ensure demine clone factory is deployed
-        const factory = args.factory || await deployFactory(
-            ethers, 'DeMineCloneFactory'
-        );
-        const factoryContract = await ethers.getContractAt(
-            'DeMineCloneFactory', factory, deployer
-        );
-
         // clone nft and agent contract
-        const tx = await factoryContract.create(
+        const factory = await getDeployment(
+            deployer, deployments, 'DeMineCloneFactory'
+        );
+        const tx = await factory.create(
             localConfig.tokenUri,
             custodian.address,
-            100,
+            localConfig.royaltyBps,
             reward,
             payments,
             custodian.address,
@@ -98,11 +79,10 @@ task('clone-demine', 'Deploy clone of demine nft and agent')
         );
     });
 
-task("clone-wrapped-token", "clone wrapped token")
-    .addOptionalParam('factory', 'contract address of wrapped token clone factory')
+subtask("clone-wrapped-token", "clone wrapped token")
     .addParam('name', 'Wrapped token name')
     .addParam('symbol', 'Wrapped token symbol')
     .addParam('decimals', 'Wrapped token decimals', undefined, types.int)
-    .setAction(async function( args, { ethers }) {
-        await cloneWrappedToken(ethers, args.factory, args);
+    .setAction(async function(args, { ethers, deployments }) {
+        await cloneWrappedToken(ethers, deployments, args);
     });
