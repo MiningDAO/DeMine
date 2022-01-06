@@ -1,9 +1,8 @@
-module.exports = async ({ getNamedAccounts, deployments }) => {
-    const { deployer } = await getNamedAccounts();
+module.exports = async ({ ethers, deployments }) => {
+    const { deployer } = await ethers.getNamedSigners();
     const { deploy } = deployments;
-
     await deploy('WrappedTokenCloneFactory', {
-        from: deployer,
+        from: deployer.address,
         log: true
     });
 };

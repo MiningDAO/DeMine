@@ -1,9 +1,12 @@
-const { ethers } = require('hardhat');
-const config = require('../config');
+const { ethers, network, localConfig } = require('hardhat');
 
 async function main() {
-    const { factory } = config[network.name];
-    await hre.run("clone-demin", { factory: factory });
+    if (localConfig[network.name]) {
+        const { factory } = localConfig[network.name];
+        await hre.run("clone-demine", { factory: factory.address });
+    } else {
+        await hre.run("clone-demine", {});
+    }
 }
 
 main()

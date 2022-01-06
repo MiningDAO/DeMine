@@ -1,26 +1,43 @@
-const { ethers } = require('hardhat');
-const config = require('../config');
+const { network, localConfig } = require('hardhat');
 
 async function main() {
-    const { tokenFactory } = config[network.name];
-    await hre.run( "cloneToken", {
-        factory: tokenFactory,
-        name: 'DeMine Test USD Token',
-        symbol: 'DMTU',
-        decimals: 6
-    });
-    await hre.run( "cloneToken", {
-        factory: tokenFactory,
-        name: 'DeMine Test DAI Token',
-        symbol: 'DMTD',
-        decimals: 6
-    });
-    await hre.run( "cloneToken", {
-        factory: tokenFactory,
-        name: 'DeMine Test Reward Token',
-        symbol: 'DMTR',
-        decimals: 6
-    });
+    if (localConfig[network.name]) {
+        const { tokenFactory } = localConfig[network.name];
+        await hre.run("clone-token", {
+            factory: tokenFactory.address,
+            name: 'DeMine Test USD Token',
+            symbol: 'DMTU',
+            decimals: 6
+        });
+        await hre.run("clone-token", {
+            factory: tokenFactory.address,
+            name: 'DeMine Test DAI Token',
+            symbol: 'DMTD',
+            decimals: 6
+        });
+        await hre.run("clone-token", {
+            factory: tokenFactory.address,
+            name: 'DeMine Test Reward Token',
+            symbol: 'DMTR',
+            decimals: 6
+        });
+    } else {
+        await hre.run("clone-token", {
+            name: 'DeMine Test USD Token',
+            symbol: 'DMTU',
+            decimals: 6
+        });
+        await hre.run("clone-token", {
+            name: 'DeMine Test DAI Token',
+            symbol: 'DMTD',
+            decimals: 6
+        });
+        await hre.run("clone-token", {
+            name: 'DeMine Test Reward Token',
+            symbol: 'DMTR',
+            decimals: 6
+        });
+    }
 }
 
 main()
