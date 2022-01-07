@@ -5,7 +5,7 @@ import '@solidstate/contracts/access/OwnableInternal.sol';
 import '../utils/PayableInternal.sol';
 import './RewarderStorage.sol';
 
-abstract contract Rewarder is PayableInternal, OwnableInternal {
+contract Rewarder is PayableInternal, OwnableInternal {
     using RewarderStorage for RewarderStorage.Layout;
 
     event Reward(uint128 indexed, address, uint256, uint256);

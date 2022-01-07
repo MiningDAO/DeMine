@@ -10,19 +10,21 @@ import '@solidstate/contracts/token/ERC1155/metadata/ERC1155Metadata.sol';
 import './utils/PausableInternal.sol';
 import './utils/CustodianStorage.sol';
 import './controller/RewarderInternal.sol';
-import './PoolInternal.sol';
-import './TokenLockerInternal.sol';
+import './controller/PoolControllerInternal.sol';
+import './controller/TokenLockerInternal.sol';
 
 contract DeMineNFT is
     ERC1155Base,
     ERC1155Metadata,
     OwnableInternal,
-    PoolInternal,
+    PoolControllerInternal,
     PausableInternal,
     TokenLockerInternal,
     RewarderInternal,
     ERC165
 {
+    using PoolControllerStorage for PoolControllerStorage.Layout;
+
     function mint(
         uint128 pool,
         uint128 startCycle,
@@ -30,7 +32,7 @@ contract DeMineNFT is
         uint256[] calldata supplies
     ) external onlyOwner {
         require(
-            pool < TokenLockerStorage.layout().nextPool,
+            pool < PoolControllerStorage.layout().next(),
             "TokenLocker: pool doesn't exsit"
         );
         _safeMintBatch(

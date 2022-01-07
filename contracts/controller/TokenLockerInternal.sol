@@ -4,12 +4,14 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 
+import './PoolControllerStorage.sol';
 import './TokenLockerStorage.sol';
-import './utils/PayableInternal.sol';
-import './utils/CustodianStorage.sol';
+import '../utils/PayableInternal.sol';
+import '../utils/CustodianStorage.sol';
 
 abstract contract TokenLockerInternal is PayableInternal, Context {
     using TokenLockerStorage for TokenLockerStorage.Layout;
+    using PoolControllerStorage for PoolControllerStorage.Layout;
 
     event Claim(address indexed, address indexed, uint128 indexed, address);
     event Redeem(address indexed, uint128 indexed, address);
@@ -27,7 +29,7 @@ abstract contract TokenLockerInternal is PayableInternal, Context {
             cycles.length == amounts.length,
             "TokenLocker: array length mismatch"
         );
-        uint256 tokenCost = TokenLockerStorage.layout().pools[pool].cost;
+        uint256 tokenCost = PoolControllerStorage.layout().cost(pool);
         uint256 totalCost;
         uint256[] memory ids = new uint256[](cycles.length);
         for (uint256 i = 0; i < cycles.length; i++) {
@@ -51,7 +53,7 @@ abstract contract TokenLockerInternal is PayableInternal, Context {
             cycles.length == amounts.length,
             "TokenLocker: array length mismatch"
         );
-        uint256 basePrice = TokenLockerStorage.layout().pools[pool].price;
+        uint256 basePrice = PoolControllerStorage.layout().price(pool);
         uint256 totalToPay;
         uint256[] memory ids = new uint256[](cycles.length);
         TokenLockerStorage.Layout storage l = TokenLockerStorage.layout();

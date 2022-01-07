@@ -5,23 +5,18 @@ pragma solidity 0.8.4;
 import '@solidstate/contracts/access/OwnableInternal.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 
-import './utils/PausableInternal.sol';
-import './controller/RewarderInternal.sol';
-import './PoolInternal.sol';
+import '../utils/PausableInternal.sol';
+import './PoolControllerInternal.sol';
 import './TokenLockerStorage.sol';
 
 contract TokenLocker is
-    PoolInternal,
-    PausableInternal,
+    PoolControllerInternal,
     OwnableInternal,
-    RewarderInternal,
+    PausableInternal,
     IERC1155Receiver
 {
     using TokenLockerStorage for TokenLockerStorage.Layout;
-
-    event NewPool(uint128 indexed, address, uint256, uint256);
-    event TransferPool(uint128 indexed, address, address);
-    event SetPoolPrice(uint128 indexed, uint256);
+    using PoolControllerStorage for PoolControllerStorage.Layout;
 
     event SetTokenPrices(
         address indexed,
@@ -52,49 +47,6 @@ contract TokenLocker is
         _;
     }
 
-    function newPool(
-        address owner,
-        uint256 tokenCost,
-        uint256 basePrice
-    ) external onlyOwner {
-        require(
-            owner != address(0),
-            "Pool: pool owner is zero address"
-        );
-        require(
-            basePrice >= tokenCost,
-            "Pool: token price lower than cost"
-        );
-        uint128 pool = TokenLockerStorage.layout().newPool(
-            owner, tokenCost, basePrice
-        );
-        emit NewPool(pool, owner, tokenCost, basePrice);
-    }
-
-    function transferPool(
-        uint128 pool,
-        address newOwner
-    ) external whenNotPaused onlyPoolOwner(pool) {
-        require(
-            newOwner != address(0),
-            "Pool: new pool owner is zero address"
-        );
-        TokenLockerStorage.layout().pools[pool].owner = newOwner;
-        emit TransferPool(pool, _msgSender(), newOwner);
-    }
-
-    function setPoolPrice(
-        uint128 pool,
-        uint256 newPrice
-    ) external whenNotPaused onlyPoolOwner(pool) {
-        require(
-            newPrice >= TokenLockerStorage.layout().pools[pool].cost,
-            "Pool: token price is lower than token cost"
-        );
-        TokenLockerStorage.layout().pools[pool].price = newPrice;
-        emit SetPoolPrice(pool, newPrice);
-    }
-
     function setTokenPrices(
         uint128 pool,
         uint128[] calldata cycles,
@@ -104,7 +56,7 @@ contract TokenLocker is
             cycles.length == newPrices.length,
             "TokenLocker: array length mismatch"
         );
-        uint256 tokenCost = TokenLockerStorage.layout().pools[pool].cost;
+        uint256 tokenCost = PoolControllerStorage.layout().cost(pool);
         mapping(uint256 => uint256)
             storage prices = TokenLockerStorage.layout().prices;
         for (uint256 i = 0; i < cycles.length; i++) {
@@ -211,18 +163,10 @@ contract TokenLocker is
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             uint128 pool = uint128(id >> 128);
-            uint256 basePrice = TokenLockerStorage.layout().pools[pool].price;
+            uint256 basePrice = PoolControllerStorage.layout().price(pool);
             result[i] = prices[id] > 0 ? prices[id] : basePrice;
         }
         return result;
-    }
-
-    function poolInfo(
-        uint128 pool
-    ) external view returns(address, uint256, uint256) {
-        TokenLockerStorage.Pool
-            memory p = TokenLockerStorage.layout().pools[pool];
-        return (p.owner, p.cost, p.price);
     }
 
     function supportsInterface(

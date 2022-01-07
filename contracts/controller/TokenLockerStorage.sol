@@ -3,15 +3,7 @@
 pragma solidity 0.8.4;
 
 library TokenLockerStorage {
-    struct Pool {
-        address owner;
-        uint256 cost; // per token
-        uint256 price; // per token
-    }
-
     struct Layout {
-        uint128 nextPool;
-        mapping(uint128 => Pool) pools;
         mapping(uint256 => uint256) prices;
         mapping(uint256 => mapping(address => uint256)) allowances;
     }
@@ -24,20 +16,6 @@ library TokenLockerStorage {
         assembly {
             l.slot := slot
         }
-    }
-
-    function newPool(
-        Layout storage l,
-        address owner,
-        uint256 cost,
-        uint256 price
-    ) internal returns(uint128) {
-        uint128 pool = l.nextPool;
-        l.pools[pool].owner = owner;
-        l.pools[pool].cost = cost;
-        l.pools[pool].price = price;
-        l.nextPool = pool + 1;
-        return pool;
     }
 
     function decreaseAllowance(
