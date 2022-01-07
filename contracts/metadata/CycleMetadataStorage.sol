@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.4;
 
-library RewarderStorage {
+library CycleMetadataStorage {
     struct Cycle {
         uint256 supply;
         uint256 reward; // per token
@@ -15,7 +15,7 @@ library RewarderStorage {
     }
 
     bytes32 internal constant STORAGE_SLOT =
-        keccak256('solidstate.contracts.storage.Rewarder');
+        keccak256('solidstate.contracts.storage.CycleMetadata');
 
     function layout() internal pure returns (Layout storage l) {
         bytes32 slot = STORAGE_SLOT;

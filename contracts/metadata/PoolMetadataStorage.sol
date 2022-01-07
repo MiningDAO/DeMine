@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.4;
 
-library PoolControllerStorage {
+library PoolMetadataStorage {
     struct Pool {
         address owner;
         uint256 tokenCost;

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+pragma solidity 0.8.4;
 
 import '@solidstate/contracts/access/OwnableInternal.sol';
 
 import '../utils/CustodianStorage.sol';
 import './ERC2981Storage.sol';
+import './IERC2981.sol';
 
 abstract contract ERC2981 is IERC2981, OwnableInternal {
-    event TokenRoyaltyBpsSet(uint256);
+    event TokenRoyaltyBpsSet(uint16);
 
     function setRoyaltyBps(uint16 bps) external onlyOwner {
         ERC2981Storage.layout().bps = bps;

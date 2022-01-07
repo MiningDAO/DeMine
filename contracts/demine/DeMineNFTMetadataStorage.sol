@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.4;
 
-library TokenLockerStorage {
+library DeMineNFTMetadataStorage {
     struct Layout {
         mapping(uint256 => uint256) prices;
         mapping(uint256 => mapping(address => uint256)) allowances;
     }
 
     bytes32 internal constant STORAGE_SLOT =
-        keccak256('solidstate.contracts.storage.TokenLocker');
+        keccak256('solidstate.contracts.storage.DeMineNFTMetadata');
 
     function layout() internal pure returns (Layout storage l) {
         bytes32 slot = STORAGE_SLOT;
