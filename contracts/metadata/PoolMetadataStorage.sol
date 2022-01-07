@@ -3,6 +3,8 @@
 pragma solidity 0.8.4;
 
 library PoolMetadataStorage {
+    event NewPool(uint128 indexed, address, uint256, uint256);
+
     struct Pool {
         address owner;
         uint256 tokenCost;
@@ -30,11 +32,20 @@ library PoolMetadataStorage {
         uint256 tokenCost,
         uint256 tokenPrice
     ) internal returns(uint128) {
+        require(
+            owner != address(0),
+            "Pool: pool owner is zero address"
+        );
+        require(
+            tokenPrice >= tokenCost,
+            "Pool: token price lower than cost"
+        );
         uint128 pool = l.nextPool;
         l.pools[pool].owner = owner;
         l.pools[pool].tokenCost = tokenCost;
         l.pools[pool].tokenPrice = tokenPrice;
         l.nextPool = pool + 1;
+        emit NewPool(pool, owner, tokenCost, tokenPrice);
         return pool;
     }
 

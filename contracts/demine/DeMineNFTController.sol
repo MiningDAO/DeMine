@@ -21,30 +21,20 @@ contract DeMineNFTController is
     using DeMineNFTMetadataStorage for DeMineNFTMetadataStorage.Layout;
     using PoolMetadataStorage for PoolMetadataStorage.Layout;
 
-    event NewPool(uint128 indexed, address, uint256, uint256);
     event Claim(address indexed, address indexed, uint128 indexed, address);
     event Redeem(address indexed, uint128 indexed, address);
 
     function newPoolWithSupply(
         address owner,
         uint256 tokenCost,
-        uint256 basePrice,
+        uint256 tokenPrice,
         uint128 startCycle,
         uint128 numCycles,
         uint256[] calldata supplies
     ) external onlyOwner {
-        require(
-            owner != address(0),
-            "Pool: pool owner is zero address"
-        );
-        require(
-            basePrice >= tokenCost,
-            "Pool: token price lower than cost"
-        );
         uint128 pool = PoolMetadataStorage.layout().newPool(
-            owner, tokenCost, basePrice
+            owner, tokenCost, tokenPrice
         );
-        emit NewPool(pool, owner, tokenCost, basePrice);
         addSupply(pool, startCycle, numCycles, supplies);
     }
 
@@ -82,66 +72,6 @@ contract DeMineNFTController is
         uint128[] calldata cycles,
         uint256[] calldata amounts
     ) external whenNotPaused onlyPoolOwner(pool) {
-        _safeTransferBatch(
-            _msgSender(),
-            address(this),
-            _msgSender(),
-            _redeem(payment, pool, cycles, amounts),
-            amounts,
-            ""
-        );
-    }
-
-    function claimUnnamed(
-        address payment,
-        uint128 pool,
-        uint128[] calldata cycles,
-        uint256[] calldata amounts
-    ) external whenNotPaused {
-        _safeTransferBatch(
-            _msgSender(),
-            address(this),
-            _msgSender(),
-            _claim(address(0), payment, pool, cycles, amounts),
-            amounts,
-            ""
-        );
-    }
-
-    function claim(
-        address payment,
-        uint128 pool,
-        uint128[] calldata cycles,
-        uint256[] calldata amounts
-    ) external whenNotPaused {
-        _safeTransferBatch(
-            _msgSender(),
-            address(this),
-            _msgSender(),
-            _claim(_msgSender(), payment, pool, cycles, amounts),
-            amounts,
-            ""
-        );
-    }
-
-    function cashout(
-        uint256[] calldata ids,
-        uint256[] calldata amounts
-    ) external onlyOwner {
-        _burnBatch(address(this), ids, amounts);
-        address custodian = CustodianStorage.layout().checking;
-        _cashout(address(this), custodian, ids, amounts);
-    }
-
-    function _redeem(
-        address payment,
-        uint128 pool,
-        uint128[] calldata cycles,
-        uint256[] calldata amounts
-    )
-        internal
-        returns(uint256[] memory)
-    {
         require(
             cycles.length == amounts.length,
             "TokenLocker: array length mismatch"
@@ -156,7 +86,41 @@ contract DeMineNFTController is
         address custodian = CustodianStorage.layout().checking;
         payFrom(payment, _msgSender(), custodian, totalCost);
         emit Redeem(_msgSender(), pool, payment);
-        return ids;
+        _safeTransferBatch(
+            _msgSender(),
+            address(this),
+            _msgSender(),
+            ids,
+            amounts,
+            ""
+        );
+    }
+
+    function claimUnnamed(
+        address payment,
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata amounts
+    ) external {
+        _claim(address(0), payment, pool, cycles, amounts);
+    }
+
+    function claim(
+        address payment,
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata amounts
+    ) external {
+        _claim(_msgSender(), payment, pool, cycles, amounts);
+    }
+
+    function cashout(
+        uint256[] calldata ids,
+        uint256[] calldata amounts
+    ) external onlyOwner {
+        _burnBatch(address(this), ids, amounts);
+        address custodian = CustodianStorage.layout().checking;
+        _cashout(address(this), custodian, ids, amounts);
     }
 
     function _claim(
@@ -165,7 +129,7 @@ contract DeMineNFTController is
         uint128 pool,
         uint128[] calldata cycles,
         uint256[] calldata amounts
-    ) internal returns(uint256[] memory) {
+    ) internal whenNotPaused {
         require(
             cycles.length == amounts.length,
             "TokenLocker: array length mismatch"
@@ -186,6 +150,13 @@ contract DeMineNFTController is
         address custodian = CustodianStorage.layout().checking;
         payFrom(payment, _msgSender(), custodian, totalToPay);
         emit Claim(_msgSender(), claimer, pool, payment);
-        return ids;
+        _safeTransferBatch(
+            _msgSender(),
+            address(this),
+            _msgSender(),
+            ids,
+            amounts,
+            ""
+        );
     }
 }

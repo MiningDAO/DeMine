@@ -18,8 +18,6 @@ contract DeMineNFT is
     ERC2981,
     ERC165
 {
-    using ERC165Storage for ERC165Storage.Layout;
-
     function cashout(
         address from,
         address to,
