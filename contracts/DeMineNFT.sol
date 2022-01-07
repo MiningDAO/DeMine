@@ -1,151 +1,91 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.4;
+// SPDX-License-Identifier: MIT
 
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/interfaces/IERC2981Upgradeable.sol";
+pragma solidity 0.8.4;
 
-/// @author Shu Dong
+import '@solidstate/contracts/access/OwnableInternal.sol';
+import '@solidstate/contracts/introspection/ERC165.sol';
+import '@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol';
+import '@solidstate/contracts/token/ERC1155/metadata/ERC1155Metadata.sol';
+
+import './utils/PausableInternal.sol';
+import './utils/CustodianStorage.sol';
+import './controller/RewarderInternal.sol';
+import './PoolInternal.sol';
+import './TokenLockerInternal.sol';
+
 contract DeMineNFT is
-    ERC1155PausableUpgradeable,
-    OwnableUpgradeable,
-    IERC2981Upgradeable
+    ERC1155Base,
+    ERC1155Metadata,
+    OwnableInternal,
+    PoolInternal,
+    PausableInternal,
+    TokenLockerInternal,
+    RewarderInternal,
+    ERC165
 {
-    using SafeERC20 for IERC20;
-
-    // Events
-    event Reward(uint128 indexed, address indexed, uint256, uint256);
-    event Cashout(address indexed, address indexed, address indexed, uint256);
-    event TokenRoyaltySet(address indexed, uint256);
-
-    address private _agent;
-    address private _rewardToken;
-    uint128 private _cycle;
-    uint128 private _pool;
-
-    address private _royaltyRecipient;
-    uint16 private _royaltyBps; // EIP2981
-
-    struct Cycle {
-        uint256 supply;
-        uint256 rewardPerToken;
-    }
-    mapping(uint128 => Cycle) private _cycles;
-
-    function initialize(
-        string memory uri,
-        address royaltyRecipient,
-        uint16 royaltyBps,
-        address rewardToken,
-        address agentContract
-    ) public initializer {
-        __Ownable_init();
-        __ERC1155Pausable_init();
-        __ERC1155_init_unchained(uri);
-        _royaltyRecipient = royaltyRecipient;
-        _royaltyBps = royaltyBps;
-        _agent = agentContract;
-        _rewardToken = rewardToken;
-    }
-
-    constructor() initializer {}
-
-    function newPool(
-        uint128 startCycle,
-        uint128 numCycles,
-        uint256[] calldata supplies,
-        uint256 tokenCost,
-        uint256 tokenPrice,
-        address owner
-    ) external onlyOwner {
-        require(owner != address(0), "DeMineNFT: pool owner is zero address");
-        require(
-            tokenPrice >= tokenCost,
-            "DeMineNFT: token price lower than cost"
-        );
-        _pool += 1;
-        _expandPool(
-            _pool,
-            startCycle,
-            numCycles,
-            supplies,
-            abi.encode(_pool, owner, tokenCost, tokenPrice)
-        );
-    }
-
-    function expandPool(
+    function mint(
         uint128 pool,
         uint128 startCycle,
         uint128 numCycles,
         uint256[] calldata supplies
-    ) public onlyOwner {
-        require(pool <= _pool, "DeMineNFT: pool doesn't exsit");
-        _expandPool(
-            pool,
-            startCycle,
-            numCycles,
-            supplies,
-            abi.encode(0, 0, 0, 0)
-        );
-    }
-
-    function _expandPool(
-        uint128 pool,
-        uint128 startCycle,
-        uint128 numCycles,
-        uint256[] calldata supplies,
-        bytes memory data
-    ) private {
-        require(
-            supplies.length == numCycles,
-            "DeMineNFT: supply array length mismatch"
-        );
-        require(
-            startCycle > _cycle + 3,
-            "DeMineNFT: startCycle too early"
-        );
-        uint256[] memory ids = new uint256[](numCycles);
-        for (uint128 i = 0; i < numCycles; i++) {
-            ids[i] = (uint256(pool) << 128) + startCycle + i;
-            _cycles[startCycle + i].supply += supplies[i];
-        }
-        _mintBatch(
-            _agent,
-            ids,
-            supplies,
-            data
-        );
-    }
-
-    function rewardNext(
-        address rewarder,
-        uint256 reward
     ) external onlyOwner {
-        _cycle += 1;
-        rewardCurrent(rewarder, reward);
+        require(
+            pool < TokenLockerStorage.layout().nextPool,
+            "TokenLocker: pool doesn't exsit"
+        );
+        _safeMintBatch(
+            address(this),
+            _addSupply(pool, startCycle, numCycles, supplies),
+            supplies,
+            ""
+        );
     }
 
-    function rewardCurrent(
-        address rewarder,
-        uint256 reward
-    ) public onlyOwner {
-        if (_cycles[_cycle].supply > 0) {
-            uint256 added = reward / _cycles[_cycle].supply;
-            _cycles[_cycle].rewardPerToken += added;
-            IERC20(_rewardToken).safeTransferFrom(
-                rewarder,
-                address(this),
-                added * _cycles[_cycle].supply
-            );
-        }
-        emit Reward(
-            _cycle,
-            rewarder,
-            _cycles[_cycle].rewardPerToken,
-            _cycles[_cycle].supply
+    function redeem(
+        address payment,
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata amounts
+    ) external whenNotPaused onlyPoolOwner(pool) {
+        _safeTransferBatch(
+            _msgSender(),
+            address(this),
+            _msgSender(),
+            _redeem(payment, pool, cycles, amounts),
+            amounts,
+            ""
+        );
+    }
+
+    function claimUnnamed(
+        address payment,
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata amounts
+    ) external whenNotPaused {
+        _safeTransferBatch(
+            _msgSender(),
+            address(this),
+            _msgSender(),
+            _claim(address(0), payment, pool, cycles, amounts),
+            amounts,
+            ""
+        );
+    }
+
+    function claim(
+        address payment,
+        uint128 pool,
+        uint128[] calldata cycles,
+        uint256[] calldata amounts
+    ) external whenNotPaused {
+        _safeTransferBatch(
+            _msgSender(),
+            address(this),
+            _msgSender(),
+            _claim(_msgSender(), payment, pool, cycles, amounts),
+            amounts,
+            ""
         );
     }
 
@@ -154,59 +94,32 @@ contract DeMineNFT is
         address to,
         uint256[] calldata ids,
         uint256[] calldata amounts
-    ) external {
+    ) external whenNotPaused {
         require(
             from == _msgSender() || isApprovedForAll(from, _msgSender()),
             "ERC1155: transfer caller is not owner nor approved"
         );
         _burnBatch(from, ids, amounts);
-        uint256 totalReward;
-        for (uint256 i = 0; i < ids.length; i++) {
-            require(uint128(ids[i]) <= _cycle, "DeMineNFT: unrewarded cycle");
-            totalReward += amounts[i] * _cycles[uint128(ids[i])].rewardPerToken;
-        }
-        if (totalReward > 0) {
-            IERC20(_rewardToken).safeTransfer(to, totalReward);
-        }
-        emit Cashout(_msgSender(), from, to, totalReward);
+        _cashout(from, to, ids, amounts);
     }
 
-    // ERC 2981
-    function setTokenRoyaltyInfo(
-        address recipient,
-        uint16 bps
+    function cashoutForBilling(
+        uint256[] calldata ids,
+        uint256[] calldata amounts
     ) external onlyOwner {
-        _royaltyRecipient = recipient;
-        _royaltyBps = bps;
-        emit TokenRoyaltySet(recipient, bps);
+        _burnBatch(address(this), ids, amounts);
+        address custodian = CustodianStorage.layout().checking;
+        _cashout(address(this), custodian, ids, amounts);
     }
 
-    function royaltyInfo(uint256, uint256 value)
-        external
-        view
-        override
-        returns (address, uint256)
-    {
-        return (_royaltyRecipient, (value * _royaltyBps) / 10000);
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(ERC1155Upgradeable, IERC165Upgradeable)
-        returns (bool)
-    {
-        return
-            interfaceId == type(IERC2981Upgradeable).interfaceId ||
-            super.supportsInterface(interfaceId);
-    }
-
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
+    function _beforeTokenTransfer(
+        address operator,
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) internal whenNotPaused virtual override(ERC1155BaseInternal) {
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
 }
