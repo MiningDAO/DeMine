@@ -4,7 +4,7 @@ pragma solidity 0.8.4;
 import '@solidstate/contracts/access/OwnableInternal.sol';
 import './CustodianStorage.sol';
 
-abstract contract Custodian is OwnableInternal {
+contract Custodian is OwnableInternal {
     event SetChecking(address checking);
     event SetSaving(address saving);
 

@@ -5,27 +5,23 @@ pragma solidity 0.8.4;
 import '@solidstate/contracts/access/IERC173.sol';
 import '@solidstate/contracts/access/SafeOwnable.sol';
 import '@solidstate/contracts/introspection/ERC165.sol';
-import '@solidstate/contracts/proxy/diamond/DiamondBase.sol';
+import '@solidstate/contracts/factory/CloneFactory.sol';
 import '@solidstate/contracts/proxy/diamond/DiamondCuttable.sol';
 import '@solidstate/contracts/proxy/diamond/DiamondLoupe.sol';
-import './utils/Initializable.sol';
-import './utils/IPausable.sol';
-import './utils/Pausable.sol';
 
-contract Diamond is
+import '../utils/Initializable.sol';
+
+contract DeMineBase is
     Initializable,
-    DiamondBase,
-    DiamondCuttable,
+    OwnableInternal,
     DiamondLoupe,
-    SafeOwnable,
-    Pausable,
-    ERC165
+    DiamondCuttable
 {
     using DiamondBaseStorage for DiamondBaseStorage.Layout;
     using ERC165Storage for ERC165Storage.Layout;
     using OwnableStorage for OwnableStorage.Layout;
 
-    function initialize() public initializer {
+    function initialize() external initializer {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
         bytes4[] memory selectors = new bytes4[](14);
 
@@ -51,15 +47,9 @@ contract Diamond is
         selectors[9] = SafeOwnable.acceptOwnership.selector;
         erc165.setSupportedInterface(type(IERC173).interfaceId, true);
 
-        // register Pausable
-        selectors[10] = Pausable.paused.selector;
-        selectors[11] = Pausable.pause.selector;
-        selectors[12] = Pausable.unpause.selector;
-        erc165.setSupportedInterface(type(IPausable).interfaceId, true);
-
         // register Diamond
-        selectors[13] = Diamond.getFallbackAddress.selector;
-        selectors[14] = Diamond.setFallbackAddress.selector;
+        selectors[10] = DeMineInitializer.getFallbackAddress.selector;
+        selectors[11] = DeMineInitializer.setFallbackAddress.selector;
 
         // diamond cut
         FacetCut[] memory facetCuts = new FacetCut[](1);
@@ -69,14 +59,7 @@ contract Diamond is
             selectors: selectors
         });
         DiamondBaseStorage.layout().diamondCut(facetCuts, address(0), '');
-
-        // set owner
-        OwnableStorage.layout().setOwner(msg.sender);
     }
-
-    constructor() initializer {}
-
-    receive() external payable {}
 
     function getFallbackAddress() external view returns (address) {
         return DiamondBaseStorage.layout().fallbackAddress;

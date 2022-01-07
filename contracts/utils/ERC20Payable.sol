@@ -5,7 +5,7 @@ import '@solidstate/contracts/access/OwnableInternal.sol';
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import './ERC20PayableInternal.sol';
 
-abstract contract ERC20Payable is ERC20PayableInternal, OwnableInternal {
+contract ERC20Payable is ERC20PayableInternal, OwnableInternal {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     event EnablePayment(address indexed, bool);
