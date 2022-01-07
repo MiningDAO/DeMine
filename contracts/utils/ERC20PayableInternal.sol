@@ -5,15 +5,15 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import './PayableStorage.sol';
+import './ERC20PayableStorage.sol';
 
-abstract contract PayableInternal {
+abstract contract ERC20PayableInternal {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    modifier onlyPayable(address payment) {
+    modifier onlyERC20Payable(address payment) {
         require(
-            PayableStorage.layout().payments.contains(payment),
+            ERC20PayableStorage.layout().payments.contains(payment),
             "DeMineAgent: payment not supported"
         );
         _;
@@ -23,7 +23,7 @@ abstract contract PayableInternal {
         address payment,
         address payee,
         uint256 amount
-    ) internal onlyPayable(payment) {
+    ) internal onlyERC20Payable(payment) {
         IERC20(payment).safeTransfer(payee, amount);
     }
 
@@ -32,7 +32,7 @@ abstract contract PayableInternal {
         address payer,
         address payee,
         uint256 amount
-    ) internal onlyPayable(payment) {
+    ) internal onlyERC20Payable(payment) {
         IERC20(payment).safeTransferFrom(payer, payee, amount);
     }
 }

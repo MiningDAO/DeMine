@@ -2,10 +2,10 @@
 pragma solidity 0.8.4;
 
 import '@solidstate/contracts/access/OwnableInternal.sol';
-import '../utils/PayableInternal.sol';
+import '../utils/ERC20PayableInternal.sol';
 import './CycleMetadataStorage.sol';
 
-contract CycleMetadata is PayableInternal, OwnableInternal {
+contract CycleMetadata is ERC20PayableInternal, OwnableInternal {
     using CycleMetadataStorage for CycleMetadataStorage.Layout;
 
     event Reward(uint128 indexed, address, uint256, uint256);

@@ -4,10 +4,10 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 
-import '../utils/PayableInternal.sol';
+import '../utils/ERC20PayableInternal.sol';
 import '../metadata/CycleMetadataStorage.sol';
 
-abstract contract DeMineNFTInternal is PayableInternal, Context {
+abstract contract DeMineNFTInternal is ERC20PayableInternal, Context {
     event Cashout(
         address indexed operator,
         address indexed from,
