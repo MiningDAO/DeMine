@@ -34,6 +34,21 @@ User can burn their tokens and cashout reward tokens. However, user cannot casho
 ## Billing
 We need receive cost of tokens to pay billing of mining farm, including electricity bill and management fee. If all tokens are all liquidized, we will receive all cost of these tokens to cover the billing. If there are tokens not liquidized, we will cashout all these tokens and sell some reward tokens to cover the billing and send rest rewards to token issuer. If the reward cannot over billing, we will use the deposit and token issuer have to pay the billing.
 
+# Contracts:
+
+There are 10 contracts deployed:
+
+ - Pausable: to pause/unpause the contract
+ - Custodian: set checking/saving accounts holding assets
+ - ERC20Payable: support multiple ERC20 token payments, in our case it's stable coin
+ - PoolMetadata: set pool metedata, incluing owner, tokeCost, tokenPrice
+ - CycleMetadata: set cycle metadata, including reward and supply
+ - DeMineNFTMetadata: set token level allowance and price for locked tokens
+ - DeMineNFTController: provide functions for users to liquidize locked tokens, also provide functions for owner to create pool and add supply
+ - DeMineNFT: ERC1155 related funcitonalities, also provide function for users to cashout their tokens
+ - Diamond: contract to provide diamond related functionalities
+ - DeMine: the proxy contract holding state
+
 # Account System
 
 - Deployer: to deploy contract
