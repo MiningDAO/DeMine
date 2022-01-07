@@ -17,4 +17,12 @@ contract Custodian is OwnableInternal {
         CustodianStorage.layout().saving = saving;
         emit SetSaving(saving);
     }
+
+    function getChecking() external view returns(address) {
+        return CustodianStorage.layout().checking;
+    }
+
+    function getSaving() external view returns(address) {
+        return CustodianStorage.layout().saving;
+    }
 }

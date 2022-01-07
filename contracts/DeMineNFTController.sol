@@ -5,10 +5,10 @@ pragma solidity 0.8.4;
 import '@solidstate/contracts/access/OwnableInternal.sol';
 import '@solidstate/contracts/token/ERC1155/base/ERC1155BaseInternal.sol';
 
-import '../utils/CustodianStorage.sol';
-import '../utils/PausableInternal.sol';
-import '../metadata/PoolMetadataInternal.sol';
-import '../metadata/DeMineNFTMetadataStorage.sol';
+import './utils/CustodianStorage.sol';
+import './utils/PausableInternal.sol';
+import './metadata/PoolMetadataInternal.sol';
+import './metadata/DeMineNFTMetadataStorage.sol';
 import './DeMineNFTInternal.sol';
 
 contract DeMineNFTController is

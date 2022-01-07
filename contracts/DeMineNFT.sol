@@ -6,8 +6,8 @@ import '@solidstate/contracts/introspection/ERC165.sol';
 import '@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol';
 import '@solidstate/contracts/token/ERC1155/metadata/ERC1155Metadata.sol';
 
-import '../utils/PausableInternal.sol';
-import '../ERC2981/ERC2981.sol';
+import './utils/PausableInternal.sol';
+import './ERC2981/ERC2981.sol';
 import './DeMineNFTInternal.sol';
 
 contract DeMineNFT is
