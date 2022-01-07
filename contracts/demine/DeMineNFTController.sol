@@ -8,14 +8,13 @@ import '@solidstate/contracts/token/ERC1155/base/ERC1155BaseInternal.sol';
 import '../utils/CustodianStorage.sol';
 import '../utils/PausableInternal.sol';
 import '../metadata/PoolMetadataInternal.sol';
-import '../metadata/PoolMetadataPublic.sol';
 import '../metadata/DeMineNFTMetadataStorage.sol';
 import './DeMineNFTInternal.sol';
 
 contract DeMineNFTController is
     ERC1155BaseInternal,
-    PoolMetadataPublic,
     PoolMetadataInternal,
+    OwnableInternal,
     PausableInternal,
     DeMineNFTInternal
 {
@@ -32,9 +31,12 @@ contract DeMineNFTController is
         uint128 startCycle,
         uint128 numCycles,
         uint256[] calldata supplies
-    ) external {
-        uint128 pool = createPool(owner, tokenCost, tokenPrice);
+    ) external onlyOwner {
+        uint128 pool = PoolMetadataStorage.layout().create(
+            owner, tokenCost, tokenPrice
+        );
         addSupply(pool, startCycle, numCycles, supplies);
+        emit CreatePool(pool, owner, tokenCost, tokenPrice);
     }
 
     function addSupply(

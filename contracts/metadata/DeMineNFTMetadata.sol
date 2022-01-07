@@ -9,9 +9,9 @@ import './PoolMetadataInternal.sol';
 import './DeMineNFTMetadataStorage.sol';
 
 contract DeMineNFTMetadata is
-    PoolMetadataInternal,
     OwnableInternal,
-    PausableInternal
+    PausableInternal,
+    PoolMetadataInternal
 {
     using DeMineNFTMetadataStorage for DeMineNFTMetadataStorage.Layout;
 

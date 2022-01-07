@@ -4,11 +4,9 @@ pragma solidity 0.8.4;
 
 import '../utils/PausableInternal.sol';
 import './PoolMetadataInternal.sol';
-import './PoolMetadataPublic.sol';
 
 contract PoolMetadata is
     PoolMetadataInternal,
-    PoolMetadataPublic,
     PausableInternal
 {
     using PoolMetadataStorage for PoolMetadataStorage.Layout;

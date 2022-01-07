@@ -63,6 +63,6 @@ library PoolMetadataStorage {
             owner != address(0),
             "PoolMetadata: new pool owner is zero address"
         );
-        PoolMetadataStorage.layout().pools[pool].owner = owner;
+        l.pools[pool].owner = owner;
     }
 }

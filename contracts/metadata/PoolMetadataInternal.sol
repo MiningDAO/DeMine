@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import './PoolMetadataStorage.sol';
 
 abstract contract PoolMetadataInternal is Context {
+    event CreatePool(uint128 indexed, address, uint256, uint256);
+
     modifier onlyPoolOwner(uint128 pool) {
         require(
             _msgSender() == PoolMetadataStorage.layout().pools[pool].owner,
