@@ -14,4 +14,22 @@ abstract contract PoolMetadataInternal is Context {
         );
         _;
     }
+
+    modifier onlyExistingPool(uint128 pool) {
+        require(
+            pool < PoolMetadataStorage.layout().next,
+            "PoolMetadata: pool doesn't exsit"
+        );
+        _;
+    }
+
+    function getTokenCost(uint128 pool) internal view returns(uint256) {
+        return PoolMetadataStorage.layout().pools[pool].tokenCost;
+    }
+
+    function getDefaultTokenPrice(
+        uint128 pool
+    ) internal view returns(uint256) {
+        return PoolMetadataStorage.layout().pools[pool].tokenPrice;
+    }
 }

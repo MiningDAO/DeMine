@@ -3,8 +3,6 @@
 pragma solidity 0.8.4;
 
 library PoolMetadataStorage {
-    event NewPool(uint128 indexed, address, uint256, uint256);
-
     struct Pool {
         address owner;
         uint256 tokenCost;
@@ -12,7 +10,7 @@ library PoolMetadataStorage {
     }
 
     struct Layout {
-        uint128 nextPool;
+        uint128 next;
         mapping(uint128 => Pool) pools;
     }
 
@@ -26,7 +24,7 @@ library PoolMetadataStorage {
         }
     }
 
-    function newPool(
+    function create(
         Layout storage l,
         address owner,
         uint256 tokenCost,
@@ -34,36 +32,37 @@ library PoolMetadataStorage {
     ) internal returns(uint128) {
         require(
             owner != address(0),
-            "Pool: pool owner is zero address"
+            "PoolMetadata: pool owner is zero address"
         );
-        require(
-            tokenPrice >= tokenCost,
-            "Pool: token price lower than cost"
-        );
-        uint128 pool = l.nextPool;
+        uint128 pool = l.next;
         l.pools[pool].owner = owner;
         l.pools[pool].tokenCost = tokenCost;
-        l.pools[pool].tokenPrice = tokenPrice;
-        l.nextPool = pool + 1;
-        emit NewPool(pool, owner, tokenCost, tokenPrice);
+        setPrice(l, pool, tokenPrice);
+        l.next = pool + 1;
         return pool;
     }
 
-    function price(
+    function setPrice(
         Layout storage l,
-        uint128 pool
-    ) internal view returns(uint256) {
-        return l.pools[pool].tokenPrice;
+        uint128 pool,
+        uint256 price
+    ) internal {
+        require(
+            price >= l.pools[pool].tokenCost,
+            "PoolMetadata: token price is lower than token cost"
+        );
+        l.pools[pool].tokenPrice = price;
     }
 
-    function cost(
+    function setOwner(
         Layout storage l,
-        uint128 pool
-    ) internal view returns(uint256) {
-        return l.pools[pool].tokenCost;
-    }
-
-    function next(Layout storage l) internal view returns(uint128) {
-        return l.nextPool;
+        uint128 pool,
+        address owner
+    ) internal {
+        require(
+            owner != address(0),
+            "PoolMetadata: new pool owner is zero address"
+        );
+        PoolMetadataStorage.layout().pools[pool].owner = owner;
     }
 }

@@ -9,13 +9,14 @@ import '@solidstate/contracts/factory/CloneFactory.sol';
 import '@solidstate/contracts/proxy/diamond/DiamondCuttable.sol';
 import '@solidstate/contracts/proxy/diamond/DiamondLoupe.sol';
 
-import '../utils/Initializable.sol';
+import './utils/Initializable.sol';
 
-contract DeMineBase is
+contract Diamond is
     Initializable,
-    OwnableInternal,
+    SafeOwnable,
     DiamondLoupe,
-    DiamondCuttable
+    DiamondCuttable,
+    ERC165
 {
     using DiamondBaseStorage for DiamondBaseStorage.Layout;
     using ERC165Storage for ERC165Storage.Layout;
@@ -48,17 +49,20 @@ contract DeMineBase is
         erc165.setSupportedInterface(type(IERC173).interfaceId, true);
 
         // register Diamond
-        selectors[10] = DeMineInitializer.getFallbackAddress.selector;
-        selectors[11] = DeMineInitializer.setFallbackAddress.selector;
+        selectors[10] = Diamond.getFallbackAddress.selector;
+        selectors[11] = Diamond.setFallbackAddress.selector;
 
         // diamond cut
         FacetCut[] memory facetCuts = new FacetCut[](1);
         facetCuts[0] = FacetCut({
-            target: address(this),
+            target: DiamondBaseStorage.layout().fallbackAddress,
             action: IDiamondCuttable.FacetCutAction.ADD,
             selectors: selectors
         });
         DiamondBaseStorage.layout().diamondCut(facetCuts, address(0), '');
+
+        // set owner
+        OwnableStorage.layout().setOwner(msg.sender);
     }
 
     function getFallbackAddress() external view returns (address) {

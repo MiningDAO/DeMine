@@ -5,7 +5,7 @@ pragma solidity 0.8.4;
 import '@solidstate/contracts/access/OwnableInternal.sol';
 
 import '../utils/PausableInternal.sol';
-import '../metadata/PoolMetadataInternal.sol';
+import './PoolMetadataInternal.sol';
 import './DeMineNFTMetadataStorage.sol';
 
 contract DeMineNFTMetadata is
@@ -14,7 +14,6 @@ contract DeMineNFTMetadata is
     PausableInternal
 {
     using DeMineNFTMetadataStorage for DeMineNFTMetadataStorage.Layout;
-    using PoolMetadataStorage for PoolMetadataStorage.Layout;
 
     event SetTokenPrices(
         address indexed,
@@ -46,7 +45,7 @@ contract DeMineNFTMetadata is
             cycles.length == newPrices.length,
             "DeMineNFTMetadata: array length mismatch"
         );
-        uint256 tokenCost = PoolMetadataStorage.layout().cost(pool);
+        uint256 tokenCost = getTokenCost(pool);
         mapping(uint256 => uint256)
             storage prices = DeMineNFTMetadataStorage.layout().prices;
         for (uint256 i = 0; i < cycles.length; i++) {
@@ -119,7 +118,7 @@ contract DeMineNFTMetadata is
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             uint128 pool = uint128(id >> 128);
-            uint256 basePrice = PoolMetadataStorage.layout().price(pool);
+            uint256 basePrice = getDefaultTokenPrice(pool);
             result[i] = prices[id] > 0 ? prices[id] : basePrice;
         }
         return result;

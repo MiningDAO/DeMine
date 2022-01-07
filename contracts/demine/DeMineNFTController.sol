@@ -8,13 +8,14 @@ import '@solidstate/contracts/token/ERC1155/base/ERC1155BaseInternal.sol';
 import '../utils/CustodianStorage.sol';
 import '../utils/PausableInternal.sol';
 import '../metadata/PoolMetadataInternal.sol';
+import '../metadata/PoolMetadataPublic.sol';
+import '../metadata/DeMineNFTMetadataStorage.sol';
 import './DeMineNFTInternal.sol';
-import './DeMineNFTMetadataStorage.sol';
 
 contract DeMineNFTController is
     ERC1155BaseInternal,
+    PoolMetadataPublic,
     PoolMetadataInternal,
-    OwnableInternal,
     PausableInternal,
     DeMineNFTInternal
 {
@@ -24,17 +25,15 @@ contract DeMineNFTController is
     event Claim(address indexed, address indexed, uint128 indexed, address);
     event Redeem(address indexed, uint128 indexed, address);
 
-    function newPoolWithSupply(
+    function createPoolWithSupply(
         address owner,
         uint256 tokenCost,
         uint256 tokenPrice,
         uint128 startCycle,
         uint128 numCycles,
         uint256[] calldata supplies
-    ) external onlyOwner {
-        uint128 pool = PoolMetadataStorage.layout().newPool(
-            owner, tokenCost, tokenPrice
-        );
+    ) external {
+        uint128 pool = createPool(owner, tokenCost, tokenPrice);
         addSupply(pool, startCycle, numCycles, supplies);
     }
 
@@ -43,11 +42,7 @@ contract DeMineNFTController is
         uint128 startCycle,
         uint128 numCycles,
         uint256[] calldata supplies
-    ) public onlyOwner {
-        require(
-            pool < PoolMetadataStorage.layout().next(),
-            "DeMineNFT: pool doesn't exsit"
-        );
+    ) public onlyExistingPool(pool) onlyOwner {
         require(
             supplies.length == numCycles,
             "TokenLocker: supply array length mismatch"
@@ -76,7 +71,7 @@ contract DeMineNFTController is
             cycles.length == amounts.length,
             "TokenLocker: array length mismatch"
         );
-        uint256 tokenCost = PoolMetadataStorage.layout().cost(pool);
+        uint256 tokenCost = getTokenCost(pool);
         uint256 totalCost;
         uint256[] memory ids = new uint256[](cycles.length);
         for (uint256 i = 0; i < cycles.length; i++) {
@@ -134,7 +129,7 @@ contract DeMineNFTController is
             cycles.length == amounts.length,
             "TokenLocker: array length mismatch"
         );
-        uint256 basePrice = PoolMetadataStorage.layout().price(pool);
+        uint256 defaultPrice = getDefaultTokenPrice(pool);
         uint256 totalToPay;
         uint256[] memory ids = new uint256[](cycles.length);
         DeMineNFTMetadataStorage.Layout
@@ -143,7 +138,7 @@ contract DeMineNFTController is
             uint256 id = (uint256(pool) << 128) + cycles[i];
             l.decreaseAllowance(id, claimer, amounts[i]);
             totalToPay += (
-                l.prices[id] > 0 ? l.prices[id] : basePrice
+                l.prices[id] > 0 ? l.prices[id] : defaultPrice
             ) * amounts[i];
             ids[i] = id;
         }
