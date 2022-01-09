@@ -4,13 +4,11 @@ pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/access/OwnableStorage.sol';
-import '@solidstate/contracts/token/ERC1155/metadata/ERC1155MetadataStorage.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondLoupe.sol';
 
 import '../../shared/lib/LibDiamond.sol';
 import './LibERC1155WithAgent.sol';
-import './LibERC2981.sol';
 import '../facets/ERC2981Facet.sol';
 import '../facets/ERC1155MetadataFacet.sol';
 import '../facets/ERC1155WithAgentFacet.sol';
@@ -78,6 +76,7 @@ library LibDeMineNFT {
         address demineAgent
     ) external {
         OwnableStorage.layout().setOwner(msg.sender);
+        LibERC1155WithAgent.layout().agent = demineAgent;
 
         IDiamondCuttable.FacetCut[] memory facetCuts
             = new IDiamondCuttable.FacetCut[](4);
@@ -93,11 +92,6 @@ library LibDeMineNFT {
                 ""
             )
         );
-
-        LibERC2981.layout().recipient = royaltyRecipient;
-        LibERC2981.layout().bps = royaltyBps;
-        ERC1155MetadataStorage.layout().baseURI = uri;
-        LibERC1155WithAgent.layout().agent = demineAgent;
         require(success, string(returndata));
     }
 }

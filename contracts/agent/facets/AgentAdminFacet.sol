@@ -2,9 +2,11 @@
 
 pragma solidity 0.8.4;
 
-import '@solidstate/contracts/access/OwnableInternal.sol';
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import '@solidstate/contracts/access/OwnableInternal.sol';
+import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../lib/LibCashoutInternal.sol';
@@ -18,7 +20,14 @@ contract AgentAdminFacet is Custodian {
     AppStorage internal s;
 
     event CreatePool(uint128 indexed, address indexed, uint256, uint256);
-    event Reward(uint128 indexed, address, uint256, uint256);
+
+    modifier onlyMinted(address from) {
+        require(
+            msg.sender == s.nft && from == address(0),
+            'DeMineAgent: only minted tokens from nft contract allowed'
+        );
+        _;
+    }
 
     modifier onlyExistingPool(uint128 pool) {
         require(pool < s.nextPool, "DeMineAgent: pool doesn't exsit");
@@ -49,7 +58,7 @@ contract AgentAdminFacet is Custodian {
             "DeMine: supply array length mismatch"
         );
         require(
-            startCycle > s.lastRewardedCycle,
+            startCycle > s.rewardingCycle,
             "DeMine: started from rewarded cycle"
         );
         uint256[] memory ids = new uint256[](numCycles);
@@ -57,42 +66,29 @@ contract AgentAdminFacet is Custodian {
             uint128 cycle = startCycle + i;
             ids[i] = (uint256(pool) << 128) + cycle;
             s.cycles[cycle].supply += supplies[i];
+            s.locked[cycle][pool] += supplies[i];
         }
-        ERC1155WithAgentFacet(s.nft).mintBatch(ids, supplies);
+        ERC1155WithAgentFacet(s.nft).mintBatch(address(this), ids, supplies);
     }
 
-    function cashout(
-        uint256[] calldata ids,
-        uint256[] calldata amounts
-    ) external onlyOwner {
-        ERC1155WithAgentFacet(s.nft).burnBatch(
-            address(this), address(this), ids, amounts
-        );
-        address checking = LibCustodian.layout().checking;
-        LibCashoutInternal.cashout(address(this), checking, ids, amounts);
+    function onERC1155Received(
+        address,
+        address from,
+        uint256,
+        uint256,
+        bytes memory data
+    ) external onlyMinted(from) override returns (bytes4) {
+        return IERC1155Receiver.onERC1155Received.selector;
     }
 
-    function reward(
-        uint128 cycle,
-        address rewarder,
-        uint256 rewarded
-    ) external onlyOwner {
-        require (
-            cycle >= s.lastRewardedCycle,
-            "Reward: cycle already rewarded"
-        );
-        uint256 supply = s.cycles[cycle].supply;
-        require(supply > 0, "Reward: cycle supply is 0");
-
-        uint256 rewardPerToken = rewarded / supply;
-        s.cycles[cycle].reward += rewardPerToken;
-
-        IERC20(s.reward).safeTransferFrom(
-            rewarder,
-            address(this),
-            supply * rewardPerToken
-        );
-        emit Reward(cycle, rewarder, rewardPerToken, supply);
+    function onERC1155BatchReceived(
+        address,
+        address from,
+        uint256[] calldata,
+        uint256[] calldata,
+        bytes memory data
+    ) external onlyMinted(from) override returns (bytes4) {
+        return IERC1155Receiver.onERC1155BatchReceived.selector;
     }
 
     function poolInfo(
@@ -102,15 +98,6 @@ contract AgentAdminFacet is Custodian {
             s.pools[pool].owner,
             s.pools[pool].tokenCost,
             s.pools[pool].tokenPrice
-        );
-    }
-
-    function cycleInfo(
-        uint128 cycle
-    ) external view returns(uint256, uint256) {
-        return (
-            s.cycles[cycle].supply,
-            s.cycles[cycle].reward
         );
     }
 }

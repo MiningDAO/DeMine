@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -11,6 +12,7 @@ library LibERC20Payable {
 
     struct Layout {
         EnumerableSet.AddressSet payments;
+        address custodian;
     }
 
     bytes32 internal constant STORAGE_SLOT =
@@ -31,12 +33,20 @@ library LibERC20Payable {
         }
     }
 
-    function pay(
+   function pay(
         address payment,
         address payer,
         address payee,
         uint256 amount
     ) internal onlyERC20Payable(payment) {
         IERC20(payment).safeTransferFrom(payer, payee, amount);
+    }
+
+    function payCustodian(
+        address payment,
+        address payer,
+        uint256 amount
+    ) internal {
+        pay(payment, payer, layout().custodian, amount);
     }
 }

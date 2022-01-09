@@ -132,9 +132,9 @@ contract PoolAdminFacet is PausableModifier {
         for (uint256 i = 0; i < cycles.length; i++) {
             ids[i] = (uint256(pool) << 128) + cycles[i];
             totalCost += tokenCost * amounts[i];
+            s.locked[cycle][pool] -= amounts[i];
         }
-        address custodian = LibCustodian.layout().checking;
-        LibERC20Payable.pay(payment, msg.sender, custodian, totalCost);
+        LibERC20Payable.payCustodian(payment, msg.sender, totalCost);
         emit Redeem(msg.sender, pool, payment);
         ERC1155WithAgentFacet(s.nft).safeBatchTransferFrom(
             address(this),

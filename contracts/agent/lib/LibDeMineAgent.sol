@@ -54,11 +54,16 @@ library LibDeMineAgent {
     }
 
     function initialize(
-        address demineNFT,
         address diamondFacet,
         address agentAdminFacet,
         address poolAdminFacet,
-        address externalFacet
+        address externalFacet,
+        // AgentAdmin initialization args
+        address rewardToken,
+        address[] memory payments,
+        address custodianChecking,
+        address custodianSaving,
+        address demineNFT
     ) external {
         OwnableStorage.layout().setOwner(msg.sender);
         LibAppStorage.layout().nft = demineNFT;

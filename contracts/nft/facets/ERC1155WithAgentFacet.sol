@@ -22,10 +22,11 @@ contract ERC1155WithAgentFacet is
     }
 
     function mintBatch(
+        address recipient,
         uint256[] memory ids,
         uint256[] memory supplies
     ) external onlyAgent {
-        _safeMintBatch(msg.sender, ids, supplies, "");
+        _safeMintBatch(recipient, ids, supplies, "");
     }
 
     function burnBatch(

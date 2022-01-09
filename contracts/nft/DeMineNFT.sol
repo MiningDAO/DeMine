@@ -8,18 +8,28 @@ import './lib/LibDeMineNFT.sol';
 
 contract DeMineNFT is DiamondBase {
     constructor(
-        address demineAgent,
+        // facets
         address diamondFacet,
         address erc2981Facet,
         address erc1155MetadataFacet,
-        address erc1155WithAgentFacet
+        address erc1155WithAgentFacet,
+        // for ERC2981
+        address royaltyRecipient,
+        uint16 royaltyBps,
+        // for ERC1155Metadata
+        string memory uri,
+        // for ERC1155WithAgent
+        address demineAgent
     ) {
         LibDeMineNFT.initialize(
-            demineAgent,
             diamondFacet,
             erc2981Facet,
             erc1155MetadataFacet,
-            erc1155WithAgentFacet
+            erc1155WithAgentFacet,
+            uri,
+            royaltyRecipient,
+            royaltyBps,
+            demineAgent
         );
     }
 }
