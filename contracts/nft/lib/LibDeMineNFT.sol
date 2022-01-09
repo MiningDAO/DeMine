@@ -7,7 +7,7 @@ import '@solidstate/contracts/access/OwnableStorage.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondLoupe.sol';
 
-import './LibDiamond.sol';
+import '../../shared/lib/LibDiamond.sol';
 import './LibERC1155WithAgent.sol';
 import '../facets/ERC2981Facet.sol';
 import '../facets/ERC1155MetadataFacet.sol';
@@ -82,7 +82,12 @@ library LibDeMineNFT {
         facetCuts[2] = genCutERC1155Metadata(erc1155MetadataFacet);
         facetCuts[3] = genCutERC1155WithAgent(erc1155WithAgentFacet);
         (bool success, bytes memory returndata) = diamondFacet.delegatecall(
-            abi.encodeWithSelector(IDiamondCuttable.diamondCut.selector, facetCuts, address(0), "")
+            abi.encodeWithSelector(
+                IDiamondCuttable.diamondCut.selector,
+                facetCuts,
+                address(0),
+                ""
+            )
         );
         require(success, string(returndata));
     }

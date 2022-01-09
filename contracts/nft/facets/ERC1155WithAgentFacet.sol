@@ -5,7 +5,7 @@ pragma solidity 0.8.4;
 import '@solidstate/contracts/introspection/ERC165.sol';
 import '@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol';
 
-import '../lib/LibPausable.sol';
+import '../../shared/lib/LibPausable.sol';
 import '../lib/LibERC1155WithAgent.sol';
 
 contract ERC1155WithAgentFacet is
