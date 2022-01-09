@@ -5,6 +5,7 @@ pragma solidity 0.8.4;
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../lib/AppStorage.sol';
+import '../lib/LibERC20Payable.sol';
 import '../lib/LibAppStorage.sol';
 import '../lib/LibCashoutInternal.sol';
 import '../lib/LibCustodian.sol';
@@ -56,7 +57,7 @@ contract ExternalFacet is PausableModifier {
             ids[i] = id;
         }
         address custodian = LibCustodian.layout().checking;
-        pay(payment, msg.sender, custodian, totalToPay);
+        LibERC20Payable.pay(payment, msg.sender, custodian, totalToPay);
         emit Claim(msg.sender, claimer, pool, payment);
         ERC1155WithAgentFacet(s.nft).safeBatchTransferFrom(
             address(this),
@@ -68,16 +69,14 @@ contract ExternalFacet is PausableModifier {
     }
 
     function cashout(
-        address from,
-        address to,
+        address account,
+        address recipient,
         uint256[] calldata ids,
         uint256[] calldata amounts
     ) external {
-        require(
-            from == msg.sender || isApprovedForAll(from, msg.sender),
-            "ERC1155: cashout caller is not owner nor approved"
+        ERC1155WithAgentFacet(s.nft).burnBatch(
+            msg.sender, account, ids, amounts
         );
-        ERC1155WithAgentFacet(s.nft).burnBatch(msg.sender, from, ids, amounts);
-        _cashout(from, to, ids, amounts);
+        LibCashoutInternal.cashout(account, recipient, ids, amounts);
     }
 }

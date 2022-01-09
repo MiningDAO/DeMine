@@ -3,14 +3,17 @@
 pragma solidity 0.8.4;
 
 import '@solidstate/contracts/access/OwnableInternal.sol';
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
+import '../lib/LibCashoutInternal.sol';
 import '../lib/AppStorage.sol';
 import '../lib/LibAppStorage.sol';
 import '../lib/LibCustodian.sol';
-import '../lib/LibCashoutInternal.sol';
 
 contract AgentAdminFacet is Custodian {
+    using SafeERC20 for IERC20;
     using LibAppStorage for AppStorage;
     AppStorage internal s;
 
@@ -18,7 +21,7 @@ contract AgentAdminFacet is Custodian {
     event Reward(uint128 indexed, address, uint256, uint256);
 
     modifier onlyExistingPool(uint128 pool) {
-        require(pool < s.next, "DeMineAgent: pool doesn't exsit");
+        require(pool < s.nextPool, "DeMineAgent: pool doesn't exsit");
         _;
     }
 
@@ -66,7 +69,7 @@ contract AgentAdminFacet is Custodian {
             address(this), address(this), ids, amounts
         );
         address checking = LibCustodian.layout().checking;
-        _cashout(address(this), checking, ids, amounts);
+        LibCashoutInternal.cashout(address(this), checking, ids, amounts);
     }
 
     function reward(

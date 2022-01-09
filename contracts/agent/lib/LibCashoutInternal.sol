@@ -17,7 +17,7 @@ library LibCashoutInternal {
         uint256 reward
     );
 
-    function _cashout(
+    function cashout(
         address account,
         address recipient,
         uint256[] calldata ids,

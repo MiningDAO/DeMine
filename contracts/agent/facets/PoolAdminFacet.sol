@@ -2,10 +2,12 @@
 
 pragma solidity 0.8.4;
 
+import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../lib/AppStorage.sol';
 import '../lib/LibAppStorage.sol';
 import '../lib/LibCustodian.sol';
+import '../lib/LibERC20Payable.sol';
 
 contract PoolAdminFacet is PausableModifier {
     using LibAppStorage for AppStorage;
@@ -53,10 +55,9 @@ contract PoolAdminFacet is PausableModifier {
             cycles.length == increment.length,
             "PoolOwnerFacet: array length mismatch"
         );
-        mapping(uint256 => uint256) storage allowances = s.allowances;
         for (uint256 i = 0; i < cycles.length; i++) {
             uint256 id = (uint256(pool) << 128) + cycles[i];
-            allowances[id][to] += increment[i];
+            s.allowances[id][to] += increment[i];
         }
         emit IncreaseAllowance(msg.sender, to, pool, cycles, increment);
     }
@@ -104,14 +105,13 @@ contract PoolAdminFacet is PausableModifier {
             "DeMineAgent: array length mismatch"
         );
         uint256 tokenCost = s.pools[pool].tokenCost;
-        mapping(uint256 => uint256) storage prices = s.prices;
         for (uint256 i = 0; i < cycles.length; i++) {
             uint256 id = (uint256(pool) << 128) + cycles[i];
             require(
                 newPrices[i] >= tokenCost,
                 "DeMineAgent: price too low to cover cost"
             );
-            prices[id] = newPrices[i];
+            s.prices[id] = newPrices[i];
         }
         emit SetTokenPrices(msg.sender, pool, cycles, newPrices);
     }
@@ -134,7 +134,7 @@ contract PoolAdminFacet is PausableModifier {
             totalCost += tokenCost * amounts[i];
         }
         address custodian = LibCustodian.layout().checking;
-        pay(payment, msg.sender, custodian, totalCost);
+        LibERC20Payable.pay(payment, msg.sender, custodian, totalCost);
         emit Redeem(msg.sender, pool, payment);
         ERC1155WithAgentFacet(s.nft).safeBatchTransferFrom(
             address(this),
@@ -150,9 +150,8 @@ contract PoolAdminFacet is PausableModifier {
         uint256[] calldata ids
     ) external view returns(uint256[] memory) {
         uint256[] memory result = new uint256[](ids.length);
-        mapping(uint256 => uint256) storage allowances = s.allowances;
         for (uint256 i = 0; i < ids.length; i++) {
-            result[i] = allowances[ids[i]][recipient];
+            result[i] = s.allowances[ids[i]][recipient];
         }
         return result;
     }
@@ -161,12 +160,11 @@ contract PoolAdminFacet is PausableModifier {
         uint256[] calldata ids
     ) external view returns(uint256[] memory) {
         uint256[] memory result = new uint256[](ids.length);
-        mapping(uint256 => uint256) storage prices = s.prices;
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             uint128 pool = uint128(id >> 128);
-            uint256 basePrice = getDefaultTokenPrice(pool);
-            result[i] = prices[id] > 0 ? prices[id] : basePrice;
+            uint256 basePrice = s.pools[pool].tokenPrice;
+            result[i] = s.prices[id] > 0 ? s.prices[id] : basePrice;
         }
         return result;
     }

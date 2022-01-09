@@ -17,7 +17,7 @@ library LibDeMineAgent {
 
     function genCutAgentAdmin(
         address target
-    ) internal returns(IDiamondCuttable.FacetCut memory) {
+    ) internal pure returns(IDiamondCuttable.FacetCut memory) {
         bytes4[] memory selectors = new bytes4[](6);
         selectors[0] = AgentAdminFacet.createPoolWithSupply.selector;
         selectors[1] = AgentAdminFacet.addSupply.selector;
@@ -30,22 +30,22 @@ library LibDeMineAgent {
 
     function genCutPoolAdmin(
         address target
-    ) internal returns(IDiamondCuttable.FacetCut memory) {
+    ) internal pure returns(IDiamondCuttable.FacetCut memory) {
         bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = PoolAdminFacet.increaseAllowance.selector;
         selectors[1] = PoolAdminFacet.decreaseAllowance.selector;
         selectors[2] = PoolAdminFacet.transferPool.selector;
         selectors[3] = PoolAdminFacet.setTokenDefaultPrice.selector;
-        selectors[4] = PoolAdminFacet.setTokenPrice.selector;
+        selectors[4] = PoolAdminFacet.setTokenPrices.selector;
         selectors[5] = PoolAdminFacet.redeem.selector;
-        selectors[6] = PoolAdminFacet.getAllowance.selector;
+        selectors[6] = PoolAdminFacet.getAllowances.selector;
         selectors[7] = PoolAdminFacet.getPrices.selector;
         return LibDiamond.genFacetCut(target, selectors);
     }
 
     function genCutExternal(
         address target
-    ) internal returns(IDiamondCuttable.FacetCut memory) {
+    ) internal pure returns(IDiamondCuttable.FacetCut memory) {
         bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = ExternalFacet.claimUnnamed.selector;
         selectors[1] = ExternalFacet.claim.selector;
@@ -54,18 +54,19 @@ library LibDeMineAgent {
     }
 
     function initialize(
-        address nft,
+        address demineNFT,
         address diamondFacet,
         address agentAdminFacet,
         address poolAdminFacet,
         address externalFacet
     ) external {
         OwnableStorage.layout().setOwner(msg.sender);
+        LibAppStorage.layout().nft = demineNFT;
         IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](4);
         facetCuts[0] = LibDiamond.genCutDiamond(diamondFacet);
-        facetCuts[1] = genCutERC2981(erc2981Facet);
-        facetCuts[2] = genCutERC1155Metadata(erc1155MetadataFacet);
-        facetCuts[3] = genCutERC1155WithAgent(erc1155WithAgentFacet);
+        facetCuts[1] = genCutAgentAdmin(agentAdminFacet);
+        facetCuts[2] = genCutPoolAdmin(poolAdminFacet);
+        facetCuts[3] = genCutExternal(externalFacet);
         (bool success, bytes memory returndata) = diamondFacet.delegatecall(
             abi.encodeWithSelector(
                 IDiamondCuttable.diamondCut.selector,

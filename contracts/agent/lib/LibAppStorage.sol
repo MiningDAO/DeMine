@@ -25,7 +25,7 @@ library LibAppStorage {
         s.pools[pool].owner = owner;
         s.pools[pool].tokenCost = tokenCost;
         setDefaultTokenPrice(s, pool, tokenPrice);
-        s.next = pool + 1;
+        s.nextPool = pool + 1;
         return pool;
     }
 
@@ -54,11 +54,11 @@ library LibAppStorage {
     }
 
     function decreaseAllowance(
+        AppStorage storage s,
         uint256 id,
         address claimer,
         uint256 amount
     ) internal {
-        AppStorage storage s = AppStorage.diamondStorage();
         uint256 allowance = s.allowances[id][claimer];
         require(
             allowance >= amount,

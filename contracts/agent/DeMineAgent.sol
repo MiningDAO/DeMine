@@ -14,7 +14,7 @@ contract DeMineAgent is DiamondBase {
         address poolAdminFacet,
         address externalFacet
     ) {
-        LibDeMineNFT.initialize(
+        LibDeMineAgent.initialize(
             demineNFT,
             diamondFacet,
             agentAdminFacet,
