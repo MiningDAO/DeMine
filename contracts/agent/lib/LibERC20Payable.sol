@@ -6,17 +6,11 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import './LibAppStorage.sol';
+
 library LibERC20Payable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
-
-    struct Layout {
-        EnumerableSet.AddressSet payments;
-        address custodian;
-    }
-
-    bytes32 internal constant STORAGE_SLOT =
-        keccak256('solidstate.contracts.storage.ERC20Payable');
 
     modifier onlyERC20Payable(address payment) {
         require(
@@ -26,14 +20,7 @@ library LibERC20Payable {
         _;
     }
 
-    function layout() internal pure returns(Layout storage l) {
-        bytes32 slot = STORAGE_SLOT;
-        assembly {
-            l.slot := slot
-        }
-    }
-
-   function pay(
+    function pay(
         address payment,
         address payer,
         address payee,
@@ -47,6 +34,6 @@ library LibERC20Payable {
         address payer,
         uint256 amount
     ) internal {
-        pay(payment, payer, layout().custodian, amount);
+        pay(payment, payer, LibAppStorage.layout().custodian, amount);
     }
 }
