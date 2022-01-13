@@ -2,21 +2,34 @@
 
 pragma solidity 0.8.4;
 
+import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
+
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import '../../shared/lib/LibPausable.sol';
+import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../lib/AppStorage.sol';
-import '../lib/LibERC20Rewardable.sol';
 
-contract ERC20RewardableFacet {
-    using EnumerableSet for EnumerableSet.UintSet;
+contract ERC20RewardableFacet is PausableModifier {
+    using SafeERC20 for IERC20;
 
-    AppStorage Internal s;
+    AppStorage internal s;
 
-    event Reward(uint128 indexed, address, uint256, uint256);
+    modifier onlyNFT() {
+        require(
+            msg.sender == s.nft,
+            'DeMineNFTFacet: only nft contract is allowed'
+        );
+        _;
+    }
+
+    event SetRewardTokenAuction(uint256, uint256, uint256);
+    event Cashout(address indexed recipient, uint256 income);
+    event Reward(uint256 indexed, address, uint256, uint256);
 
     function reward(
-        uint128 cycle,
+        uint256 tokenId,
         address rewarder,
         uint256 rewarded
     ) external onlyOwner {
@@ -38,32 +51,24 @@ contract ERC20RewardableFacet {
         emit Reward(cycle, rewarder, rewardPerToken, supply);
     }
 
-    function billing(uint128 pool, uint128 billingCycle) external onlyOwner {
-        require(
-            billingCycle < s.rewardingCycle,
-            "DeMineAgent: unrewarded cycle"
-        );
-        uint256[] memory ids = new uint256[]();
-        uint256[] memory amounts = new uint256[]();
-        for (uint128 cycle = s.lastBillingCycle + 1; cycle <= billingCycle; cycle++) {
-            AppStorage.Cycle memory cycle = s.cycles[cycle];
-            mapping(uint128 => uint256) memory balances = s.balances[cycle];
-            uint256[] memory pools = cycle.pools.values();
-            for (uint256 j = 0; j < pools.length; j++) {
-                s.pools[pool].locked += balances[pool] * cycle.reward;
-                ids.push((uint256(entries[j].key) << 128) + cycle);
-                amounts.push(balances[pool]);
-            }
+    function cashout(
+        address recipient,
+        uint256[] calldata ids,
+        uint256[] calldata amounts
+    ) external whenNotPaused onlyNFT {
+        uint256 totalIncome;
+        for (uint256 i = 0; i < ids.length; i++) {
+            require(
+                ids[i] < s.rewardingCycle,
+                "DeMineNFT: unrewarded cycle"
+            );
+            totalIncome += amounts[i] * s.cycles[ids[i]].reward;
         }
-        ERC1155WithAgentFacet(s.nft).burnBatch(
-            address(this), address(this), ids, amounts
-        );
-        l.lastBillingCycle = billingCycle;
+        IERC20(s.reward).safeTransfer(recipient, totalIncome);
+        emit Cashout(recipient, totalIncome);
     }
 
-    function cycleInfo(
-        uint128 cycle
-    ) external view returns(uint256, uint256) {
+    function cycleInfo(uint256 cycle) external view returns(uint256, uint256) {
         return (
             s.cycles[cycle].supply,
             s.cycles[cycle].reward

@@ -14,7 +14,7 @@ library LibERC20Payable {
 
     modifier onlyERC20Payable(address payment) {
         require(
-            layout().payments.contains(payment),
+            layout().payments[payment].supported,
             "DeMineAgent: payment not supported"
         );
         _;

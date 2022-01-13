@@ -5,6 +5,7 @@ pragma solidity 0.8.4;
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
+import '../lib/LibERC20Payable.sol';
 import '../lib/LibAppStorage.sol';
 
 contract MortgageFacet is PausableModifier, OwnableInternal {
@@ -48,38 +49,43 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
     }
 
     function transferMortgage(
-        uint256[] calldata cycles,
+        uint256[] calldata ids,
         uint256[] calldata amounts;
         address newMortgager
     ) external whenNotPaused {
-        for (uint256 i = 0; i < cycles.length; i++) {
-            s.decreaseBalance(msg.sender, cycles[i], amounts[i]);
-            s.accounts[cycles[i]][newMortgager] += amounts[i];
+        for (uint256 i = 0; i < ids.length; i++) {
+            s.decreaseBalance(msg.sender, ids[i], amounts[i]);
+            s.accounts[ids[i]][newMortgager] += amounts[i];
         }
-        emit TransferMortgage(msg.sender, newMortgager, cycles, amounts);
+        emit TransferMortgage(msg.sender, newMortgager, ids, amounts);
     }
 
     function redeem(
         address payment,
-        uint256[] calldata cycles,
+        uint256[] calldata ids,
         uint256[] calldata amounts
     ) external whenNotPaused {
         require(
-            cycles.length == amounts.length,
+            ids.length == amounts.length,
             "PoolOwnerFacet: array length mismatch"
         );
-        uint256 tokenCost = s.pools[pool].tokenCost;
+        uint256 tokenCost = s.tokenCost;
+        uint256 lastUnbillingCycle = s.lastUnbillingCycle;
         uint256 totalCost;
-        for (uint256 i = 0; i < cycles.length; i++) {
+        for (uint256 i = 0; i < ids.length; i++) {
+            require(
+                ids[i] >= lastUnbillingCycle,
+                'DeMineAgent: token not redeemable'
+            );
             totalCost += tokenCost * amounts[i];
-            s.decreaseBalance(msg.sender, cycles[i], amounts[i]);
+            s.decreaseBalance(msg.sender, ids[i], amounts[i]);
         }
         LibERC20Payable.payCustodian(payment, msg.sender, totalCost);
-        emit Redeem(msg.sender, payment, cycles, amounts);
+        emit Redeem(msg.sender, payment, ids, amounts);
         ERC1155WithAgentFacet(s.nft).safeBatchTransferFrom(
             address(this),
             msg.sender,
-            cycles,
+            ids,
             amounts,
             ""
         );

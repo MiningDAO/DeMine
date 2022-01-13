@@ -6,6 +6,7 @@ import '@solidstate/contracts/introspection/ERC165.sol';
 import '@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol';
 
 import '../../shared/lib/LibPausable.sol';
+import '../../agent/facet/ERC20RewardableFacet.sol';
 import '../lib/LibERC1155WithAgent.sol';
 
 contract ERC1155WithAgentFacet is
@@ -21,6 +22,19 @@ contract ERC1155WithAgentFacet is
         _;
     }
 
+    event Alchemy(
+        address indexed operator,
+        address indexed account,
+        address indexed recipient,
+        uint256[] ids,
+        uint256[] amounts
+    );
+    event BurnThemAll(
+        address indexed,
+        uint256 start,
+        uint256 end
+    );
+
     function mintBatch(
         address recipient,
         uint256[] memory ids,
@@ -29,17 +43,37 @@ contract ERC1155WithAgentFacet is
         _safeMintBatch(recipient, ids, supplies, "");
     }
 
-    function burnBatch(
-        address operator,
+    function burnThemAll(
+        uint256 start,
+        uint256 end
+    ) external onlyAgent returns(uint256[] memory balances) {
+        require(end >= start, "DeMineNFT: invalid input for burn them call");
+        uint256[] memory result = new uint256[](end - start + 1);
+        mapping(uint256 => mapping(address => uint256))
+            storage balances = ERC1155BaseStorage.layout().balances;
+        unchecked {
+            for (uint256 id = start; id <= end; id++) {
+                result[id - start] = balances[id][msg.sender];
+                balances[id][msg.sender] = 0;
+            }
+        }
+        emit BurnThemAll(msg.sender, start, end);
+        return result;
+    }
+
+    function alchemize(
         address account,
+        address recipient,
         uint256[] memory ids,
-        uint256[] memory supplies
-    ) external onlyAgent {
+        uint256[] memory amounts
+    ) external {
         require(
-            operator == account || isApprovedForAll(account, operator),
+            msg.sender == account || isApprovedForAll(account, msg.sender),
             'DeMineNFT: operator is not caller or approved'
         );
-        _burnBatch(account, ids, supplies);
+        _burnBatch(account, ids, amounts);
+        ERC20RewardableFacet(agent).cashout(recipient, ids, amounts);
+        emit Alchemy(msg.sender, account, recipient, ids, amounts);
     }
 
     function _beforeTokenTransfer(

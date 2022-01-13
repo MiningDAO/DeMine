@@ -10,22 +10,27 @@ contract ERC20PayableFacet is OwnableInternal {
     using EnumerableSet for EnumerableSet.AddressSet;
     AppStorage internal s;
 
-    event AddPayment(address indexed, bool);
-    event RemovePayment(address indexed, bool);
+    event SetPayment(address indexed, bool, uint8);
     event SetCustodian(address custodian);
 
-    function addPayment(address payment, bool supported) external onlyOwner {
-        s.payments.add(payment);
-        emit AddPayment(payment, supported);
+    function setPayment(
+        address payment,
+        bool supported,
+        uint8 decimals
+    ) external onlyOwner {
+        s.payments[payment].decimals = decimals;
+        emit SetPayment(payment, supported, decimals);
     }
 
-    function removePayment(address payment, bool supported) external onlyOwner {
-        s.payments.remove(payment);
-        emit RemovePayment(payment, supported);
-    }
-
-    function supportedPayments() external view returns(address[] memory) {
-        return s.payments.values();
+    function paymentInfo(address payment)
+        external
+        view
+        returns(bool, uint8)
+    {
+        return (
+            s.payments[payment].supported,
+            s.payments[payment].decimals
+        );
     }
 
     function setCustodian(address custodian) external onlyOwner {

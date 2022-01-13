@@ -3,7 +3,7 @@
 pragma solidity 0.8.4;
 
 library PricingStorage {
-    enum PricingStrategy{ STATIC, DYNAMIC }
+    enum PricingStrategy{ STATIC, LINEAR }
 
     struct Pricing {
         PricingStrategy strategy;

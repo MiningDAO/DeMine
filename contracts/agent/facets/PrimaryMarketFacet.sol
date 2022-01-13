@@ -4,10 +4,10 @@ pragma solidity 0.8.4;
 
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../../shared/lib/LibPausable.sol';
-import '../lib/AppStorage.sol';
 import '../lib/LibAppStorage.sol';
 import '../lib/LibERC20Payable.sol';
 import '../lib/PricingStatic/sol';
+import '../lib/PricingLinear/sol';
 
 contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinear {
     using LibAppStorage for AppStorage;
@@ -98,18 +98,23 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinear {
             address,
             uint256
         ) internal view returns(uint256) priceF = LibPricing.priceOfFunc(l);
-        AppStorage.Pool memory p = s.pools[pool];
+        uint256 tokenCost = s.tokenCost;
+        uint256 lastUnbillingCycle = s.lastUnbillingCycle;
         uint256 totalToPay;
         uint256 totalToCost;
         uint256[] memory ids = new uint256[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
+            require(
+                ids[i] >= lastUnbillingCycle,
+                'DeMineAgent: cycle not redeemable'
+            );
             s.decreaseAllowance(from, ids[i], claimer, amounts[i]);
             s.locked[cycle][pool] -= amounts[i];
-            totalCost += p.tokenCost * amounts[i];
+            totalCost += tokenCost * amounts[i];
             totalToPay += priceF(l, from, ids[i]) * amounts[i];
         }
         LibERC20Payable.payCustodian(payment, msg.sender, totalCost);
-        LibERC20Payable.pay(payment, msg.sender, p.owner, totalToPay - totalCost);
+        LibERC20Payable.pay(payment, msg.sender, from, totalToPay - totalCost);
         ERC1155WithAgentFacet(s.nft).safeBatchTransferFrom(
             address(this),
             msg.sender,
