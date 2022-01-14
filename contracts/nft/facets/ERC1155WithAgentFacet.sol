@@ -29,11 +29,6 @@ contract ERC1155WithAgentFacet is
         uint256[] ids,
         uint256[] amounts
     );
-    event BurnThemAll(
-        address indexed,
-        uint256 start,
-        uint256 end
-    );
 
     function mintBatch(
         address recipient,
@@ -43,21 +38,11 @@ contract ERC1155WithAgentFacet is
         _safeMintBatch(recipient, ids, supplies, "");
     }
 
-    function burnThemAll(
-        uint256 start,
-        uint256 end
-    ) external onlyAgent returns(uint256[] memory balances) {
-        require(end >= start, "DeMineNFT: invalid input for burn them call");
-        uint256[] memory result = new uint256[](end - start + 1);
-        mapping(uint256 => mapping(address => uint256))
-            storage balances = ERC1155BaseStorage.layout().balances;
-        unchecked {
-            for (uint256 id = start; id <= end; id++) {
-                result[id - start] = balances[id][msg.sender];
-                balances[id][msg.sender] = 0;
-            }
-        }
-        emit BurnThemAll(msg.sender, start, end);
+    function burn(
+        uint256 tokenId
+    ) external onlyAgent returns(uint256 balance) {
+        uint256 balance = _balanceOf(msg.sender, tokenId);
+        _burn(msg.sender, tokenId);
         return result;
     }
 
@@ -72,7 +57,9 @@ contract ERC1155WithAgentFacet is
             'DeMineNFT: operator is not caller or approved'
         );
         _burnBatch(account, ids, amounts);
-        ERC20RewardableFacet(agent).cashout(recipient, ids, amounts);
+        ERC20RewardableFacet(
+            LibERC1155WithAgent.layout().agent
+        ).cashout(recipient, ids, amounts);
         emit Alchemy(msg.sender, account, recipient, ids, amounts);
     }
 

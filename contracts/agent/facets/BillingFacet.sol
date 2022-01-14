@@ -3,136 +3,82 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 import '../../shared/lib/LibPausable.sol';
 import '../lib/LibERC20Payable.sol';
 import '../lib/AppStorage.sol';
+import '../lib/LibBilling.sol';
 
-contract BillingRewardableFacet is PausableModifier {
-    event RewardTokenSold(address indexed, uint256 rewardTokenSold, uint256 subtotal);
-    event StartBilling(uint256 indexed, uint256, uint256);
-    event EndBilling(uint256 indexed, uint256);
-    event SkipBilling(uint256 indexed);
+contract BillingRewardableFacet is PausableModifier, BillingInternal {
+    AppStorage internal s;
+
+    using BillingStorage for BillingStorage.Layout;
+
+    event RewardTokenSold(address indexed, uint256, uint256);
+    event CloseBilling(uint256 indexed, uint256);
     event AutoSwapTry(uint256 indexed, uint256);
 
-    modifier onlyBilling() {
+    function retrySwapAndClose() external onlyOwner {
+        BillingStorage.Layout storage l = BillingStorage.layout();
         require(
-            s.pendingCost > 0,
-            'DeMineAgent: no billing in progress'
+            l.pendingCost > 0 && l.auctionExpireAt > l.billingAt,
+            'DeMineAgent: auction on-going or no-billing on-going'
         );
-        _;
-    }
-
-    function billingStart(uint256 billingCycle) external onlyOwner {
-        uint256 prevBillingCycle = s.billingCycle;
-        require(s.pendingCost == 0, 'DeMineAgent: billing in progress');
-        require(
-            billingCycle < s.rewardingCycle && billingCycle > prevBillingCycle,
-            'DeMineAgent: cycle unrewarded or already paid'
-        );
-        uint256[] memory balances = ERC1155WithAgentFacet(nft).burnThemAll(
-            s.billingCycle + 1,
-            billingCycle
-        );
-        uint256 totalReward;
-        uint256 totalCost;
-        uint256 tokenCost = s.tokenCost;
-        for (uint256 i = 0; i < balances.length; i++) {
-            uint256 tokenId = prevBillingCycle + 1 + i;
-            totalReward = s.cycles[tokenId].reward * balances[i];
-            totalCost = tokenCost * balances[i];
-        }
-        s.billingCycle = billingCycle;
-        if (totalCost > 0) {
-            s.lockedReward += totalReward;
-            s.pendingCost += totalCost;
-            s.saleExpireAt = block.timestamp + 24 * 3600; // one day from now
-            s.numAutoSwapTried = 0;
-            emit StartBilling(billingCycle, totalReward, totalCost);
-        } else {
-            emit SkipBilling(billingCycle);
-        }
-    }
-
-    function billingEnd(
-        address payment,
-        uint256 cost
-    ) external onlyOwner onlyBilling {
-        uint256 amountInMaximum = s.lockedReward;
-        TransferHelper.safeApprove(s.reward, s.swapRouter, amountInMaximum);
-        ISwapRouter.ExactOutputSingleParams memory params =
-            ISwapRouter.ExactOutputSingleParams({
-                tokenIn: s.reward,
-                tokenOut: s.defaultCostToken,
-                fee: 3000, // 0.3%
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountOut: s.pendingCost,
-                amountInMaximum: amountInMaximum,
-                sqrtPriceLimitX96: 0
-        });
-        (bool success, bytes memory encoded) = s.swapRouter.call(
-            abi.encodeWithSignature(
-                'exactOutputSingle((address,address,uint24,address,uint256,uiint256,uint256,uint160))',
-                params
-            )
-        );
-        TransferHelper.safeApprove(s.reward, s.swapRouter, 0);
+        (
+            bool success,
+            uint256 amountIn
+        ) = LibBilling.trySwapAndClose(l.swapRouter, l.lockedReward, l.pendingCost);
         if (success) {
-            uint256 amountIn = abi.decode(encoded);
-            s.pendingCost = 0;
-            s.lockedReward = 0;
-            uint256 billingCycle = s.billingCycle;
-            uint256 totalSoldReward = s.soldReward[billingCycle] + amountIn;
-            s.soldReward[billingCycle] = totalSoldReward;
-            emit EndBilling(billingCycle, totalSoldReward);
+            LibBilling.closeBilling(l, amountIn);
         } else {
-            s.numAutoSwapTried += 1;
-            emit AutoSwapTry(billingCycle, block.timestamp);
-            if (s.numAutoSwapTried > minTryRequiredBeforeManualEnd) {
-                billingEndWithDeposit();
-            }
+            uint256 swapTried = l.numSwapTried + 1;
+            l.numSwapTried += swapTried;
+            emit AutoSwapTry(billingCycle, swapTried);
         }
     }
 
-    function billingEndWithDeposit() private {
+    function startRewardTokenAuction() external onlyOwner {
+        BillingStorage.Layout storage l = BillingStorage.layout();
         require(
-            s.deposit >= s.pendingCost,
-            'DeMineAgent: insufficient deposit'
+            l.pendingCost > 0 &&
+                l.numSwapTried > 0 &&
+                l.auctionExpireAt < l.billingAt,
+            'DeMineAgent: auction not ready'
         );
-        uint pendingCost = s.pendingCost;
-        uint lockedReward = s.lockedReward;
-        s.deposit -= pendingCost;
-        s.pendingCost = 0;
-        s.lockedReward = 0;
-        uint256 billingCycle = s.billingCycle;
-        uint256 totalSoldReward = s.soldReward[billingCycle] + s.lockedReward;
-        s.soldReward[billingCycle] = totalSoldReward;
-        IERC20(s.reward).transferFrom(address(this), operator, lockedReward);
-        emit EndBilling(billingCycle, totalSoldReward);
+        l.saleExpireAt = block.timestamp + 12 * 3600;
     }
 
-    function lockPrice() external onlyBilling {
+    function lockPriceForAuction() external returns(uint256, uint256) {
+        BillingStorage.Layout storage l = BillingStorage.layout();
+        require(
+            l.isAuctionOngoing(),
+            'DeMineAgent: no auction on-going'
+        );
         (
             uint256 unitSize,
             uint256 unitPrice
-        ) = getRealtimeRewardTokenPrice();
-        s.lockedPrices[msg.sender] = AppStorage.RewardTokenLockedPrice(
+        ) = getRealtimeRewardTokenPrice(l);
+        s.lockedPrices[msg.sender] = BillingStorage.RewardTokenLockedPrice(
             unitSize, unitPrice, block.timestamp + priceLockDuration
         );
+        returns (unitSize, unitPrice);
     }
 
     function buyRewardTokenWithLockedPrice(
         address payment,
         uint256 totalToPay
-    ) external onlyBilling {
-        AppStorage.RewardTokenLockedPrice memory p = s.lockedPrices[msg.sender];
+    ) external {
+        BillingStorage.Layout storage l = BillingStorage.layout();
         require(
-            block.timestamp < s.lockExpireAt && block.timestamp < p.expireAt,
-            'DeMineAgent: sale or price expired'
+            l.isAuctionOngoing(),
+            'DeMineAgent: no auction on-going'
+        );
+        BillingStorage.RewardTokenLockedPrice memory p = s.lockedPrices[msg.sender];
+        require(
+            block.timestamp < p.expireAt,
+            'DeMineAgent: price expired'
         );
         uint256 pendingCost = s.pendingCost;
         uint256 lockedReward = s.lockedReward;
@@ -143,20 +89,37 @@ contract BillingRewardableFacet is PausableModifier {
         );
         uint256 subtotal = unitToBuy * p.unitPrice;
         uint256 rewardTokenSold = unitToBuy * p.unitSize;
-        uint billingCycle = s.billingCycle;
-        uint totalSoldReward = s.soldReward[billingCycle] + rewardTokenSold;
-        s.soldReward[billingCycle] = totalSoldReward;
+        uint256 totalRewardSold = l.rewardSold + rewardTokenSold;
         if (subtotal > pendingCost) {
-            s.pendingCost = 0;
-            s.lockedReward = 0;
-            emit EndBilling(billingCycle, totalSoldReward);
+            LibBilling.closeBilling(l, totalRewardSold);
         } else {
-            s.pendingCost = pendingCost - subtotal;
-            s.lockedReward = lockedReward - rewardTokenSold;
+            l.pendingCost = pendingCost - subtotal;
+            l.lockedReward = lockedReward - rewardTokenSold;
+            l.rewardSold = totalRewardSold;
         }
         LibERC20Payable.payCustodian(payment, msg.sender, subtotal);
         IERC20(s.reward).transfer(msg.sender, rewardTokenSold);
         emit RewardTokenSold(msg.sender, rewardTokenSold, subtotal);
+    }
+
+    function closeBillingWithDeposit() external onlyOwner {
+        BillingStorage.Layout storage l = BillingStorage.layout();
+        require(
+            l.pendingCost > 0 &&
+                l.auctionExpireAt > l.billingAt &&
+                block.timestamp > l.auctionExpireAt,
+            'DeMineAgent: no billing on-going or aution not finished'
+        );
+        s.deposit -= l.pendingCost;
+        s.info[s.billingCycle].debt = ceil(l.pendingCost, l.balance);
+        l.shrinkPool = true;
+        LibBilling.closeBilling(l, l.rewardSold);
+    }
+
+    function shrinkPool(uint256 tokenId) private {
+        uint256 balance = nft.burn(tokenId)
+        s.info[tokenId].supply -= balance;
+        s.info[tokenId].adjustedReward = 0;
     }
 
     function min2(uint256 a, uint256 b) private pure {
@@ -167,10 +130,10 @@ contract BillingRewardableFacet is PausableModifier {
         return a < b ? min2(a, c) : min2(b, c);
     }
 
-    function getRealtimeRewardTokenPrice() public view {
-        uint256 totalCost = s.pendingCost;
-        uint256 totalReward = s.lockedReward;
-        uint256 price = getNormalizedChainlinkPriceWithDiscount();
+    function getRealtimeRewardTokenPrice(BillingStorage.Layout storage l) public view {
+        uint256 totalCost = l.pendingCost;
+        uint256 totalReward = l.lockedReward;
+        uint256 price = getNormalizedChainlinkPriceWithDiscount(l);
         uint256 rewardBase = base(s.rewardTokenDecimals);
         uint256 maxCostTokenTraded = price * totalReward / rewardBase;
         (
@@ -182,18 +145,17 @@ contract BillingRewardableFacet is PausableModifier {
         return (unitSize, unitPrice);
     }
 
-    function getNormalizedChainlinkPriceWithDiscount()
-        private
-        returns(uint256)
-    {
+    function getNormalizedChainlinkPriceWithDiscount(
+        BillingStorage.Layout storage l
+    ) private returns(uint256) {
         (
             uint80, int price, uint timestamp, uint, uint80
-        ) = AggregatorV3Interface(s.chainlink).latestRoundData();
+        ) = AggregatorV3Interface(l.chainlink).latestRoundData();
         if (price <= 0) { returns 0; }
         // normalize
         uint256 normalized = uint256(price) * base(
-            s.costTokenDecimals
-        ) / base(s.chainlinkDecimals);
+            l.costTokenDecimals
+        ) / base(l.chainlinkDecimals);
         return normalized * billingDiscount / 100;
     }
 

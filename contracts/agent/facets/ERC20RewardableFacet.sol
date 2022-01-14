@@ -2,16 +2,15 @@
 
 pragma solidity 0.8.4;
 
-import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
-
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../shared/lib/LibPausable.sol';
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../lib/AppStorage.sol';
+import '../lib/LibBilling.sol';
 
-contract ERC20RewardableFacet is PausableModifier {
+contract ERC20RewardableFacet is PausableModifier, BillingInternal {
     using SafeERC20 for IERC20;
 
     AppStorage internal s;
@@ -28,27 +27,40 @@ contract ERC20RewardableFacet is PausableModifier {
     event Cashout(address indexed recipient, uint256 income);
     event Reward(uint256 indexed, address, uint256, uint256);
 
-    function reward(
-        uint256 tokenId,
+    function rewardCurrent(
         address rewarder,
-        uint256 rewarded
+        uint256 totalReward
     ) external onlyOwner {
-        require (
-            cycle >= s.rewardingCycle,
-            "Reward: cycle already rewarded"
-        );
-        uint256 supply = s.cycles[cycle].supply;
-        require(supply > 0, "Reward: cycle supply is 0");
+        uint256 rewarding = s.rewardingCycle;
+        reward(rewarding, rewarder, totalReward);
+    }
 
-        uint256 rewardPerToken = rewarded / supply;
-        s.cycles[cycle].reward += rewardPerToken;
+    function rewardNext(
+        address rewarder,
+        uint256 totalReward
+    ) external onlyOwner {
+        uint256 rewarding = s.rewardingCycle;
+        s.rewardingCycle = rewarding + 1;
+        reward(rewarding + 1, rewarder, totalReward);
+        LibBilling.billing(s, rewarding);
+    }
 
-        IERC20(s.reward).safeTransferFrom(
-            rewarder,
-            address(this),
-            supply * rewardPerToken
-        );
-        emit Reward(cycle, rewarder, rewardPerToken, supply);
+    function reward(
+        uint256 id,
+        address rewarder,
+        uint256 totalReward
+    ) internal {
+        uint256 supply = s.info[rewarding].supply;
+        if (supply > 0) {
+            uint256 rewardPerToken = totalReward / supply;
+            s.info[id].reward += rewardPerToken;
+            IERC20(s.reward).safeTransferFrom(
+                rewarder,
+                address(this),
+                supply * rewardPerToken
+            );
+            emit Reward(id, rewarder, rewardPerToken, supply);
+        }
     }
 
     function cashout(
@@ -60,18 +72,18 @@ contract ERC20RewardableFacet is PausableModifier {
         for (uint256 i = 0; i < ids.length; i++) {
             require(
                 ids[i] < s.rewardingCycle,
-                "DeMineNFT: unrewarded cycle"
+                "DeMineNFT: unrewarded token"
             );
-            totalIncome += amounts[i] * s.cycles[ids[i]].reward;
+            totalIncome += amounts[i] * s.info[ids[i]].reward;
         }
         IERC20(s.reward).safeTransfer(recipient, totalIncome);
         emit Cashout(recipient, totalIncome);
     }
 
-    function cycleInfo(uint256 cycle) external view returns(uint256, uint256) {
+    function tokenInfo(uint256 token) external view returns(uint256, uint256) {
         return (
-            s.cycles[cycle].supply,
-            s.cycles[cycle].reward
+            s.info[token].supply,
+            s.info[token].reward
         );
     }
 }
