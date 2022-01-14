@@ -5,7 +5,7 @@ pragma solidity 0.8.4;
 import '../AppStorage.sol';
 import './PricingStorage.sol';
 
-library LibPricingLinear {
+library LibPricingLinearDecay {
     function priceOf(
         PricingStorage.Layout storage l,
         address mortgager,
@@ -75,7 +75,7 @@ library LibPricingLinear {
     }
 }
 
-abstract PricingLinear {
+abstract PricingLinearDecay {
     using LibPricingLinear for PricingStorage.Layout;
     AppStorage internal s;
 

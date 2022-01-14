@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.4;
+pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -47,9 +48,9 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
             supplies[i] = supplies;
         }
         uint256 mortgageId = s.nextMortgage;
-        uint256 deposit = supply * s.tokenCost * s.depositCycles;
+        uint256 deposit = supply * s.tokenCost * s.minDepositDaysRequired;
         IERC20(s.cost).safeTransferFrom(msg.sender, address(this), deposit);
-        s.mortgage[mortgageId] = Mortgage(
+        s.mortgages[mortgageId] = Mortgage(
             msg.sender, start, start + end, supply, deposit
         );
         s.nextMortgage = mortgageId + 1;
@@ -114,7 +115,7 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
 
     function clearMortgage(uint256 mortgage) external whenNotPaused {
         BillingStorage.Layout storage l = BillingStorage.layout();
-        Mortgage memory m = s.mortgage[mortgage];
+        Mortgage memory m = s.mortgages[mortgage];
         require(
             m.end < l.billingCycle,
             'DeMineAgent: mortgage not finished yet'
@@ -132,12 +133,20 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
         uint256 deposit = m.deposit - totalDebt;
         IERC20(s.cost).safeTransferFrom(msg.sender, address(this), m.deposit - totalDebt);
         IERC20(s.reward).safeTransfer(msg.sender, totalReward);
-        s.mortgage[mortgage].supply = 0;
-        s.mortgage[mortgage].deposit = 0;
+        s.mortgages[mortgage].supply = 0;
+        s.mortgages[mortgage].deposit = 0;
     }
 
     function min2(uint256 a, uint256 b) private pure {
         return a < b ? a : b;
+    }
+
+    function getMortgage(uint256 mortgage)
+        external
+        view
+        returns(Mortgage memory)
+    {
+        return s.mortgages[mortgage];
     }
 
     function onERC1155Received(

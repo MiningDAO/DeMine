@@ -8,10 +8,10 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../lib/LibAppStorage.sol';
-import '../lib/PricingStatic/sol';
-import '../lib/PricingLinear/sol';
+import '../lib/PricingStatic.sol';
+import '../lib/PricingLinearDecay.sol';
 
-contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinear {
+contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDecay {
     AppStorage internal s;
 
     using LibAppStorage for AppStorage;

@@ -3,7 +3,7 @@
 pragma solidity 0.8.4;
 
 import './LibPricingStatic.sol';
-import './LibPricingLinear.sol';
+import './LibPricingLinearDecay.sol';
 
 library LibPricing {
     function initialize(
@@ -16,7 +16,7 @@ library LibPricing {
         l.settings[from] = strategy;
         if (strategy == PricingStorage.PricingStrategy.STATIC) {
             LibPricingStatic.initialize(s.tokenCost, from, args);
-        } else if (strategy == PricingStorage.PricingStrategy.LINEAR) {
+        } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
             LibPricingLinear.initialize(l, s.tokenCost, from, args);
         }
     }
@@ -33,7 +33,7 @@ library LibPricing {
         PricingStorage.PricingStrategy strategy = l.settings[from];
         if (strategy == PricingStorage.PricingStrategy.STATIC) {
             return LibPricingStatic.priceOf;
-        } else if (strategy == PricingStorage.PricingStrategy.LINEAR) {
+        } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
             return LibPricingLinear.priceOf;
         }
     }

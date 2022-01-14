@@ -9,12 +9,7 @@ struct Mortgage {
     uint256 start;
     uint256 end;
     uint256 supply;
-    uint256 deposit;
-}
-
-struct Payment{
-    bool supported;
-    uint8 decimals;
+    uint256 initialDeposit;
 }
 
 struct TokenInfo {
@@ -22,22 +17,22 @@ struct TokenInfo {
     uint256 supply;
     // after billing
     uint256 adjustedReward; // per token
-    uint256 debt; // per token
+    uint256 depositDebt; // per token
 }
 
 struct AppStorage {
     ERC1155WithAgentFacet nft;
 
+    uint8 minDepositDaysRequired;
     uint8 costTokenDecimals;
     uint8 rewardTokenDecimals;
-    uint8 depositCycles;
     address cost;
     address reward;
     uint256 tokenCost;
 
     // mortgage
     uint256 nextMortgage;
-    mapping(uint256 => Mortgage) mortgage;
+    mapping(uint256 => Mortgage) mortgages;
 
     // rewarding
     uint256 rewardingCycle;

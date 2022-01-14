@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.4;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -80,10 +81,9 @@ contract ERC20RewardableFacet is PausableModifier, BillingInternal {
         emit Cashout(recipient, totalIncome);
     }
 
-    function tokenInfo(uint256 token) external view returns(uint256, uint256) {
-        return (
-            s.info[token].supply,
-            s.info[token].reward
-        );
+    function tokenInfo(
+        uint256 token
+    ) external view returns(TokenInfo memory) {
+        return s.info[token];
     }
 }
