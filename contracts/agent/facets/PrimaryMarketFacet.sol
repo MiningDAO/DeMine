@@ -2,18 +2,22 @@
 
 pragma solidity 0.8.4;
 
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../lib/LibAppStorage.sol';
-import '../lib/LibERC20Payable.sol';
 import '../lib/PricingStatic/sol';
 import '../lib/PricingLinear/sol';
 
 contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinear {
-    using LibAppStorage for AppStorage;
     AppStorage internal s;
 
-    event Claim(address indexed, address indexed, uint128 indexed, address);
+    using LibAppStorage for AppStorage;
+    using SafeERC20 for IERC20;
+
+    event Invest(address indexed, address indexed, uint128 indexed, address);
     event TransferMortgage(address indexed, address indexed, uint256[], uint256[]);
     event IncreaseAllowance(
         address indexed,
@@ -63,27 +67,24 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinear {
         emit DecreaseAllowance(msg.sender, buyer, cycles, amounts);
     }
 
-    function claimUnnamed(
-        address payment,
+    function investUnnamed(
         address from,
         uint256[] calldata ids,
         uint256[] calldata amounts
     ) external {
-        _claim(address(0), payment, mortgager, ids, amounts);
+        _invest(address(0), mortgager, ids, amounts);
     }
 
-    function claim(
-        address payment,
+    function invest(
         address from,
         uint256[] calldata ids,
         uint256[] calldata amounts
     ) external {
-        _claim(msg.sender, payment, mortgager, ids, amounts);
+        _invest(msg.sender, mortgager, ids, amounts);
     }
 
-    function _claim(
-        address claimer,
-        address payment,
+    function _invest(
+        address investor,
         address from,
         uint256[] calldata ids,
         uint256[] calldata amounts
@@ -108,13 +109,13 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinear {
                 ids[i] >= lastUnbillingCycle,
                 'DeMineAgent: cycle not redeemable'
             );
-            s.decreaseAllowance(from, ids[i], claimer, amounts[i]);
+            s.decreaseAllowance(from, ids[i], investor, amounts[i]);
             s.locked[cycle][pool] -= amounts[i];
             totalCost += tokenCost * amounts[i];
             totalToPay += priceF(l, from, ids[i]) * amounts[i];
         }
-        LibERC20Payable.payCustodian(payment, msg.sender, totalCost);
-        LibERC20Payable.pay(payment, msg.sender, from, totalToPay - totalCost);
+        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalCost);
+        IERC20(s.cost).safeTransferFrom(msg.sender, from, totalToPay - totalCost);
         ERC1155WithAgentFacet(s.nft).safeBatchTransferFrom(
             address(this),
             msg.sender,
@@ -122,7 +123,7 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinear {
             amounts,
             ""
         );
-        emit Claim(msg.sender, claimer, pool, payment);
+        emit Invest(msg.sender, investor, pool);
     }
 
     function setPricingStrategy(

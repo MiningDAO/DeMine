@@ -7,13 +7,13 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
-import '../lib/LibERC20Payable.sol';
 import '../lib/LibAppStorage.sol';
 
 contract MortgageFacet is PausableModifier, OwnableInternal {
+    AppStorage internal s;
+
     using LibAppStorage for AppStorage;
     using SafeERC20 for IERC20;
-    AppStorage internal s;
 
     event Mortgage(address indexed, uint256 indexed);
     event Redeem(address indexed, address indexed, uint256[], uint256[]);
@@ -88,7 +88,7 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
             totalCost += tokenCost * amounts[i];
             s.decreaseBalance(msg.sender, ids[i], amounts[i]);
         }
-        IERC20(s.cost).transferFrom(msg.sender, address(this), totalCost);
+        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalCost);
         emit Redeem(msg.sender, , ids, amounts);
         ERC1155WithAgentFacet(s.nft).safeBatchTransferFrom(
             address(this),
@@ -108,8 +108,8 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
             totalDebt += s.info[ids[i]].debt * balance;
             s.balances[ids[i]][msg.sender] = 0;
         }
-        IERC20(s.cost).transferFrom(msg.sender, address(this), totalDebt);
-        IERC20(s.reward).transfer(msg.sender, totalReward);
+        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalDebt);
+        IERC20(s.reward).safeTransfer(msg.sender, totalReward);
     }
 
     function clearMortgage(uint256 mortgage) external whenNotPaused {
@@ -130,8 +130,8 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
             s.balances[id][msg.sender] = total - balance;
         }
         uint256 deposit = m.deposit - totalDebt;
-        IERC20(s.cost).transferFrom(msg.sender, address(this), m.deposit - totalDebt);
-        IERC20(s.reward).transfer(msg.sender, totalReward);
+        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), m.deposit - totalDebt);
+        IERC20(s.reward).safeTransfer(msg.sender, totalReward);
         s.mortgage[mortgage].supply = 0;
         s.mortgage[mortgage].deposit = 0;
     }

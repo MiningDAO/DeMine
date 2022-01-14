@@ -3,6 +3,9 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
@@ -14,6 +17,7 @@ import '../lib/LibBilling.sol';
 contract BillingRewardableFacet is PausableModifier, BillingInternal {
     AppStorage internal s;
 
+    using SafeERC20 for IERC20;
     using BillingStorage for BillingStorage.Layout;
 
     event RewardTokenSold(address indexed, uint256, uint256);
@@ -97,8 +101,8 @@ contract BillingRewardableFacet is PausableModifier, BillingInternal {
             l.lockedReward = lockedReward - rewardTokenSold;
             l.rewardSold = totalRewardSold;
         }
-        LibERC20Payable.payCustodian(payment, msg.sender, subtotal);
-        IERC20(s.reward).transfer(msg.sender, rewardTokenSold);
+        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), subtotal);
+        IERC20(s.reward).safeTransfer(msg.sender, rewardTokenSold);
         emit RewardTokenSold(msg.sender, rewardTokenSold, subtotal);
     }
 
