@@ -17,7 +17,7 @@ library LibPricing {
         if (strategy == PricingStorage.PricingStrategy.STATIC) {
             LibPricingStatic.initialize(s.tokenCost, from, args);
         } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
-            LibPricingLinear.initialize(l, s.tokenCost, from, args);
+            LibPricingLinearDecay.initialize(l, s.tokenCost, from, args);
         }
     }
 
@@ -34,7 +34,7 @@ library LibPricing {
         if (strategy == PricingStorage.PricingStrategy.STATIC) {
             return LibPricingStatic.priceOf;
         } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
-            return LibPricingLinear.priceOf;
+            return LibPricingLinearDecay.priceOf;
         }
     }
 }

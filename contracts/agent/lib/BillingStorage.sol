@@ -10,26 +10,23 @@ library BillingStorage {
     }
 
     struct Layout {
-        // settings
+        mapping(address => RewardTokenLockedPrice) lockedPrices;
+        // reward sale
+        uint sold;
+        uint saleExpireAt;
+        uint16 discount; // 10000 based
+        uint16 saleDuration; // as second
         uint16 priceLockDuration; // as second
-        uint16 auctionDuration; // as second
-        uint8 discount; // 10000 based
         uint8 chainlinkDecimals;
         address chainlink;
         address swapRouter;
-        // for swap
-        uint8 numSwapTried;
-        // state
-        bool shrinkPool;
-        uint256 billingAt;
-        uint256 billingCycle;
-        uint256 balance;
-        uint256 lockedReward;
-        uint256 pendingCost;
-        // reward aution
-        uint256 rewardSold;
-        uint256 auctionExpireAt;
-        mapping(address => RewardTokenLockedPrice) lockedPrices;
+        uint8 shrinkSize; // num of tokens we shrink starting from next rewarding token
+        uint shrinked; // current shrinked token
+        uint startAt; // timestamp
+        uint billing; // tokenId
+        uint balance; // balance of billing token agent holds
+        uint reward;
+        uint debt;
     }
 
     bytes32 internal constant STORAGE_SLOT =
@@ -40,11 +37,5 @@ library BillingStorage {
         assembly {
             l.slot := slot
         }
-    }
-
-    function isAuctionOngoing(Layout storage l) internal returns(bool) {
-        return l.pendingCost > 0 &&
-            && l.auctionExpireAt > l.billingAt
-            && block.timestamp < l.auctionExpireAt;
     }
 }

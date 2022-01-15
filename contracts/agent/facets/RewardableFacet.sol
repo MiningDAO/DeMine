@@ -9,9 +9,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import '../../shared/lib/LibPausable.sol';
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../lib/AppStorage.sol';
-import '../lib/LibBilling.sol';
 
-contract ERC20RewardableFacet is PausableModifier, BillingInternal {
+contract RewardableFacet is PausableModifier {
     using SafeERC20 for IERC20;
 
     AppStorage internal s;
@@ -24,43 +23,24 @@ contract ERC20RewardableFacet is PausableModifier, BillingInternal {
         _;
     }
 
-    event SetRewardTokenAuction(uint256, uint256, uint256);
     event Cashout(address indexed recipient, uint256 income);
     event Reward(uint256 indexed, address, uint256, uint256);
 
-    function rewardCurrent(
-        address rewarder,
-        uint256 totalReward
-    ) external onlyOwner {
-        uint256 rewarding = s.rewardingCycle;
-        reward(rewarding, rewarder, totalReward);
-    }
-
-    function rewardNext(
-        address rewarder,
-        uint256 totalReward
-    ) external onlyOwner {
-        uint256 rewarding = s.rewardingCycle;
-        s.rewardingCycle = rewarding + 1;
-        reward(rewarding + 1, rewarder, totalReward);
-        LibBilling.billing(s, rewarding);
-    }
-
     function reward(
-        uint256 id,
         address rewarder,
         uint256 totalReward
-    ) internal {
+    ) external onlyOwner {
+        uint256 rewarding = s.rewardingCycle;
         uint256 supply = s.info[rewarding].supply;
         if (supply > 0) {
             uint256 rewardPerToken = totalReward / supply;
-            s.info[id].reward += rewardPerToken;
+            s.info[rewarding].reward += rewardPerToken;
             IERC20(s.reward).safeTransferFrom(
                 rewarder,
                 address(this),
                 supply * rewardPerToken
             );
-            emit Reward(id, rewarder, rewardPerToken, supply);
+            emit Reward(rewarding, rewarder, rewardPerToken, supply);
         }
     }
 
