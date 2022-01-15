@@ -7,125 +7,41 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../../shared/lib/LibPausable.sol';
+import '../../shared/lib/Util.sol';
 import '../lib/LibAppStorage.sol';
 import '../lib/PricingStatic.sol';
 import '../lib/PricingLinearDecay.sol';
 
+/**
+ * @title: PrimaryMarketFacet
+ * @author: Shu Dong
+ * @notice: Facet contract holding functions for primary market sale
+ */
 contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDecay {
     AppStorage internal s;
 
     using LibAppStorage for AppStorage;
     using SafeERC20 for IERC20;
 
-    event Invest(address indexed, address indexed, uint128 indexed, address);
-    event TransferMortgage(address indexed, address indexed, uint256[], uint256[]);
+    event Claim(address indexed, address indexed, uint[], uint[]);
     event IncreaseAllowance(
         address indexed,
         address indexed,
-        uint256[],
-        uint256[]
+        uint[],
+        uint[]
     );
     event DecreaseAllowance(
         address indexed,
         address indexed,
-        uint256[],
-        uint256[]
+        uint[],
+        uint[]
     );
 
-    function increaseAllowance(
-        address buyer,
-        uint128[] calldata cycles,
-        uint256[] calldata amounts
-    ) external whenNotPaused {
-        require(
-            cycles.length == amounts.length,
-            "PoolOwnerFacet: array length mismatch"
-        );
-        for (uint256 i = 0; i < cycles.length; i++) {
-            s.allowances[mortgager][buyer][cycles[i]] += amounts[i];
-        }
-        emit IncreaseAllowance(msg.sender, buyer, cycles, amounts;
-    }
-
-    function decreaseAllowance(
-        address to,
-        uint128[] calldata cycles,
-        uint256[] calldata amounts
-    ) external whenNotPaused {
-        require(
-            cycles.length == amounts.length,
-            "DeMineNFTMetadata: array length mismatch"
-        );
-        for (uint256 i = 0; i < cycles.length; i++) {
-            uint256 allowance = s.allowances[mortgager][buyer][cycles[i]];
-            require(
-                allowance >= amounts[i],
-                "DeMineAgent: allowance will below zero"
-            );
-            s.allowances[mortgager][buyer][cycles[i]] = allowance - amounts[i];
-        }
-        emit DecreaseAllowance(msg.sender, buyer, cycles, amounts);
-    }
-
-    function investUnnamed(
-        address from,
-        uint256[] calldata ids,
-        uint256[] calldata amounts
-    ) external {
-        _invest(address(0), mortgager, ids, amounts);
-    }
-
-    function invest(
-        address from,
-        uint256[] calldata ids,
-        uint256[] calldata amounts
-    ) external {
-        _invest(msg.sender, mortgager, ids, amounts);
-    }
-
-    function _invest(
-        address investor,
-        address from,
-        uint256[] calldata ids,
-        uint256[] calldata amounts
-    ) internal whenNotPaused {
-        require(
-            ids.length == amounts.length,
-            "TokenLocker: array length mismatch"
-        );
-        PricingStorage.Layout storage l = PricingStorage.layout();
-        function(
-            PricingStorage.Layout storage,
-            address,
-            uint256
-        ) internal view returns(uint256) priceF = LibPricing.priceOfFunc(l);
-        uint256 tokenCost = s.tokenCost;
-        uint256 lastUnbillingCycle = s.lastUnbillingCycle;
-        uint256 totalToPay;
-        uint256 totalToCost;
-        uint256[] memory ids = new uint256[](ids.length);
-        for (uint256 i = 0; i < ids.length; i++) {
-            require(
-                ids[i] >= lastUnbillingCycle,
-                'DeMineAgent: cycle not redeemable'
-            );
-            s.decreaseAllowance(from, ids[i], investor, amounts[i]);
-            s.locked[cycle][pool] -= amounts[i];
-            totalCost += tokenCost * amounts[i];
-            totalToPay += priceF(l, from, ids[i]) * amounts[i];
-        }
-        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalCost);
-        IERC20(s.cost).safeTransferFrom(msg.sender, from, totalToPay - totalCost);
-        ERC1155WithAgentFacet(s.nft).safeBatchTransferFrom(
-            address(this),
-            msg.sender,
-            ids,
-            amounts,
-            ""
-        );
-        emit Invest(msg.sender, investor, pool);
-    }
-
+    /**
+     * @notice set pricing strategy for msg.sender
+     * @params pricing strategy to set, currently STATIC and LINEAR_DECAY are supported
+     * @params arguments of pricing strategy set
+     */
     function setPricingStrategy(
         AppStorage.PricingStrategy ps,
         bytes memory args
@@ -135,31 +51,161 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         LibPricing.initialize(l, s, msg.sender, args);
     }
 
-    function tokenPrices(
-        address mortgager,
-        uint256[] calldata ids
-    ) external view override returns(uint256[] memory) {
+    /**
+     * @notice increase allowance of target for msg.sender
+     * @params address of target user
+     * @params demine nft token ids to increase allowance
+     * @params amount to increase per token
+     */
+    function increaseAllowance(
+        address target,
+        uint128[] calldata ids,
+        uint[] calldata amounts
+    ) external whenNotPaused {
+        require(
+            ids.length == amounts.length,
+            "PoolOwnerFacet: array length mismatch"
+        );
+        for (uint i = 0; i < ids.length; i++) {
+            s.allowances[mortgager][target][ids[i]] += amounts[i];
+        }
+        emit IncreaseAllowance(msg.sender, target, ids, amounts;
+    }
+
+    /**
+     * @notice decrease allowance of target for msg.sender
+     * @params address of target user
+     * @params demine nft token ids to decrease allowance
+     * @params amount to decrease per token
+     */
+    function decreaseAllowance(
+        address target,
+        uint128[] calldata ids,
+        uint[] calldata amounts
+    ) external whenNotPaused {
+        require(
+            ids.length == amounts.length,
+            "DeMineNFTMetadata: array length mismatch"
+        );
+        for (uint i = 0; i < ids.length; i++) {
+            uint allowance = s.allowances[msg.sender][target][ids[i]];
+            require(
+                allowance >= amounts[i],
+                "DeMineAgent: allowance will below zero"
+            );
+            s.allowances[from][target][ids[i]] = allowance - amounts[i];
+        }
+        emit DecreaseAllowance(msg.sender, target, ids, amounts);
+    }
+
+    /**
+     * @notice claim tokens listed for msg.sender from DeMineAgent
+     * @params address of demine nft issuer
+     * @params demine nft token ids to buy
+     * @params max amount to buy per token, the amount of final bought token
+     *         could be less than this per allowance and balance state
+     */
+    function claim(
+        address from,
+        uint[] calldata ids,
+        uint[] calldata maxAmounts
+    ) external whenNotPaused returns(uint[] memory) {
+        require(
+            ids.length == maxAmounts.length,
+            "TokenLocker: array length mismatch"
+        );
         PricingStorage.Layout storage l = PricingStorage.layout();
         function(
             PricingStorage.Layout storage,
             address,
-            uint256
-        ) internal view returns(uint256) priceF = LibPricing.priceOfFunc(l);
-        uint256[] memory prices = new uint256[](ids.length);
-        for (uint256 i = 0; i < ids.length; i++) {
-            prices[i] = priceF(l, mortgager, ids[i]);
+            uint
+        ) internal view returns(uint) priceF = LibPricing.priceOfFunc(l);
+        uint tokenCost = s.tokenCost;
+        uint billing = s.billing;
+        uint totalToPay;
+        uint totalCost;
+        uint[] memory ids = new uint[](ids.length);
+        uint[] memory amounts = new uint[](ids.length);
+        for (uint i = 0; i < ids.length; i++) {
+            require(ids[i] > billing, 'DeMineAgent: billing token');
+            uint amount = checkBalance(from, ids[i], maxAmounts[i]);
+            amount = checkAllowance(s.allowances[from], ids[i], amount);
+            amounts[i] = amount;
+            s.locked[cycle][pool] -= amount;
+            totalCost += tokenCost * amount;
+        }
+        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalCost);
+        IERC20(s.cost).safeTransferFrom(msg.sender, from, totalToPay - totalCost);
+        s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
+        emit Claim(msg.sender, from, ids, amounts);
+    }
+
+    function checkBalance(address from, uint id, uint amount) private returns(uint) {
+        uint balance = s.balances[id][from];
+        uint amount = Util.min2(balance, amount);
+        s.balances[id][from] = balance - amount;
+        return amount;
+    }
+
+    function checkAllowance(
+        mapping(address => mapping(uint => uint)) storage allowances,
+        uint id,
+        uint amount
+    ) private returns(uint) {
+        uint allowance1 = allowances[msg.sender][id];
+        uint allowance2 = allowances[address(0)][id];
+        uint maxAllowed = allowance1 + allowance2;
+        require(maxAllowed >= amount, 'DeMineAgent: insufficient allowance');
+        if (amount <= allowance1) {
+            s.allowances[mortgager][msg.sender][id] -= amount;
+            return amount;
+        } else if (amount <= maxAllowed) {
+            s.allowances[mortgager][msg.sender][id] = 0;
+            s.allowances[mortgager][address(0)][id] = amount - allowance1;
+            return amount;
+        } else if (amount > maxAllowed) {
+            s.allowances[mortgager][msg.sender][id] = 0;
+            s.allowances[mortgager][address(0)][id] = 0;
+            return maxAllowed;
+        }
+    }
+
+    /**
+     * @notice get listed prices of demine nft
+     * @params address of demine nft issuer
+     * @params demine nft token ids to check
+     */
+    function getListedPrices(
+        address from,
+        uint[] calldata ids
+    ) external view override returns(uint[] memory) {
+        PricingStorage.Layout storage l = PricingStorage.layout();
+        function(
+            PricingStorage.Layout storage,
+            address,
+            uint
+        ) internal view returns(uint) priceF = LibPricing.priceOfFunc(l);
+        uint[] memory prices = new uint[](ids.length);
+        for (uint i = 0; i < ids.length; i++) {
+            prices[i] = priceF(l, from, ids[i]);
         }
         return prices;
     }
 
+    /**
+     * @notice get allowance information
+     * @params address of demine nft issuer
+     * @params address of target address
+     * @params demine nft token ids to check
+     */
     function getAllowances(
-        address mortgager,
+        address from,
         address buyer,
-        uint256[] calldata ids
-    ) external view returns(uint256[] memory) {
-        uint256[] memory result = new uint256[](ids.length);
-        for (uint256 i = 0; i < ids.length; i++) {
-            result[i] = s.allowances[mortgager][buyer][ids[i]];
+        uint[] calldata ids
+    ) external view returns(uint[] memory) {
+        uint[] memory result = new uint[](ids.length);
+        for (uint i = 0; i < ids.length; i++) {
+            result[i] = s.allowances[from][buyer][ids[i]];
         }
         return result;
     }

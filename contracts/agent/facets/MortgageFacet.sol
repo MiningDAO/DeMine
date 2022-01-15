@@ -10,14 +10,20 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../lib/LibAppStorage.sol';
 
-contract MortgageFacet is PausableModifier, OwnableInternal {
+/**
+ * @title: MortgageFacet
+ * @author: Shu Dong
+ * @notice: Facet contract holding functions for miners to manage mortgage.
+ * @dev the contract also implements IERC1155Receiver to receive and lock demine nft
+ */
+contract MortgageFacet is PausableModifier, OwnableInternal, IERC1155Receiver {
     AppStorage internal s;
 
     using LibAppStorage for AppStorage;
     using SafeERC20 for IERC20;
 
     event Mortgage(address indexed, uint256 indexed);
-    event Redeem(address indexed, address indexed, uint256[], uint256[]);
+    event Redeem(address indexed, uint256[], uint256[]);
 
     modifier onlyMinted(address from) {
         require(
@@ -27,14 +33,23 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
         _;
     }
 
+    /**
+     * @notice Mortgage your computation power(offline) and mint demine nft.
+     *         Minted tokens are locked at DeMineAgent contract.
+     * @params address of miner to start the mortgage
+     * @params start demine nft id to mint
+     * @params end demine nft id to mint
+     * @params amount for each token to mint. This also decide amount
+     *         of deposit mortgager has to pay
+     */
     function mortgage(
         address mortgager,
         uint256 start,
         uint256 end,
-        uint256 supplies
+        uint256 supply
     ) external onlyOwner {
         require(
-            start > s.rewardingCycle,
+            start > s.rewarding,
             "DeMine: started from rewarded cycle"
         );
         uint256 numCycles = end - start + 1;
@@ -54,22 +69,15 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
             msg.sender, start, start + end, supply, deposit
         );
         s.nextMortgage = mortgageId + 1;
-        ERC1155WithAgentFacet(s.nft).mintBatch(address(this), ids, supplies);
+        s.nft.mintBatch(address(this), ids, supplies);
         emit Mortgage(msg.sender, mortgageId);
     }
 
-    function transferMortgage(
-        uint256[] calldata ids,
-        uint256[] calldata amounts;
-        address newMortgager
-    ) external whenNotPaused {
-        for (uint256 i = 0; i < ids.length; i++) {
-            s.decreaseBalance(msg.sender, ids[i], amounts[i]);
-            s.accounts[ids[i]][newMortgager] += amounts[i];
-        }
-        emit TransferMortgage(msg.sender, newMortgager, ids, amounts);
-    }
-
+    /**
+     * @notice Pay token cost and liquidize tokens
+     * @params ids of demine nft token to redeem
+     * @params amount of each demine nft token
+     */
     function redeem(
         uint256[] calldata ids,
         uint256[] calldata amounts
@@ -79,41 +87,26 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
             "PoolOwnerFacet: array length mismatch"
         );
         uint256 tokenCost = s.tokenCost;
-        uint256 lastUnbillingCycle = s.lastUnbillingCycle;
+        uint256 billing = s.billing;
         uint256 totalCost;
         for (uint256 i = 0; i < ids.length; i++) {
-            require(
-                ids[i] >= lastUnbillingCycle,
-                'DeMineAgent: token not redeemable'
-            );
+            require(ids[i] >= billing, 'DeMineAgent: token not redeemable');
             totalCost += tokenCost * amounts[i];
-            s.decreaseBalance(msg.sender, ids[i], amounts[i]);
+            uint256 balance = s.accounts[ids[i]][msg.sender];
+            require(balance > amounts[i], 'DeMineAgent: no sufficient balance');
+            s.balances[ids[i]][msg.sender] = balance - amounts[i];
         }
         IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalCost);
-        emit Redeem(msg.sender, , ids, amounts);
-        ERC1155WithAgentFacet(s.nft).safeBatchTransferFrom(
-            address(this),
-            msg.sender,
-            ids,
-            amounts,
-            ""
-        );
+        emit Redeem(msg.sender, ids, amounts);
+        s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
     }
 
-    function withdraw(uint256[] calldata ids) external whenNotPaused {
-        uint256 totalReward;
-        uint256 totalDebt;
-        for (uint i = 0; i < ids.length; i++) {
-            uint256 balance = s.balances[ids[i]][msg.sender];
-            totalReward += s.info[ids[i]].adjustedReward * balance;
-            totalDebt += s.info[ids[i]].debt * balance;
-            s.balances[ids[i]][msg.sender] = 0;
-        }
-        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalDebt);
-        IERC20(s.reward).safeTransfer(msg.sender, totalReward);
-    }
-
-    function clearMortgage(uint256 mortgage) external whenNotPaused {
+    /**
+     * @notice close finished mortgage, a mortgage can be closed if
+     *         the end token has been billed
+     * @params mortgage id to close
+     */
+    function close(uint256 mortgage) external whenNotPaused {
         BillingStorage.Layout storage l = BillingStorage.layout();
         Mortgage memory m = s.mortgages[mortgage];
         require(
@@ -137,10 +130,10 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
         s.mortgages[mortgage].deposit = 0;
     }
 
-    function min2(uint256 a, uint256 b) private pure {
-        return a < b ? a : b;
-    }
-
+    /**
+     * @notice get mortgage info
+     * @params mortgage id to check
+     */
     function getMortgage(uint256 mortgage)
         external
         view
@@ -167,5 +160,9 @@ contract MortgageFacet is PausableModifier, OwnableInternal {
         bytes memory data
     ) external onlyMinted(from) override returns (bytes4) {
         return IERC1155Receiver.onERC1155BatchReceived.selector;
+    }
+
+    function min2(uint256 a, uint256 b) private pure {
+        return a < b ? a : b;
     }
 }

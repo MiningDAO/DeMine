@@ -10,6 +10,7 @@ import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 import '../../shared/lib/LibPausable.sol';
+import '../../shared/lib/Util.sol';
 import '../lib/LibERC20Payable.sol';
 import '../lib/AppStorage.sol';
 
@@ -40,7 +41,7 @@ contract BillingRewardableFacet is PausableModifier {
             uint debt = tokenCost * balance;
             (bool success, uint sold) = trySwap(l.swapRouter, reward, debt);
             if (success) {
-                s.info[rewarding].adjust = ceil(sold, balance);
+                s.info[rewarding].adjust = Util.ceil(sold, balance);
                 emit CloseBilling(rewarding);
             else {
                 l.balance = balance;
@@ -79,15 +80,15 @@ contract BillingRewardableFacet is PausableModifier {
         );
         uint debt = s.debt;
         uint reward = s.reward;
-        uint unitToBuy = min3(
+        uint unitToBuy = Util.min3(
             totalToPay / p.unitPrice,
-            ceil(debt, p.unitPrice),
+            Util.ceil(debt, p.unitPrice),
             reward / p.unitSize
         );
         uint subtotal = unitToBuy * p.unitPrice;
         uint rewardTokenSold = unitToBuy * p.unitSize;
         uint billing = l.billing;
-        s.info[billing].adjust += ceil(rewardTokenSold, l.balance);
+        s.info[billing].adjust += Util.ceil(rewardTokenSold, l.balance);
         if (subtotal < debt) {
             l.debt = debt - subtotal;
             l.reward = reward - rewardTokenSold;
@@ -105,7 +106,7 @@ contract BillingRewardableFacet is PausableModifier {
         require(stage(l) == Stage.SALE_EXPIRED, 'DeMineAgent: invalid stage');
         s.deposit -= l.debt;
         uint billing = l.billing;
-        s.info[s.billing].debt = ceil(l.debt, l.balance);
+        s.info[s.billing].debt = Util.ceil(l.debt, l.balance);
         l.shrinked = max2(s.rewarding, l.shrinked);
         l.debt = 0;
         emit CloseBilling(billing);
@@ -114,6 +115,21 @@ contract BillingRewardableFacet is PausableModifier {
     function resetShrink() external onlyOwner {
         emit ResetShrink(l.shrinked);
         l.shrinked = 0;
+    }
+
+    function withdrawAfterBilling(uint256[] calldata ids) external whenNotPaused {
+        BillingStorage.Layout storage l = BillingStorage.layout();
+        uint256 totalReward;
+        uint256 totalDebt;
+        for (uint i = 0; i < ids.length; i++) {
+            require(ids[i] <= l.billing, 'DeMineAgent: not billed yet');
+            uint256 balance = s.balances[ids[i]][msg.sender];
+            totalReward += s.info[ids[i]].adjustedReward * balance;
+            totalDebt += s.info[ids[i]].debt * balance;
+            s.balances[ids[i]][msg.sender] = 0;
+        }
+        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalDebt);
+        IERC20(s.reward).safeTransfer(msg.sender, totalReward);
     }
 
     function stage(BillingStorage.Layout storage l) private view {
@@ -135,7 +151,7 @@ contract BillingRewardableFacet is PausableModifier {
                     s.info[tokenId].supply -= balance;
                     s.info[tokenId].adjust = 0;
                 }
-                l.shrinked = billing + shrinkDuration;
+                l.shrinked = shrinkTo;
             }
         }
     }
@@ -211,30 +227,10 @@ contract BillingRewardableFacet is PausableModifier {
           uint reward
     ) private pure returns(uint, uint) {
         if (cost > reward) {
-            return (1, ceil(cost, reward));
+            return (1, Util.ceil(cost, reward));
         } else {
-            uint uintSize = ceil(reward, cost);
-            return (uintSize, ceil(cost, reward / uintSize));
+            uint uintSize = Util.ceil(reward, cost);
+            return (uintSize, Util.ceil(cost, reward / uintSize));
         }
-    }
-
-    function ceil(uint a, uint m) private pure returns(uint) {
-        returns ((a + m - 1) / m) * m;
-    }
-
-    function base(uint x, uint8 decimal) private pure returns(uint) {
-        return x * (10 ** decimal);
-    }
-
-    function max2(uint a, uint b) private pure {
-        return a > b ? a : b;
-    }
-
-    function min2(uint a, uint b) private pure {
-        return a < b ? a : b;
-    }
-
-    function min3(uint a, uint b, uint c) private pure {
-        return a < b ? min2(a, c) : min2(b, c);
     }
 }
