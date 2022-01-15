@@ -47,30 +47,31 @@ contract MortgageFacet is PausableModifier, OwnableInternal, IERC1155Receiver {
         uint256 start,
         uint256 end,
         uint256 supply
-    ) external onlyOwner {
+    ) external onlyOwner returns(mortgage) {
         require(
-            start > s.rewarding,
-            "DeMine: started from rewarded cycle"
+            start > s.mining && start > s.shrinking,
+            'DeMine: token mined already or shrinked'
         );
         uint256 numCycles = end - start + 1;
         uint256[] memory ids = new uint256[](numCycles);
         uint256[] memory supplies = new uint256[](numCycles);
         for (uint256 i = 0; i < numCycles; i++) {
-            uint256 cycle = start + i;
-            s.cycles[cycle].supply += supplies[i];
-            s.accounts[cycle][mortgager].balance += supplies[i];
-            ids[i] = cycle;
+            uint256 id = start + i;
+            s.info[id].supply += supplies[i];
+            s.balances[id][mortgager] += supplies[i];
+            ids[i] = id;
             supplies[i] = supplies;
         }
-        uint256 mortgageId = s.nextMortgage;
+        uint256 mortgage = s.mortgage;
         uint256 deposit = supply * s.tokenCost * s.minDepositDaysRequired;
-        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), deposit);
-        s.mortgages[mortgageId] = Mortgage(
+        s.cost.safeTransferFrom(msg.sender, address(this), deposit);
+        s.mortgages[mortgage] = Mortgage(
             msg.sender, start, start + end, supply, deposit
         );
-        s.nextMortgage = mortgageId + 1;
+        s.mortgage = mortgage + 1;
         s.nft.mintBatch(address(this), ids, supplies);
-        emit Mortgage(msg.sender, mortgageId);
+        emit Mortgage(msg.sender, mortgage);
+        return mortgage;
     }
 
     /**
@@ -96,36 +97,34 @@ contract MortgageFacet is PausableModifier, OwnableInternal, IERC1155Receiver {
             require(balance > amounts[i], 'DeMineAgent: no sufficient balance');
             s.balances[ids[i]][msg.sender] = balance - amounts[i];
         }
-        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalCost);
+        s.cost.safeTransferFrom(msg.sender, address(this), totalCost);
         emit Redeem(msg.sender, ids, amounts);
         s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
     }
 
     /**
      * @notice close finished mortgage, a mortgage can be closed if
-     *         the end token has been billed
+     *         the all tokens are billed or liquidized
      * @params mortgage id to close
      */
     function close(uint256 mortgage) external whenNotPaused {
         BillingStorage.Layout storage l = BillingStorage.layout();
         Mortgage memory m = s.mortgages[mortgage];
-        require(
-            m.end < l.billingCycle,
-            'DeMineAgent: mortgage not finished yet'
-        );
         uint256 totalReward;
         uint256 totalDebt;
         for (uint i = 0; i < m.end - m.start + 1; i ++) {
             uint256 id = i + m.start;
-            uint256 total = s.balances[id][msg.sender];
-            uint256 balance = min2(total, m.supply);
-            totalReward += s.info[id]].adjustedReward * balance;
-            totalDebt += s.info[id].debt * balance;
-            s.balances[id][msg.sender] = total - balance;
+            uint256 balance = s.balances[id][msg.sender];
+            if (balance > 0) {
+                require(id < s.billing, 'DeMineAgent: unliqudized token');
+                uint256 min = Util.min2(balance, m.supply);
+                totalReward += s.info[id]].adjustedReward * min;
+                totalDebt += s.info[id].debt * min;
+                s.balances[id][msg.sender] = balance - min;
+            }
         }
-        uint256 deposit = m.deposit - totalDebt;
-        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), m.deposit - totalDebt);
-        IERC20(s.reward).safeTransfer(msg.sender, totalReward);
+        s.cost.safeTransferFrom(msg.sender, address(this), m.deposit - totalDebt);
+        s.income.safeTransfer(msg.sender, totalReward);
         s.mortgages[mortgage].supply = 0;
         s.mortgages[mortgage].deposit = 0;
     }

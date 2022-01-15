@@ -20,7 +20,6 @@ import '../lib/PricingLinearDecay.sol';
 contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDecay {
     AppStorage internal s;
 
-    using LibAppStorage for AppStorage;
     using SafeERC20 for IERC20;
 
     event Claim(address indexed, address indexed, uint[], uint[]);
@@ -134,8 +133,8 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             s.locked[cycle][pool] -= amount;
             totalCost += tokenCost * amount;
         }
-        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalCost);
-        IERC20(s.cost).safeTransferFrom(msg.sender, from, totalToPay - totalCost);
+        s.cost.safeTransferFrom(msg.sender, address(this), totalCost);
+        s.cost.safeTransferFrom(msg.sender, from, totalToPay - totalCost);
         s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
         emit Claim(msg.sender, from, ids, amounts);
     }

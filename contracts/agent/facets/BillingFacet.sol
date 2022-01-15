@@ -5,17 +5,17 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/Util.sol';
-import '../lib/LibERC20Payable.sol';
 import '../lib/AppStorage.sol';
 
-
-contract BillingRewardableFacet is PausableModifier {
+/**
+ * @title: BillingFacet
+ * @author: Shu Dong
+ * @notice: billing related functions
+ */
+contract BillingFacet is PausableModifier {
     AppStorage internal s;
 
     using SafeERC20 for IERC20;
@@ -28,28 +28,33 @@ contract BillingRewardableFacet is PausableModifier {
     event BillingSale(uint indexed, uint, uint);
     event ResetShrink(uint indexed);
 
+    /**
+     * @notice finalize the mining cycle and pay bill.
+     *         It will try to sell income token at Uniswap
+     *         and start an income token sale if it fails
+     */
     function finalize() external onlyOwner {
-        uint rewarding = s.rewardingCycle;
-        s.rewardingCycle = rewarding + 1;
+        uint mining = s.mining;
+        s.mining = mining + 1;
         BillingStorage.Layout storage l = BillingStorage.layout();
         require(stage(l) == Stage.NOT_BILLING, 'DeMineAgent: billing in progress');
         l.startAt = block.timestamp;
-        l.billing = rewarding;
-        uint balance = nft.burn(rewarding);
+        s.billing = mining;
+        uint balance = nft.burn(mining);
         if (balance > 0) {
-            uint reward = s.cycles[tokenId].reward * balance;
+            uint income = s.cycles[tokenId].income * balance;
             uint debt = tokenCost * balance;
-            (bool success, uint sold) = trySwap(l.swapRouter, reward, debt);
+            (bool success, uint sold) = trySwap(l.swapRouter, income, debt);
             if (success) {
-                s.info[rewarding].adjust = Util.ceil(sold, balance);
-                emit CloseBilling(rewarding);
+                s.info[mining].adjust = Util.ceil(sold, balance);
+                emit CloseBilling(mining);
             else {
                 l.balance = balance;
-                l.reward = l.reward;
+                l.income = l.income;
                 l.debt = debt;
                 uint saleExpireAt = block.timestamp + l.saleDuration;
                 l.saleExpireAt = saleExpireAt;
-                emit BillingSale(rewarding, block.timestamp, saleExpireAt);
+                emit BillingSale(mining, block.timestamp, saleExpireAt);
             }
         } else {
             emit CloseBilling(billing);
@@ -57,6 +62,9 @@ contract BillingRewardableFacet is PausableModifier {
         shrink();
     }
 
+    /**
+     * @notice lock price to buy income token in income token sale
+     */
     function lockPrice() external returns(uint, uint) {
         BillingStorage.Layout storage l = BillingStorage.layout();
         require(stage(l) == Stage.SALE_ONGOING, 'DeMineAgent: invalid stage');
@@ -64,72 +72,90 @@ contract BillingRewardableFacet is PausableModifier {
             uint unitSize,
             uint unitPrice
         ) = getRealtimeRewardTokenPrice(l);
-        l.rewardPrices[msg.sender] = BillingStorage.RewardTokenLockedPrice(
+        l.incomePrices[msg.sender] = BillingStorage.RewardTokenLockedPrice(
             unitSize, unitPrice, block.timestamp + priceLockDuration
         );
         returns (unitSize, unitPrice);
     }
 
-    function buyWithLockedPrice(uint totalToPay) external {
+    /**
+     * @notice buy income token with locked price
+     * @params max amount of cost to pay
+     */
+    function buyWithLockedPrice(uint maxToPay) external {
         BillingStorage.Layout storage l = BillingStorage.layout();
         require(stage(l) == Stage.SALE_ONGOING, 'DeMineAgent: invalid stage');
-        BillingStorage.RewardTokenLockedPrice memory p = l.rewardPrices[msg.sender];
+        BillingStorage.RewardTokenLockedPrice memory p = l.incomePrices[msg.sender];
         require(
             block.timestamp < p.expireAt,
             'DeMineAgent: price expired'
         );
         uint debt = s.debt;
-        uint reward = s.reward;
+        uint income = s.income;
         uint unitToBuy = Util.min3(
-            totalToPay / p.unitPrice,
+            maxToPay / p.unitPrice,
             Util.ceil(debt, p.unitPrice),
-            reward / p.unitSize
+            income / p.unitSize
         );
         uint subtotal = unitToBuy * p.unitPrice;
-        uint rewardTokenSold = unitToBuy * p.unitSize;
-        uint billing = l.billing;
-        s.info[billing].adjust += Util.ceil(rewardTokenSold, l.balance);
+        uint incomeTokenSold = unitToBuy * p.unitSize;
+        uint billing = s.billing;
+        s.info[billing].adjust += Util.ceil(incomeTokenSold, l.balance);
         if (subtotal < debt) {
             l.debt = debt - subtotal;
-            l.reward = reward - rewardTokenSold;
+            l.income = income - incomeTokenSold;
         } else {
             l.debt = 0;
             emit CloseBilling(billing);
         }
-        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), subtotal);
-        IERC20(s.reward).safeTransfer(msg.sender, rewardTokenSold);
-        emit RewardTokenSold(msg.sender, rewardTokenSold, subtotal);
+        s.cost.safeTransferFrom(msg.sender, address(this), subtotal);
+        s.income.safeTransfer(msg.sender, incomeTokenSold);
+        emit RewardTokenSold(msg.sender, incomeTokenSold, subtotal);
     }
 
+    /**
+     * @notice manually close the billing by paying cost with user deposit.
+     *         In this case, the pool will be shrinked since current mining
+     *         token.
+     */
     function manualCloseBilling() external onlyOwner {
         BillingStorage.Layout storage l = BillingStorage.layout();
         require(stage(l) == Stage.SALE_EXPIRED, 'DeMineAgent: invalid stage');
         s.deposit -= l.debt;
-        uint billing = l.billing;
+        uint billing = s.billing;
         s.info[s.billing].debt = Util.ceil(l.debt, l.balance);
-        l.shrinked = max2(s.rewarding, l.shrinked);
         l.debt = 0;
+        if (s.shrinked == 0) {
+            s.shrinked = s.mining;
+            shrink();
+        }
         emit CloseBilling(billing);
     }
 
+    /**
+     * @notice disable shrink. Token already shrinked will not be affected
+     */
     function resetShrink() external onlyOwner {
-        emit ResetShrink(l.shrinked);
-        l.shrinked = 0;
+        emit ResetShrink(s.shrinked);
+        s.shrinked = 0;
     }
 
+    /**
+     * @notice withdraw income and pay debt for tokens already billed
+     */
     function withdrawAfterBilling(uint256[] calldata ids) external whenNotPaused {
         BillingStorage.Layout storage l = BillingStorage.layout();
         uint256 totalReward;
         uint256 totalDebt;
         for (uint i = 0; i < ids.length; i++) {
-            require(ids[i] <= l.billing, 'DeMineAgent: not billed yet');
+            require(ids[i] <= s.billing, 'DeMineAgent: not billed yet');
             uint256 balance = s.balances[ids[i]][msg.sender];
             totalReward += s.info[ids[i]].adjustedReward * balance;
             totalDebt += s.info[ids[i]].debt * balance;
             s.balances[ids[i]][msg.sender] = 0;
         }
-        IERC20(s.cost).safeTransferFrom(msg.sender, address(this), totalDebt);
-        IERC20(s.reward).safeTransfer(msg.sender, totalReward);
+        s.cost.safeTransferFrom(msg.sender, address(this), totalDebt);
+        s.income.safeTransfer(msg.sender, totalReward);
     }
 
     function stage(BillingStorage.Layout storage l) private view {
@@ -143,15 +169,16 @@ contract BillingRewardableFacet is PausableModifier {
     }
 
     function shrink() private {
-        if (l.shrinked > 0) {
-            uint shrinkTo = s.rewarding + l.shrinkSize;
+        uint shrinked = s.shrinked;
+        if (shrinked > 0) {
+            uint shrinkTo = s.mining + s.shrinkSize;
             if (shrinked < shrinkTo) {
-                for (uint256 tokenId = l.shrinked + 1, tokenId <= shrinkTo, tokenId++) {
+                for (uint256 tokenId = s.shrinked + 1, tokenId <= shrinkTo, tokenId++) {
                     uint balance = nft.burn(tokenId)
                     s.info[tokenId].supply -= balance;
                     s.info[tokenId].adjust = 0;
                 }
-                l.shrinked = shrinkTo;
+                s.shrinked = shrinkTo;
             }
         }
     }
@@ -161,10 +188,10 @@ contract BillingRewardableFacet is PausableModifier {
         uint amountInMaximum,
         uint amountOut
     ) internal view returns(bool, uint) {
-        TransferHelper.safeApprove(s.reward, swapRouter, amountInMaximum);
+        TransferHelper.safeApprove(s.income, swapRouter, amountInMaximum);
         ISwapRouter.ExactOutputSingleParams memory params =
             ISwapRouter.ExactOutputSingleParams({
-                tokenIn: s.reward,
+                tokenIn: s.income,
                 tokenOut: s.defaultCostToken,
                 fee: 3000, // 0.3%
                 recipient: address(this),
@@ -179,21 +206,21 @@ contract BillingRewardableFacet is PausableModifier {
                 params
             )
         );
-        TransferHelper.safeApprove(s.reward, swapRouter, 0);
+        TransferHelper.safeApprove(s.income, swapRouter, 0);
         return success ? abi.decode(encoded) : 0;
     }
 
     function getRealtimeRewardTokenPrice(BillingStorage.Layout storage l) private view {
         uint debt = l.debt;
-        uint totalReward = l.reward;
+        uint totalReward = l.income;
         uint price = getNormalizedChainlinkPriceWithDiscount(l);
-        uint rewardBase = base(s.rewardTokenDecimals);
-        uint maxCostTokenTraded = price * totalReward / rewardBase;
+        uint incomeBase = base(s.income.decimals());
+        uint maxCostTokenTraded = price * totalReward / incomeBase;
         (
             uint unitSize,
             uint unitPrice
         ) = maxCostTokenTraded > debt
-            ? calcUnitPrice(price, rewardBase)
+            ? calcUnitPrice(price, incomeBase)
             : calcUnitPrice(debt, totalReward);
         return (unitSize, unitPrice);
     }
@@ -205,32 +232,31 @@ contract BillingRewardableFacet is PausableModifier {
             uint80, int price, uint timestamp, uint, uint80
         ) = AggregatorV3Interface(l.chainlink).latestRoundData();
         if (price <= 0) { returns 0; }
-        // normalize
         uint normalized = uint(price) * base(
-            l.costTokenDecimals
-        ) / base(l.chainlinkDecimals);
+            s.cost.decimals()
+        ) / base(l.chainklink.decimals());
         return normalized * l.discount / 10000;
     }
 
-    /** @notice: this function returns the min unit size of reward
+    /** @notice: this function returns the min unit size of income
      token sale and price for each unit. Considering the following
      case:
-        1. cost = 100, reward = 1000, then unit = 10, price = 1,
-           which means you have to buy at least 10 reward tokens
+        1. cost = 100, income = 1000, then unit = 10, price = 1,
+           which means you have to buy at least 10 income tokens
            each time and each unit cost 1 cost token
-        2. cost = 1000, reward = 100, then unit = 1, price = 10,
-           which means you can buy at least 1 reward token each
-           time and each reward token cost 10 cost token
+        2. cost = 1000, income = 100, then unit = 1, price = 10,
+           which means you can buy at least 1 income token each
+           time and each income token cost 10 cost token
      **/
     function calcUnitPrice(
           uint cost,
-          uint reward
+          uint income
     ) private pure returns(uint, uint) {
-        if (cost > reward) {
-            return (1, Util.ceil(cost, reward));
+        if (cost > income) {
+            return (1, Util.ceil(cost, income));
         } else {
-            uint uintSize = Util.ceil(reward, cost);
-            return (uintSize, Util.ceil(cost, reward / uintSize));
+            uint uintSize = Util.ceil(income, cost);
+            return (uintSize, Util.ceil(cost, income / uintSize));
         }
     }
 }
