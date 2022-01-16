@@ -40,9 +40,8 @@ contract ERC1155WithAgentFacet is
     function burn(
         uint256 tokenId
     ) external onlyAgent returns(uint256 balance) {
-        uint256 balance = _balanceOf(msg.sender, tokenId);
+        balance = _balanceOf(msg.sender, tokenId);
         _burn(msg.sender, tokenId, balance);
-        return balance;
     }
 
     function alchemize(

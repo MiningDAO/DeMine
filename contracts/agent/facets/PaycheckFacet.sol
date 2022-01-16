@@ -73,6 +73,25 @@ contract PaycheckFacet is PausableModifier, OwnableInternal {
     }
 
     /**
+     * @notice withdraw income and pay debt for tokens already billed
+     * @param ids DeMine NFT ids to withdraw
+     */
+    function withdraw(uint256[] calldata ids) external whenNotPaused {
+        uint256 totalReward;
+        uint256 totalDebt;
+        for (uint i = 0; i < ids.length; i++) {
+            require(ids[i] <= s.billing, 'DeMineAgent: not billed yet');
+            uint256 balance = s.balances[ids[i]][msg.sender];
+            TokenInfo memory info = s.info[ids[i]];
+            totalReward += (info.income - info.adjust) * balance;
+            totalDebt += info.debt * balance;
+            s.balances[ids[i]][msg.sender] = 0;
+        }
+        s.cost.safeTransferFrom(msg.sender, address(this), totalDebt);
+        s.income.safeTransfer(msg.sender, totalReward);
+    }
+
+    /**
      * @notice get demine nft stats given list of nft ids
      * @param ids DeMineNFT id list
      * @return list of TokenInfo struct

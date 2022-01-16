@@ -53,7 +53,7 @@ contract MortgageFacet is
         uint start,
         uint end,
         uint supply
-    ) external onlyOwner returns(uint) {
+    ) external onlyOwner returns(uint mortgageId) {
         require(
             start > s.mining && start > s.shrinked,
             'DeMine: token mined already or shrinked'
@@ -68,17 +68,16 @@ contract MortgageFacet is
             ids[i] = id;
             supplies[i] = supply;
         }
-        uint mortgage = s.mortgage;
+        mortgageId = s.mortgage;
         uint deposit = supply * s.tokenCost * s.minDepositDaysRequired;
         s.cost.safeTransferFrom(msg.sender, address(this), deposit);
-        s.mortgages[mortgage] = Mortgage(
+        s.mortgages[mortgageId] = Mortgage(
             msg.sender, start, start + end, supply, deposit
         );
         s.deposit += deposit;
-        s.mortgage = mortgage + 1;
+        s.mortgage = mortgageId + 1;
         s.nft.mintBatch(address(this), ids, supplies);
-        emit NewMortgage(msg.sender, mortgage);
-        return mortgage;
+        emit NewMortgage(msg.sender, mortgageId);
     }
 
     /**
@@ -112,10 +111,10 @@ contract MortgageFacet is
     /**
      * @notice close finished mortgage, a mortgage can be closed if
      *         the all tokens are billed or liquidized
-     * @param mortgage The mortgage id returned by mortgage function
+     * @param mortgageId The mortgage id returned by mortgage function
      */
-    function close(uint mortgage) external whenNotPaused {
-        Mortgage memory m = s.mortgages[mortgage];
+    function close(uint mortgageId) external whenNotPaused {
+        Mortgage memory m = s.mortgages[mortgageId];
         uint totalReward;
         uint totalDebt;
         for (uint i = 0; i < m.end - m.start + 1; i ++) {
@@ -132,20 +131,20 @@ contract MortgageFacet is
         }
         s.cost.safeTransferFrom(msg.sender, address(this), m.deposit - totalDebt);
         s.income.safeTransfer(msg.sender, totalReward);
-        s.mortgages[mortgage].supply = 0;
-        s.mortgages[mortgage].deposit = 0;
+        s.mortgages[mortgageId].supply = 0;
+        s.mortgages[mortgageId].deposit = 0;
     }
 
     /**
      * @notice get mortgage info
-     * @param mortgage The mortgage id returned by mortgage function
+     * @param mortgageId The mortgage id returned by mortgage function
      */
-    function getMortgage(uint mortgage)
+    function getMortgage(uint mortgageId)
         external
         view
         returns(Mortgage memory)
     {
-        return s.mortgages[mortgage];
+        return s.mortgages[mortgageId];
     }
 
     function onERC1155Received(
@@ -153,8 +152,8 @@ contract MortgageFacet is
         address from,
         uint,
         uint,
-        bytes memory data
-    ) external onlyMinted(from) override returns (bytes4) {
+        bytes memory
+    ) external view onlyMinted(from) override returns (bytes4) {
         return IERC1155Receiver.onERC1155Received.selector;
     }
 
@@ -163,8 +162,8 @@ contract MortgageFacet is
         address from,
         uint[] calldata,
         uint[] calldata,
-        bytes memory data
-    ) external onlyMinted(from) override returns (bytes4) {
+        bytes memory
+    ) external view onlyMinted(from) override returns (bytes4) {
         return IERC1155Receiver.onERC1155BatchReceived.selector;
     }
 }

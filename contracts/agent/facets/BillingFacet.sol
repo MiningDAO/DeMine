@@ -143,26 +143,6 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         s.shrinked = 0;
     }
 
-    /**
-     * @notice withdraw income and pay debt for tokens already billed
-     * @param ids DeMine NFT ids to withdraw
-     */
-    function withdrawAfterBilling(uint256[] calldata ids) external whenNotPaused {
-        BillingStorage.Layout storage l = BillingStorage.layout();
-        uint256 totalReward;
-        uint256 totalDebt;
-        for (uint i = 0; i < ids.length; i++) {
-            require(ids[i] <= s.billing, 'DeMineAgent: not billed yet');
-            uint256 balance = s.balances[ids[i]][msg.sender];
-            TokenInfo memory info = s.info[ids[i]];
-            totalReward += (info.income - info.adjust) * balance;
-            totalDebt += info.debt * balance;
-            s.balances[ids[i]][msg.sender] = 0;
-        }
-        s.cost.safeTransferFrom(msg.sender, address(this), totalDebt);
-        s.income.safeTransfer(msg.sender, totalReward);
-    }
-
     function stage(BillingStorage.Layout storage l) private view returns(Stage) {
         if (l.debt == 0) {
             return Stage.NO_BILLING;
@@ -222,7 +202,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
 
     function getRealtimeRewardTokenPrice(
         BillingStorage.Layout storage l
-    ) private returns(uint, uint) {
+    ) private view returns(uint, uint) {
         uint debt = l.debt;
         uint totalReward = l.income;
         uint price = getNormalizedChainlinkPriceWithDiscount(l);
@@ -239,7 +219,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
 
     function getNormalizedChainlinkPriceWithDiscount(
         BillingStorage.Layout storage l
-    ) private returns(uint) {
+    ) private view returns(uint) {
         (,int price, , ,) = l.chainlink.latestRoundData();
         if (price <= 0) { return 0; }
         uint chainlinkBase = 10 ** (l.chainlink.decimals());
@@ -247,7 +227,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         return normalized * l.discount / 10000;
     }
 
-    function base(IERC20 token) private returns(uint) {
+    function base(IERC20 token) private view returns(uint) {
         uint8 decimals = IERC20Metadata(address(token)).decimals();
         return 10 ** decimals;
     }

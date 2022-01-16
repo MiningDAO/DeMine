@@ -35,6 +35,13 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         uint[]
     );
 
+    struct ClaimMetadata {
+        uint billing;
+        uint tokenCost;
+        uint totalCost;
+        uint totalPay;
+    }
+
     /**
      * @notice set pricing strategy for msg.sender
      * @param strategy pricing strategy to set, currently STATIC and LINEAR_DECAY are supported
@@ -117,64 +124,51 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             ids.length == maxAmounts.length,
             "TokenLocker: array length mismatch"
         );
+        ClaimMetadata memory m = ClaimMetadata(s.billing, s.tokenCost, 0, 0);
         PricingStorage.Layout storage l = PricingStorage.layout();
         function(
             PricingStorage.Layout storage,
             address,
             uint
-        ) internal view returns(uint) priceF;
-        PricingStorage.PricingStrategy strategy = l.strategy[from];
-        if (strategy == PricingStorage.PricingStrategy.STATIC) {
-            priceF = LibPricingStatic.priceOf;
-        } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
-            priceF = LibPricingLinearDecay.priceOf;
-        }
-        uint tokenCost = s.tokenCost;
-        uint billing = s.billing;
-        uint totalToPay;
-        uint totalCost;
-        uint[] memory ids = new uint[](ids.length);
+        ) internal view returns(uint) f = priceF(l.strategy[from]);
         uint[] memory amounts = new uint[](ids.length);
         for (uint i = 0; i < ids.length; i++) {
-            require(ids[i] > billing, 'DeMineAgent: billing token');
-            uint amount = checkBalance(from, ids[i], maxAmounts[i]);
-            amount = checkAllowance(s.allowances[from], ids[i], amount);
+            require(ids[i] > m.billing, 'DeMineAgent: billing token');
+            uint amount = maxAllowed(from, ids[i], maxAmounts[i]);
             amounts[i] = amount;
-            totalCost += tokenCost * amount;
+            m.totalCost += m.tokenCost * amount;
+            m.totalPay += f(l, from, ids[i]) * amount;
         }
-        s.cost.safeTransferFrom(msg.sender, address(this), totalCost);
-        s.cost.safeTransferFrom(msg.sender, from, totalToPay - totalCost);
+        s.cost.safeTransferFrom(msg.sender, address(this), m.totalCost);
+        s.cost.safeTransferFrom(msg.sender, from, m.totalPay - m.totalCost);
         s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
         emit Claim(msg.sender, from, ids, amounts);
+        return amounts;
     }
 
-    function checkBalance(address from, uint id, uint amount) private returns(uint) {
+    function maxAllowed(address from, uint id, uint amount) private returns(uint) {
         uint balance = s.balances[id][from];
-        uint amount = Util.min2(balance, amount);
+        amount = Util.min2(balance, amount);
+        amount = checkAllowance(from, id, amount);
         s.balances[id][from] = balance - amount;
         return amount;
     }
 
-    function checkAllowance(
-        mapping(address => mapping(uint => uint)) storage allowances,
-        uint id,
-        uint amount
-    ) private returns(uint) {
-        uint allowance1 = allowances[msg.sender][id];
-        uint allowance2 = allowances[address(0)][id];
-        uint maxAllowed = allowance1 + allowance2;
-        require(maxAllowed >= amount, 'DeMineAgent: insufficient allowance');
+    function checkAllowance(address from, uint id, uint amount) private returns(uint) {
+        uint allowance1 = s.allowances[from][msg.sender][id];
+        uint allowance2 = s.allowances[from][address(0)][id];
+        uint allowed = allowance1 + allowance2;
         if (amount <= allowance1) {
-            allowances[msg.sender][id] -= amount;
+            s.allowances[from][msg.sender][id] -= amount;
             return amount;
-        } else if (amount <= maxAllowed) {
-            allowances[msg.sender][id] = 0;
-            allowances[address(0)][id] = amount - allowance1;
+        } else if (amount <= allowed) {
+            s.allowances[from][msg.sender][id] = 0;
+            s.allowances[from][address(0)][id] = amount - allowance1;
             return amount;
-        } else if (amount > maxAllowed) {
-            allowances[msg.sender][id] = 0;
-            allowances[address(0)][id] = 0;
-            return maxAllowed;
+        } else {
+            s.allowances[from][msg.sender][id] = 0;
+            s.allowances[from][address(0)][id] = 0;
+            return allowed;
         }
     }
 
@@ -193,18 +187,28 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             PricingStorage.Layout storage,
             address,
             uint
-        ) internal view returns(uint) priceF;
-        PricingStorage.PricingStrategy strategy = l.strategy[from];
-        if (strategy == PricingStorage.PricingStrategy.STATIC) {
-            priceF = LibPricingStatic.priceOf;
-        } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
-            priceF = LibPricingLinearDecay.priceOf;
-        }
+        ) internal view returns(uint) f = priceF(l.strategy[from]);
         uint[] memory prices = new uint[](ids.length);
         for (uint i = 0; i < ids.length; i++) {
-            prices[i] = priceF(l, from, ids[i]);
+            prices[i] = f(l, from, ids[i]);
         }
         return prices;
+    }
+
+    function priceF(
+        PricingStorage.PricingStrategy strategy
+    ) private pure returns(
+        function(
+            PricingStorage.Layout storage,
+            address,
+            uint
+        ) internal view returns(uint) f
+    ) {
+        if (strategy == PricingStorage.PricingStrategy.STATIC) {
+            f = LibPricingStatic.priceOf;
+        } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
+            f = LibPricingLinearDecay.priceOf;
+        }
     }
 
     /**
