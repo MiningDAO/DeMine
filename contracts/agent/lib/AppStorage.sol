@@ -4,7 +4,7 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import '../../nft/facets/ERC1155WithAgentFacet.sol';
+import '../../nft/interfaces/IDeMineNFT.sol';
 
 struct Mortgage {
     address owner;
@@ -23,7 +23,7 @@ struct TokenInfo {
 }
 
 struct AppStorage {
-    ERC1155WithAgentFacet nft;
+    IDeMineNFT nft;
 
     uint8 minDepositDaysRequired;
     IERC20 cost;

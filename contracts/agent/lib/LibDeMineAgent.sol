@@ -9,7 +9,7 @@ import '@solidstate/contracts/proxy/diamond/IDiamondLoupe.sol';
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import '../../shared/lib/LibDiamond.sol';
-import '../../nft/facets/ERC1155WithAgentFacet.sol';
+import '../../nft/interfaces/IDeMineNFT.sol';
 import '../facets/MortgageFacet.sol';
 import '../facets/PrimaryMarketFacet.sol';
 import '../facets/PaycheckFacet.sol';
@@ -100,7 +100,7 @@ library LibDeMineAgent {
 
         // init storage
         AppStorage storage s = LibAppStorage.layout();
-        s.nft = ERC1155WithAgentFacet(demineNFT);
+        s.nft = IDeMineNFT(demineNFT);
         s.tokenCost = tokenCost;
         s.income = IERC20(income);
         s.cost = IERC20(cost);

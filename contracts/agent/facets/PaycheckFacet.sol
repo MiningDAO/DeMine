@@ -16,7 +16,7 @@ import '../lib/AppStorage.sol';
  * @author Shu Dong
  * @notice deposit and cashout related functions
  */
-contract PaycheckFacet is PausableModifier, OwnableInternal {
+contract PaycheckFacet is IDeMineAgent, PausableModifier, OwnableInternal {
     AppStorage internal s;
 
     using SafeERC20 for IERC20;
@@ -62,7 +62,7 @@ contract PaycheckFacet is PausableModifier, OwnableInternal {
         address recipient,
         uint[] calldata ids,
         uint[] calldata amounts
-    ) external whenNotPaused onlyNFT {
+    ) external override whenNotPaused onlyNFT {
         uint total;
         for (uint i = 0; i < ids.length; i++) {
             require(ids[i] < s.mining, "DeMineNFT: token not mined yet");

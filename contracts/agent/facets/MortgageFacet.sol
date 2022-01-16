@@ -9,8 +9,9 @@ import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../../shared/lib/Util.sol';
+import '../../shared/lib/LibPausable.sol';
+import '../lib/AppStorage.sol';
 
 /**
  * @title MortgageFacet
@@ -76,7 +77,7 @@ contract MortgageFacet is
         );
         s.deposit += deposit;
         s.mortgage = mortgageId + 1;
-        s.nft.mintBatch(address(this), ids, supplies);
+        s.nft.mintBatch(ids, supplies);
         emit NewMortgage(msg.sender, mortgageId);
     }
 
