@@ -3,31 +3,37 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
+import '@solidstate/contracts/access/OwnableInternal.sol';
+import '@solidstate/contracts/introspection/ERC165.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
-import '../lib/LibAppStorage.sol';
+import '../../shared/lib/Util.sol';
 
 /**
- * @title: MortgageFacet
- * @author: Shu Dong
- * @notice: Facet contract holding functions for miners to manage mortgage.
+ * @title MortgageFacet
+ * @author Shu Dong
+ * @notice Facet contract holding functions for miners to manage mortgage.
  * @dev the contract also implements IERC1155Receiver to receive and lock demine nft
  */
-contract MortgageFacet is PausableModifier, OwnableInternal, IERC1155Receiver {
+contract MortgageFacet is
+    PausableModifier,
+    OwnableInternal,
+    IERC1155Receiver,
+    ERC165
+{
     AppStorage internal s;
 
-    using LibAppStorage for AppStorage;
     using SafeERC20 for IERC20;
 
-    event Mortgage(address indexed, uint256 indexed);
-    event Redeem(address indexed, uint256[], uint256[]);
+    event NewMortgage(address indexed, uint indexed);
+    event Redeem(address indexed, uint[], uint[]);
 
     modifier onlyMinted(address from) {
         require(
-            msg.sender == s.nft && from == address(0),
+            msg.sender == address(s.nft) && from == address(0),
             'DeMineAgent: only minted tokens from nft contract allowed'
         );
         _;
@@ -36,64 +42,65 @@ contract MortgageFacet is PausableModifier, OwnableInternal, IERC1155Receiver {
     /**
      * @notice Mortgage your computation power(offline) and mint demine nft.
      *         Minted tokens are locked at DeMineAgent contract.
-     * @params address of miner to start the mortgage
-     * @params start demine nft id to mint
-     * @params end demine nft id to mint
-     * @params amount for each token to mint. This also decide amount
-     *         of deposit mortgager has to pay
+     * @param mortgager Address of miner owning this mortgage
+     * @param start DeMine nft id to mint
+     * @param end DeMine nft id to mint
+     * @param supply Amount for each token to mint. This also decide
+     *        amount of deposit mortgager has to pay
      */
     function mortgage(
         address mortgager,
-        uint256 start,
-        uint256 end,
-        uint256 supply
-    ) external onlyOwner returns(mortgage) {
+        uint start,
+        uint end,
+        uint supply
+    ) external onlyOwner returns(uint) {
         require(
-            start > s.mining && start > s.shrinking,
+            start > s.mining && start > s.shrinked,
             'DeMine: token mined already or shrinked'
         );
-        uint256 numCycles = end - start + 1;
-        uint256[] memory ids = new uint256[](numCycles);
-        uint256[] memory supplies = new uint256[](numCycles);
-        for (uint256 i = 0; i < numCycles; i++) {
-            uint256 id = start + i;
+        uint numCycles = end - start + 1;
+        uint[] memory ids = new uint[](numCycles);
+        uint[] memory supplies = new uint[](numCycles);
+        for (uint i = 0; i < numCycles; i++) {
+            uint id = start + i;
             s.info[id].supply += supplies[i];
             s.balances[id][mortgager] += supplies[i];
             ids[i] = id;
-            supplies[i] = supplies;
+            supplies[i] = supply;
         }
-        uint256 mortgage = s.mortgage;
-        uint256 deposit = supply * s.tokenCost * s.minDepositDaysRequired;
+        uint mortgage = s.mortgage;
+        uint deposit = supply * s.tokenCost * s.minDepositDaysRequired;
         s.cost.safeTransferFrom(msg.sender, address(this), deposit);
         s.mortgages[mortgage] = Mortgage(
             msg.sender, start, start + end, supply, deposit
         );
+        s.deposit += deposit;
         s.mortgage = mortgage + 1;
         s.nft.mintBatch(address(this), ids, supplies);
-        emit Mortgage(msg.sender, mortgage);
+        emit NewMortgage(msg.sender, mortgage);
         return mortgage;
     }
 
     /**
      * @notice Pay token cost and liquidize tokens
-     * @params ids of demine nft token to redeem
-     * @params amount of each demine nft token
+     * @param ids DeMine nft token ids to redeem
+     * @param amounts Amount of each demine nft token
      */
     function redeem(
-        uint256[] calldata ids,
-        uint256[] calldata amounts
+        uint[] calldata ids,
+        uint[] calldata amounts
     ) external whenNotPaused {
         require(
             ids.length == amounts.length,
             "PoolOwnerFacet: array length mismatch"
         );
-        uint256 tokenCost = s.tokenCost;
-        uint256 billing = s.billing;
-        uint256 totalCost;
-        for (uint256 i = 0; i < ids.length; i++) {
+        uint tokenCost = s.tokenCost;
+        uint billing = s.billing;
+        uint totalCost;
+        for (uint i = 0; i < ids.length; i++) {
             require(ids[i] >= billing, 'DeMineAgent: token not redeemable');
             totalCost += tokenCost * amounts[i];
-            uint256 balance = s.accounts[ids[i]][msg.sender];
+            uint balance = s.balances[ids[i]][msg.sender];
             require(balance > amounts[i], 'DeMineAgent: no sufficient balance');
             s.balances[ids[i]][msg.sender] = balance - amounts[i];
         }
@@ -105,21 +112,21 @@ contract MortgageFacet is PausableModifier, OwnableInternal, IERC1155Receiver {
     /**
      * @notice close finished mortgage, a mortgage can be closed if
      *         the all tokens are billed or liquidized
-     * @params mortgage id to close
+     * @param mortgage The mortgage id returned by mortgage function
      */
-    function close(uint256 mortgage) external whenNotPaused {
-        BillingStorage.Layout storage l = BillingStorage.layout();
+    function close(uint mortgage) external whenNotPaused {
         Mortgage memory m = s.mortgages[mortgage];
-        uint256 totalReward;
-        uint256 totalDebt;
+        uint totalReward;
+        uint totalDebt;
         for (uint i = 0; i < m.end - m.start + 1; i ++) {
-            uint256 id = i + m.start;
-            uint256 balance = s.balances[id][msg.sender];
+            uint id = i + m.start;
+            uint balance = s.balances[id][msg.sender];
             if (balance > 0) {
                 require(id < s.billing, 'DeMineAgent: unliqudized token');
-                uint256 min = Util.min2(balance, m.supply);
-                totalReward += s.info[id]].adjustedReward * min;
-                totalDebt += s.info[id].debt * min;
+                TokenInfo memory info = s.info[id];
+                uint min = Util.min2(balance, m.supply);
+                totalReward += (info.income - info.adjust) * min;
+                totalDebt += info.debt * min;
                 s.balances[id][msg.sender] = balance - min;
             }
         }
@@ -131,9 +138,9 @@ contract MortgageFacet is PausableModifier, OwnableInternal, IERC1155Receiver {
 
     /**
      * @notice get mortgage info
-     * @params mortgage id to check
+     * @param mortgage The mortgage id returned by mortgage function
      */
-    function getMortgage(uint256 mortgage)
+    function getMortgage(uint mortgage)
         external
         view
         returns(Mortgage memory)
@@ -144,8 +151,8 @@ contract MortgageFacet is PausableModifier, OwnableInternal, IERC1155Receiver {
     function onERC1155Received(
         address,
         address from,
-        uint256,
-        uint256,
+        uint,
+        uint,
         bytes memory data
     ) external onlyMinted(from) override returns (bytes4) {
         return IERC1155Receiver.onERC1155Received.selector;
@@ -154,14 +161,10 @@ contract MortgageFacet is PausableModifier, OwnableInternal, IERC1155Receiver {
     function onERC1155BatchReceived(
         address,
         address from,
-        uint256[] calldata,
-        uint256[] calldata,
+        uint[] calldata,
+        uint[] calldata,
         bytes memory data
     ) external onlyMinted(from) override returns (bytes4) {
         return IERC1155Receiver.onERC1155BatchReceived.selector;
-    }
-
-    function min2(uint256 a, uint256 b) private pure {
-        return a < b ? a : b;
     }
 }

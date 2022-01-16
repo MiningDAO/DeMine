@@ -3,6 +3,7 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
+import '@solidstate/contracts/access/OwnableInternal.sol';
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -11,11 +12,11 @@ import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../lib/AppStorage.sol';
 
 /**
- * @title: RewardableFacet
- * @author: Shu Dong
- * @notice: deposit and extract income related functions
+ * @title RewardableFacet
+ * @author Shu Dong
+ * @notice deposit and cashout related functions
  */
-contract PaycheckFacet is PausableModifier {
+contract PaycheckFacet is PausableModifier, OwnableInternal {
     AppStorage internal s;
 
     using SafeERC20 for IERC20;
@@ -28,19 +29,19 @@ contract PaycheckFacet is PausableModifier {
         _;
     }
 
-    event Cashout(address indexed, uint256 income);
-    event Paycheck(uint256 indexed, address, uint256, uint256);
+    event Cashout(address indexed, uint income);
+    event Paycheck(uint indexed, address, uint, uint);
 
     /**
      * @notice deposit income to current mining token
-     * @params the address to deposit income
-     * @params amount of income token to deposit
+     * @param source The address to deposit income
+     * @param amount The amount of income token to deposit
      */
-    function paycheck(address source, uint256 amount) external onlyOwner {
-        uint256 mining = s.mining;
-        uint256 supply = s.info[mining].supply;
+    function paycheck(address source, uint amount) external onlyOwner {
+        uint mining = s.mining;
+        uint supply = s.info[mining].supply;
         if (supply > 0) {
-            uint256 incomePerToken = amount / supply;
+            uint incomePerToken = amount / supply;
             s.info[mining].income += incomePerToken;
             s.income.safeTransferFrom(
                 source,
@@ -53,31 +54,33 @@ contract PaycheckFacet is PausableModifier {
 
     /**
      * @notice burn DeMineNFT tokens to cashout income tokens
-     * @params demine nft ids
-     * @params amount per token to burn
+     * @param recipient Address to receive cashed out reward
+     * @param ids DeMineNFT id list
+     * @param amounts Amount per token to cashout
      */
-    function exchange(
-        uint256[] calldata ids,
-        uint256[] calldata amounts
+    function cashout(
+        address recipient,
+        uint[] calldata ids,
+        uint[] calldata amounts
     ) external whenNotPaused onlyNFT {
-        uint256 total;
-        for (uint256 i = 0; i < ids.length; i++) {
-            require(ids[i] < s.mining, "DeMineNFT: unincomeed token");
+        uint total;
+        for (uint i = 0; i < ids.length; i++) {
+            require(ids[i] < s.mining, "DeMineNFT: token not mined yet");
             total += amounts[i] * s.info[ids[i]].income;
         }
-        s.income.safeTransfer(msg.sender, total);
-        emit Cashout(msg.sender, total);
+        s.income.safeTransfer(recipient, total);
+        emit Cashout(recipient, total);
     }
 
     /**
      * @notice get demine nft stats given list of nft ids
-     * @params demine nft ids
-     * @returns list of TokenInfo struct
+     * @param ids DeMineNFT id list
+     * @return list of TokenInfo struct
      */
-    function tokenInfo(uint256 ids) external view returns(TokenInfo[] memory) {
-        TokenInfo[] result = new TokenInfo[]();
+    function tokenInfo(uint[] calldata ids) external view returns(TokenInfo[] memory) {
+        TokenInfo[] memory result = new TokenInfo[](ids.length);
         for (uint i = 0; i < ids.length; i++) {
-            result[i] = s.info[ids[i]]
+            result[i] = s.info[ids[i]];
         }
         return result;
     }

@@ -6,7 +6,7 @@ import '@solidstate/contracts/introspection/ERC165.sol';
 import '@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol';
 
 import '../../shared/lib/LibPausable.sol';
-import '../../agent/facet/ERC20RewardableFacet.sol';
+import '../../agent/facets/PaycheckFacet.sol';
 import '../lib/LibERC1155WithAgent.sol';
 
 contract ERC1155WithAgentFacet is
@@ -25,7 +25,6 @@ contract ERC1155WithAgentFacet is
     event Alchemy(
         address indexed operator,
         address indexed account,
-        address indexed recipient,
         uint256[] ids,
         uint256[] amounts
     );
@@ -42,13 +41,12 @@ contract ERC1155WithAgentFacet is
         uint256 tokenId
     ) external onlyAgent returns(uint256 balance) {
         uint256 balance = _balanceOf(msg.sender, tokenId);
-        _burn(msg.sender, tokenId);
-        return result;
+        _burn(msg.sender, tokenId, balance);
+        return balance;
     }
 
     function alchemize(
         address account,
-        address recipient,
         uint256[] memory ids,
         uint256[] memory amounts
     ) external {
@@ -57,10 +55,10 @@ contract ERC1155WithAgentFacet is
             'DeMineNFT: operator is not caller or approved'
         );
         _burnBatch(account, ids, amounts);
-        ERC20RewardableFacet(
+        PaycheckFacet(
             LibERC1155WithAgent.layout().agent
-        ).cashout(recipient, ids, amounts);
-        emit Alchemy(msg.sender, account, recipient, ids, amounts);
+        ).cashout(account, ids, amounts);
+        emit Alchemy(msg.sender, account, ids, amounts);
     }
 
     function _beforeTokenTransfer(

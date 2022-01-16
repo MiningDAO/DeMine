@@ -9,22 +9,26 @@ import './lib/LibDeMineAgent.sol';
 contract DeMineAgent is DiamondBase {
     constructor(
         address diamondFacet,
-        address agentAdminFacet,
-        address poolAdminFacet,
-        address externalFacet,
+        address mortgageFacet,
+        address primaryMarketFacet,
+        address paycheckFacet,
+        address billingFacet,
         // AgentAdmin initialization args
-        address rewardToken,
-        address[] memory payments,
-        address custodianChecking,
-        address custodianSaving,
+        uint256 tokenCost,
+        address income,
+        address cost,
         address demineNFT
     ) {
         LibDeMineAgent.initialize(
-            demineNFT,
             diamondFacet,
-            agentAdminFacet,
-            poolAdminFacet,
-            externalFacet
+            mortgageFacet,
+            primaryMarketFacet,
+            paycheckFacet,
+            billingFacet,
+            tokenCost,
+            income,
+            cost,
+            demineNFT
         );
     }
 }

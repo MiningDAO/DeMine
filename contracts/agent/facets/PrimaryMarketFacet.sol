@@ -8,14 +8,13 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/Util.sol';
-import '../lib/LibAppStorage.sol';
-import '../lib/PricingStatic.sol';
-import '../lib/PricingLinearDecay.sol';
+import '../lib/pricing/LibPricingStatic.sol';
+import '../lib/pricing/LibPricingLinearDecay.sol';
 
 /**
- * @title: PrimaryMarketFacet
- * @author: Shu Dong
- * @notice: Facet contract holding functions for primary market sale
+ * @title PrimaryMarketFacet
+ * @author Shu Dong
+ * @notice Facet contract holding functions for primary market sale
  */
 contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDecay {
     AppStorage internal s;
@@ -38,27 +37,31 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
 
     /**
      * @notice set pricing strategy for msg.sender
-     * @params pricing strategy to set, currently STATIC and LINEAR_DECAY are supported
-     * @params arguments of pricing strategy set
+     * @param strategy pricing strategy to set, currently STATIC and LINEAR_DECAY are supported
+     * @param args Arguments of pricing strategy set
      */
     function setPricingStrategy(
-        AppStorage.PricingStrategy ps,
+        PricingStorage.PricingStrategy strategy,
         bytes memory args
     ) external {
         PricingStorage.Layout storage l = PricingStorage.layout();
-        l.settings[msg.sender].pricingStrategy = ps;
-        LibPricing.initialize(l, s, msg.sender, args);
+        l.strategy[msg.sender] = strategy;
+        if (strategy == PricingStorage.PricingStrategy.STATIC) {
+            LibPricingStatic.initialize(l, s.tokenCost, msg.sender, args);
+        } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
+            LibPricingLinearDecay.initialize(l, s.tokenCost, msg.sender, args);
+        }
     }
 
     /**
      * @notice increase allowance of target for msg.sender
-     * @params address of target user
-     * @params demine nft token ids to increase allowance
-     * @params amount to increase per token
+     * @param target Address of target user
+     * @param ids DeMine nft token ids to increase allowance
+     * @param amounts Amount to increase per token
      */
     function increaseAllowance(
         address target,
-        uint128[] calldata ids,
+        uint[] calldata ids,
         uint[] calldata amounts
     ) external whenNotPaused {
         require(
@@ -66,20 +69,20 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             "PoolOwnerFacet: array length mismatch"
         );
         for (uint i = 0; i < ids.length; i++) {
-            s.allowances[mortgager][target][ids[i]] += amounts[i];
+            s.allowances[target][target][ids[i]] += amounts[i];
         }
-        emit IncreaseAllowance(msg.sender, target, ids, amounts;
+        emit IncreaseAllowance(msg.sender, target, ids, amounts);
     }
 
     /**
      * @notice decrease allowance of target for msg.sender
-     * @params address of target user
-     * @params demine nft token ids to decrease allowance
-     * @params amount to decrease per token
+     * @param target Address of target user
+     * @param ids DeMine nft token ids to decrease allowance
+     * @param amounts Amount to decrease per token
      */
     function decreaseAllowance(
         address target,
-        uint128[] calldata ids,
+        uint[] calldata ids,
         uint[] calldata amounts
     ) external whenNotPaused {
         require(
@@ -92,17 +95,18 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
                 allowance >= amounts[i],
                 "DeMineAgent: allowance will below zero"
             );
-            s.allowances[from][target][ids[i]] = allowance - amounts[i];
+            s.allowances[msg.sender][target][ids[i]] = allowance - amounts[i];
         }
         emit DecreaseAllowance(msg.sender, target, ids, amounts);
     }
 
     /**
      * @notice claim tokens listed for msg.sender from DeMineAgent
-     * @params address of demine nft issuer
-     * @params demine nft token ids to buy
-     * @params max amount to buy per token, the amount of final bought token
-     *         could be less than this per allowance and balance state
+     * @param from Address of demine nft issuer
+     * @param ids DeMine nft token ids to buy
+     * @param maxAmounts The max amount to buy per token, the amount of
+     *        final bought token could be less than this per allowance
+     *        and balance state
      */
     function claim(
         address from,
@@ -118,7 +122,13 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             PricingStorage.Layout storage,
             address,
             uint
-        ) internal view returns(uint) priceF = LibPricing.priceOfFunc(l);
+        ) internal view returns(uint) priceF;
+        PricingStorage.PricingStrategy strategy = l.strategy[from];
+        if (strategy == PricingStorage.PricingStrategy.STATIC) {
+            priceF = LibPricingStatic.priceOf;
+        } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
+            priceF = LibPricingLinearDecay.priceOf;
+        }
         uint tokenCost = s.tokenCost;
         uint billing = s.billing;
         uint totalToPay;
@@ -130,7 +140,6 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             uint amount = checkBalance(from, ids[i], maxAmounts[i]);
             amount = checkAllowance(s.allowances[from], ids[i], amount);
             amounts[i] = amount;
-            s.locked[cycle][pool] -= amount;
             totalCost += tokenCost * amount;
         }
         s.cost.safeTransferFrom(msg.sender, address(this), totalCost);
@@ -156,34 +165,41 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         uint maxAllowed = allowance1 + allowance2;
         require(maxAllowed >= amount, 'DeMineAgent: insufficient allowance');
         if (amount <= allowance1) {
-            s.allowances[mortgager][msg.sender][id] -= amount;
+            allowances[msg.sender][id] -= amount;
             return amount;
         } else if (amount <= maxAllowed) {
-            s.allowances[mortgager][msg.sender][id] = 0;
-            s.allowances[mortgager][address(0)][id] = amount - allowance1;
+            allowances[msg.sender][id] = 0;
+            allowances[address(0)][id] = amount - allowance1;
             return amount;
         } else if (amount > maxAllowed) {
-            s.allowances[mortgager][msg.sender][id] = 0;
-            s.allowances[mortgager][address(0)][id] = 0;
+            allowances[msg.sender][id] = 0;
+            allowances[address(0)][id] = 0;
             return maxAllowed;
         }
     }
 
     /**
      * @notice get listed prices of demine nft
-     * @params address of demine nft issuer
-     * @params demine nft token ids to check
+     * @param from Address of demine nft issuer
+     * @param ids DeMine nft token ids to check
+     * @return list of prices for each token
      */
     function getListedPrices(
         address from,
         uint[] calldata ids
-    ) external view override returns(uint[] memory) {
+    ) external view returns(uint[] memory) {
         PricingStorage.Layout storage l = PricingStorage.layout();
         function(
             PricingStorage.Layout storage,
             address,
             uint
-        ) internal view returns(uint) priceF = LibPricing.priceOfFunc(l);
+        ) internal view returns(uint) priceF;
+        PricingStorage.PricingStrategy strategy = l.strategy[from];
+        if (strategy == PricingStorage.PricingStrategy.STATIC) {
+            priceF = LibPricingStatic.priceOf;
+        } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
+            priceF = LibPricingLinearDecay.priceOf;
+        }
         uint[] memory prices = new uint[](ids.length);
         for (uint i = 0; i < ids.length; i++) {
             prices[i] = priceF(l, from, ids[i]);
@@ -193,18 +209,18 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
 
     /**
      * @notice get allowance information
-     * @params address of demine nft issuer
-     * @params address of target address
-     * @params demine nft token ids to check
+     * @param from Address of demine nft issuer
+     * @param target Address of target address
+     * @param ids DeMine nft token ids to check
      */
     function getAllowances(
         address from,
-        address buyer,
+        address target,
         uint[] calldata ids
     ) external view returns(uint[] memory) {
         uint[] memory result = new uint[](ids.length);
         for (uint i = 0; i < ids.length; i++) {
-            result[i] = s.allowances[from][buyer][ids[i]];
+            result[i] = s.allowances[from][target][ids[i]];
         }
         return result;
     }

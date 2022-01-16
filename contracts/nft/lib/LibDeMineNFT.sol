@@ -51,7 +51,7 @@ library LibDeMineNFT {
     ) internal returns(IDiamondCuttable.FacetCut memory) {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
 
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](9);
         // register ERC1155
         selectors[0] = IERC1155.balanceOf.selector;
         selectors[1] = IERC1155.balanceOfBatch.selector;
@@ -63,7 +63,8 @@ library LibDeMineNFT {
 
         // register ERC1155WithAgent
         selectors[6] = ERC1155WithAgentFacet.mintBatch.selector;
-        selectors[7] = ERC1155WithAgentFacet.burnBatch.selector;
+        selectors[7] = ERC1155WithAgentFacet.burn.selector;
+        selectors[8] = ERC1155WithAgentFacet.alchemize.selector;
         return LibDiamond.genFacetCut(target, selectors);
     }
 

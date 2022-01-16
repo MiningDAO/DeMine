@@ -5,21 +5,21 @@ pragma solidity 0.8.4;
 library PricingStorage {
     enum PricingStrategy{ STATIC, LINEAR_DECAY }
 
-    struct Pricing {
-        PricingStrategy strategy;
-        // static pricing
-        uint256 staticBase;
-        mapping(uint256 => uint256) staticOverride;
-        // for linear pricing
-        uint256 linearAnchor;
-        uint256 linearMaxPrice;
-        uint256 linearMinPrice;
-        uint256 linearSlope;
-        uint256 linearSlopeBase;
+    struct LinearDecay {
+        uint256 anchor;
+        uint256 maxPrice;
+        uint256 minPrice;
+        uint256 slope;
+        uint256 slopeBase;
     }
 
     struct Layout {
-        mapping(address => Pricing) pricing;
+        mapping(address => PricingStrategy) strategy;
+        // static pricing
+        mapping(address => uint256) staticBase;
+        mapping(address => mapping(uint256 => uint256)) staticOverride;
+        // linear decay
+        mapping(address => LinearDecay) linearDecay;
     }
 
     bytes32 internal constant STORAGE_SLOT =

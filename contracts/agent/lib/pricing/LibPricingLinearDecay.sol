@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.4;
+pragma experimental ABIEncoderV2;
 
 import '../AppStorage.sol';
 import './PricingStorage.sol';
@@ -8,23 +9,18 @@ import './PricingStorage.sol';
 library LibPricingLinearDecay {
     function priceOf(
         PricingStorage.Layout storage l,
-        address mortgager,
+        address account,
         uint256 tokenId
     ) internal view returns(uint256) {
-        PricingStorage.Pricing storage linear = l.pricing[mortgager];
-        uint256 anchor = linear.linearAnchor;
-        uint256 maxPrice = linear.linearMaxPrice;
-        uint256 minPrice = linear.linearMinPrice;
-        uint256 slopeBase = linear.linearSlopeBase;
-
-        if (tokenId < anchor) {
-            return maxPrice;
+        PricingStorage.LinearDecay memory ld = l.linearDecay[account];
+        if (tokenId < ld.anchor) {
+            return ld.maxPrice;
         }
-        uint256 delta = tokenId - anchor;
-        uint256 price = maxPrice * (
-            slopeBase - delta * linear.linearSlope
-        ) / slopeBase;
-        return price > minPrice ? price : minPrice;
+        uint256 delta = tokenId - ld.anchor;
+        uint256 price = ld.maxPrice * (
+            ld.slopeBase - delta * ld.slope
+        ) / ld.slopeBase;
+        return price > ld.minPrice ? price : ld.minPrice;
     }
 
     function initialize(
@@ -33,51 +29,27 @@ library LibPricingLinearDecay {
         address from,
         bytes memory args
     ) internal {
-        (
-            uint256 anchor,
-            uint256 maxPrice,
-            uint256 minPrice,
-            uint256 slope,
-            uint256 slopeBase
-        ) = abi.decode(args);
-        setLinearPricing(
-            l,
-            from,
-            tokenCost,
-            anchor,
-            maxPrice,
-            minPrice,
-            slope,
-            slopeBase
-        );
+        PricingStorage.LinearDecay memory ld
+            = abi.decode(args, (PricingStorage.LinearDecay));
+        setLinearDecay(l, from, tokenCost, ld);
     }
 
-    function setLinearPricing(
+    function setLinearDecay(
         PricingStorage.Layout storage l,
         address from,
         uint256 tokenCost,
-        address from,
-        uint256 anchor,
-        uint256 maxPrice,
-        uint256 minPrice,
-        uint256 slope,
-        uint256 slopeBase
+        PricingStorage.LinearDecay memory ld
     ) internal {
         require(
-            minPrice > tokenCost,
+            ld.minPrice > tokenCost,
             'LibPricingLinear: price too low to cover cost'
         );
-        l.pricing[from].linearAnchoredToken = anchor;
-        l.pricing[from].linearMaxPrice = maxPrice;
-        l.pricing[from].linearMinPrice = minPrice;
-        l.pricing[from].linearSlope = slope;
-        l.pricing[from].linearSlopeBase = slopeBase;
+        l.linearDecay[from] = ld;
     }
 }
 
-abstract PricingLinearDecay {
-    using LibPricingLinear for PricingStorage.Layout;
-    AppStorage internal s;
+abstract contract PricingLinearDecay {
+    using LibPricingLinearDecay for PricingStorage.Layout;
 
     event SetLinerPricing(
         address indexed,
@@ -88,29 +60,21 @@ abstract PricingLinearDecay {
         uint256
     );
 
-    function setLinearPricing(
-        uint256 anchor,
-        uint256 maxPrice,
-        uint256 minPrice,
-        uint256 slope,
-        uint256 slopeBase
+    function setLinearDecay(
+        PricingStorage.LinearDecay memory ld
     ) external {
-        PricingStorage.layout().setLinearPricing(
+        PricingStorage.layout().setLinearDecay(
             msg.sender,
-            s.tokenCost,
-            anchor,
-            maxPrice,
-            minPrice,
-            slope,
-            slopeBase
+            LibAppStorage.layout().tokenCost,
+            ld
         );
         emit SetLinerPricing(
             msg.sender,
-            anchor,
-            maxPrice,
-            minPrice,
-            slope,
-            slopeBase
+            ld.anchor,
+            ld.maxPrice,
+            ld.minPrice,
+            ld.slope,
+            ld.slopeBase
         );
     }
 }

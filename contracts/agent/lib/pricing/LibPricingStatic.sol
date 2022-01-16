@@ -8,11 +8,11 @@ import './PricingStorage.sol';
 library LibPricingStatic {
     function priceOf(
         PricingStorage.Layout storage l,
-        address mortagager,
+        address account,
         uint256 tokenId
     ) internal view returns(uint256) {
-        uint256 tokenPrice = l.staticOverride[mortagager][tokenId];
-        return tokenPrice > 0 ? tokenPrice : l.staticBase[mortagager];
+        uint256 tokenPrice = l.staticOverride[account][tokenId];
+        return tokenPrice > 0 ? tokenPrice : l.staticBase[account];
     }
 
     function initialize(
@@ -25,7 +25,7 @@ library LibPricingStatic {
             uint256 basePrice,
             uint256[] memory ids,
             uint256[] memory prices
-        ) = abi.decode(args);
+        ) = abi.decode(args, (uint256, uint256[], uint256[]));
         setBase(l, minPrice, from,  basePrice);
         setOverride(l, minPrice, from, ids, prices);
     }
@@ -40,15 +40,15 @@ library LibPricingStatic {
             price >= minPrice,
             "LibPricingStatic: price is lower than token cost"
         );
-        l.staticBase[from] = basePrice;
+        l.staticBase[from] = price;
     }
 
     function setOverride(
         PricingStorage.Layout storage l,
         uint256 minPrice,
         address from,
-        uint256[] calldata ids,
-        uint256[] calldata prices
+        uint256[] memory ids,
+        uint256[] memory prices
     ) internal {
         require(
             ids.length == prices.length,
@@ -59,33 +59,36 @@ library LibPricingStatic {
                 prices[i] >= minPrice,
                 "LibPricingStatic: price too low to cover cost"
             );
-            l.override[from][ids[i]] = prices[i];
+            l.staticOverride[from][ids[i]] = prices[i];
         }
     }
 }
 
-abstract PricingStatic {
+abstract contract PricingStatic {
     using LibPricingStatic for PricingStorage.Layout;
-    AppStorage internal s;
 
-    event SetBasePrice(address indexed, uint256);
-    event SetTokenPrices(address indexed, uint256[], uint256[]);
+    event SetStaticBase(address indexed, uint256);
+    event SetStaticOverride(address indexed, uint256[], uint256[]);
 
     function setStaticBase(uint256 price) external {
-        PricingStorage.layout().setBase(s.tokenCost, msg.sender, price);
+        PricingStorage.layout().setBase(
+            LibAppStorage.layout().tokenCost,
+            msg.sender,
+            price
+        );
         emit SetStaticBase(msg.sender, price);
     }
 
     function setStaticOverride(
-        uint256[] ids,
-        uint256[] prices
+        uint256[] memory ids,
+        uint256[] memory prices
     ) external {
         PricingStorage.layout().setOverride(
-            s.tokenCost,
+            LibAppStorage.layout().tokenCost,
             msg.sender,
             ids,
             prices
         );
-        emit setStaticOverride(msg.sender, ids, prices);
+        emit SetStaticOverride(msg.sender, ids, prices);
     }
 }

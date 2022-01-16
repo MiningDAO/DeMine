@@ -3,12 +3,11 @@
 pragma solidity 0.8.4;
 
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
 library BillingStorage {
-    struct RewardTokenLockedPrice {
-        uint256 uintSize;
-        uint256 uintPrice;
+    struct LockedPrice {
+        uint256 unitSize;
+        uint256 unitPrice;
         uint expireAt;
     }
 
@@ -24,8 +23,8 @@ library BillingStorage {
         uint income;
         uint debt;
         AggregatorV3Interface chainlink;
-        ISwapRouter swapRouter;
-        mapping(address => RewardTokenLockedPrice) lockedPrices;
+        address swapRouter;
+        mapping(address => LockedPrice) lockedPrices;
     }
 
     bytes32 internal constant STORAGE_SLOT =
