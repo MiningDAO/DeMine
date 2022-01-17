@@ -2,22 +2,25 @@
 
 pragma solidity 0.8.4;
 
-import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
+import '@solidstate/contracts/token/ERC1155/IERC1155Internal.sol';
 
 /**
  * @dev Interface for DeMineNFT for DeMineAgent
  */
-interface IDeMineNFT is IERC1155 {
+interface IDeMineNFT is IERC1155Internal {
     /**
-     * @dev Mint new tokens and transfer them to DeMineAgent
-     * @param ids List of NFT ids
-     * @param amounts List of amount of each NFT id
+     * @dev burn token mined and cashout income
+     * @param account Address of token holder
+     * @param id Token id to achemize
+     * @return total income
      */
-    function mintBatch(uint[] memory ids, uint[] memory amounts) external;
+    function alchemize(address account, uint id) external returns(uint);
 
     /**
-     * @dev burn tokens of agent and return balance of token
-     * @param tokenId NFT token to burn
+     * @dev burn tokens mined for one pool in batch and cashout income
+     * @param account Address of token holder
+     * @param ids List of token ids to alchemize
+     * @return total income
      */
-    function burn(uint tokenId) external returns(uint);
+    function alchemizeBatch(address account, uint[] ids) external returns(uint);
 }

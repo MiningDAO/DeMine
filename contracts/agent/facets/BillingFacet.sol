@@ -71,10 +71,17 @@ contract BillingFacet is PausableModifier, OwnableInternal {
     function lockPrice() external returns(uint, uint) {
         BillingStorage.Layout storage l = BillingStorage.layout();
         require(stage(l) == Stage.SALE_ONGOING, 'DeMineAgent: invalid stage');
+        uint debt = l.debt;
+        uint totalReward = l.income;
+        uint price = getNormalizedChainlinkPriceWithDiscount(l);
+        uint incomeBase = base(s.income);
+        uint maxCostTokenTraded = price * totalReward / incomeBase;
         (
             uint unitSize,
             uint unitPrice
-        ) = getRealtimeRewardTokenPrice(l);
+        ) = maxCostTokenTraded > debt
+            ? calcUnitPrice(price, incomeBase)
+            : calcUnitPrice(debt, totalReward);
         l.lockedPrices[msg.sender] = BillingStorage.LockedPrice(
             unitSize, unitPrice, block.timestamp + l.priceLockDuration
         );
@@ -143,6 +150,25 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         s.shrinked = 0;
     }
 
+    /**
+     * @notice withdraw income and pay debt for tokens already billed
+     * @param ids DeMine NFT ids to withdraw
+     */
+    function withdraw(uint256[] calldata ids) external whenNotPaused {
+        uint256 totalReward;
+        uint256 totalDebt;
+        for (uint i = 0; i < ids.length; i++) {
+            require(ids[i] <= s.billing, 'DeMineAgent: not billed yet');
+            uint256 balance = s.balances[ids[i]][msg.sender];
+            TokenInfo memory info = s.info[ids[i]];
+            totalReward += (info.income - info.adjust) * balance;
+            totalDebt += info.debt * balance;
+            s.balances[ids[i]][msg.sender] = 0;
+        }
+        s.cost.safeTransferFrom(msg.sender, address(this), totalDebt);
+        s.income.safeTransfer(msg.sender, totalReward);
+    }
+
     function stage(BillingStorage.Layout storage l) private view returns(Stage) {
         if (l.debt == 0) {
             return Stage.NO_BILLING;
@@ -198,23 +224,6 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         } else {
             return (false, 0);
         }
-    }
-
-    function getRealtimeRewardTokenPrice(
-        BillingStorage.Layout storage l
-    ) private view returns(uint, uint) {
-        uint debt = l.debt;
-        uint totalReward = l.income;
-        uint price = getNormalizedChainlinkPriceWithDiscount(l);
-        uint incomeBase = base(s.income);
-        uint maxCostTokenTraded = price * totalReward / incomeBase;
-        (
-            uint unitSize,
-            uint unitPrice
-        ) = maxCostTokenTraded > debt
-            ? calcUnitPrice(price, incomeBase)
-            : calcUnitPrice(debt, totalReward);
-        return (unitSize, unitPrice);
     }
 
     function getNormalizedChainlinkPriceWithDiscount(

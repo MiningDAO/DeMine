@@ -53,5 +53,4 @@ library LibAppStorage {
             s.slot := 0
         }
     }
-
 }
