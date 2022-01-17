@@ -36,7 +36,7 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
     );
 
     struct ClaimMetadata {
-        uint billing;
+        uint128 billing;
         uint tokenCost;
         uint totalCost;
         uint totalPay;
@@ -63,65 +63,65 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
     /**
      * @notice increase allowance of target for msg.sender
      * @param target Address of target user
-     * @param ids DeMine nft token ids to increase allowance
+     * @param cycles DeMine nft token cycles to increase allowance
      * @param amounts Amount to increase per token
      */
     function increaseAllowance(
         address target,
-        uint[] calldata ids,
+        uint128[] calldata cycles,
         uint[] calldata amounts
     ) external whenNotPaused {
         require(
-            ids.length == amounts.length,
+            cycles.length == amounts.length,
             "PoolOwnerFacet: array length mismatch"
         );
-        for (uint i = 0; i < ids.length; i++) {
-            s.allowances[target][target][ids[i]] += amounts[i];
+        for (uint i = 0; i < cycles.length; i++) {
+            s.allowances[target][target][cycles[i]] += amounts[i];
         }
-        emit IncreaseAllowance(msg.sender, target, ids, amounts);
+        emit IncreaseAllowance(msg.sender, target, cycles, amounts);
     }
 
     /**
      * @notice decrease allowance of target for msg.sender
      * @param target Address of target user
-     * @param ids DeMine nft token ids to decrease allowance
+     * @param cycles DeMine nft token cycles to decrease allowance
      * @param amounts Amount to decrease per token
      */
     function decreaseAllowance(
         address target,
-        uint[] calldata ids,
+        uint128[] calldata cycles,
         uint[] calldata amounts
     ) external whenNotPaused {
         require(
-            ids.length == amounts.length,
+            cycles.length == amounts.length,
             "DeMineNFTMetadata: array length mismatch"
         );
-        for (uint i = 0; i < ids.length; i++) {
-            uint allowance = s.allowances[msg.sender][target][ids[i]];
+        for (uint i = 0; i < cycles.length; i++) {
+            uint allowance = s.allowances[msg.sender][target][cycles[i]];
             require(
                 allowance >= amounts[i],
                 "DeMineAgent: allowance will below zero"
             );
-            s.allowances[msg.sender][target][ids[i]] = allowance - amounts[i];
+            s.allowances[msg.sender][target][cycles[i]] = allowance - amounts[i];
         }
-        emit DecreaseAllowance(msg.sender, target, ids, amounts);
+        emit DecreaseAllowance(msg.sender, target, cycles, amounts);
     }
 
     /**
      * @notice claim tokens listed for msg.sender from DeMineAgent
      * @param from Address of demine nft issuer
-     * @param ids DeMine nft token ids to buy
+     * @param cycles DeMine nft token cycles to buy
      * @param maxAmounts The max amount to buy per token, the amount of
      *        final bought token could be less than this per allowance
      *        and balance state
      */
     function claim(
         address from,
-        uint[] calldata ids,
+        uint128[] calldata cycles,
         uint[] calldata maxAmounts
     ) external whenNotPaused returns(uint[] memory) {
         require(
-            ids.length == maxAmounts.length,
+            cycles.length == maxAmounts.length,
             "TokenLocker: array length mismatch"
         );
         ClaimMetadata memory m = ClaimMetadata(s.billing, s.tokenCost, 0, 0);
@@ -131,56 +131,30 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             address,
             uint
         ) internal view returns(uint) f = priceF(l.strategy[from]);
-        uint[] memory amounts = new uint[](ids.length);
-        for (uint i = 0; i < ids.length; i++) {
-            require(ids[i] > m.billing, 'DeMineAgent: billing token');
-            uint amount = maxAllowed(from, ids[i], maxAmounts[i]);
+        uint[] memory amounts = new uint[](cycles.length);
+        for (uint i = 0; i < cycles.length; i++) {
+            require(cycles[i] > m.billing, 'DeMineAgent: billing token');
+            uint amount = maxAllowed(from, cycles[i], maxAmounts[i]);
             amounts[i] = amount;
             m.totalCost += m.tokenCost * amount;
-            m.totalPay += f(l, from, ids[i]) * amount;
+            m.totalPay += f(l, from, cycles[i]) * amount;
         }
         s.cost.safeTransferFrom(msg.sender, address(this), m.totalCost);
         s.cost.safeTransferFrom(msg.sender, from, m.totalPay - m.totalCost);
-        s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
-        emit Claim(msg.sender, from, ids, amounts);
+        s.nft.safeBatchTransferFrom(address(this), msg.sender, cycles, amounts, "");
+        emit Claim(msg.sender, from, cycles, amounts);
         return amounts;
-    }
-
-    function maxAllowed(address from, uint id, uint amount) private returns(uint) {
-        uint balance = s.balances[id][from];
-        amount = Util.min2(balance, amount);
-        amount = checkAllowance(from, id, amount);
-        s.balances[id][from] = balance - amount;
-        return amount;
-    }
-
-    function checkAllowance(address from, uint id, uint amount) private returns(uint) {
-        uint allowance1 = s.allowances[from][msg.sender][id];
-        uint allowance2 = s.allowances[from][address(0)][id];
-        uint allowed = allowance1 + allowance2;
-        if (amount <= allowance1) {
-            s.allowances[from][msg.sender][id] -= amount;
-            return amount;
-        } else if (amount <= allowed) {
-            s.allowances[from][msg.sender][id] = 0;
-            s.allowances[from][address(0)][id] = amount - allowance1;
-            return amount;
-        } else {
-            s.allowances[from][msg.sender][id] = 0;
-            s.allowances[from][address(0)][id] = 0;
-            return allowed;
-        }
     }
 
     /**
      * @notice get listed prices of demine nft
      * @param from Address of demine nft issuer
-     * @param ids DeMine nft token ids to check
+     * @param cycles DeMine nft token cycles to check
      * @return list of prices for each token
      */
     function getListedPrices(
         address from,
-        uint[] calldata ids
+        uint128[] calldata cycles
     ) external view returns(uint[] memory) {
         PricingStorage.Layout storage l = PricingStorage.layout();
         function(
@@ -188,11 +162,55 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             address,
             uint
         ) internal view returns(uint) f = priceF(l.strategy[from]);
-        uint[] memory prices = new uint[](ids.length);
-        for (uint i = 0; i < ids.length; i++) {
-            prices[i] = f(l, from, ids[i]);
+        uint[] memory prices = new uint[](cycles.length);
+        for (uint i = 0; i < cycles.length; i++) {
+            prices[i] = f(l, from, cycles[i]);
         }
         return prices;
+    }
+
+    /**
+     * @notice get allowance information
+     * @param from Address of demine nft issuer
+     * @param target Address of target address
+     * @param cycles DeMine nft token cycles to check
+     */
+    function getAllowances(
+        address from,
+        address target,
+        uint128[] calldata cycles
+    ) external view returns(uint[] memory) {
+        uint[] memory result = new uint[](cycles.length);
+        for (uint i = 0; i < cycles.length; i++) {
+            result[i] = s.allowances[from][target][cycles[i]];
+        }
+        return result;
+    }
+
+    function maxAllowed(address from, uint128 cycle, uint amount) private returns(uint) {
+        uint balance = s.balances[cycle][from];
+        amount = Util.min2(balance, amount);
+        amount = checkAllowance(from, cycle, amount);
+        s.balances[cycle][from] = balance - amount;
+        return amount;
+    }
+
+    function checkAllowance(address from, uint128 cycle, uint amount) private returns(uint) {
+        uint allowance1 = s.allowances[from][msg.sender][cycle];
+        uint allowance2 = s.allowances[from][address(0)][cycle];
+        uint allowed = allowance1 + allowance2;
+        if (amount <= allowance1) {
+            s.allowances[from][msg.sender][cycle] -= amount;
+            return amount;
+        } else if (amount <= allowed) {
+            s.allowances[from][msg.sender][cycle] = 0;
+            s.allowances[from][address(0)][cycle] = amount - allowance1;
+            return amount;
+        } else {
+            s.allowances[from][msg.sender][cycle] = 0;
+            s.allowances[from][address(0)][cycle] = 0;
+            return allowed;
+        }
     }
 
     function priceF(
@@ -209,23 +227,5 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
             f = LibPricingLinearDecay.priceOf;
         }
-    }
-
-    /**
-     * @notice get allowance information
-     * @param from Address of demine nft issuer
-     * @param target Address of target address
-     * @param ids DeMine nft token ids to check
-     */
-    function getAllowances(
-        address from,
-        address target,
-        uint[] calldata ids
-    ) external view returns(uint[] memory) {
-        uint[] memory result = new uint[](ids.length);
-        for (uint i = 0; i < ids.length; i++) {
-            result[i] = s.allowances[from][target][ids[i]];
-        }
-        return result;
     }
 }

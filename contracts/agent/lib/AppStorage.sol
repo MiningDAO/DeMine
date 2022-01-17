@@ -8,49 +8,35 @@ import '../../nft/interfaces/IDeMineNFT.sol';
 
 struct Mortgage {
     address owner;
-    uint start;
-    uint end;
+    uint128 start;
+    uint128 end;
     uint supply;
     uint deposit;
 }
 
-struct TokenInfo {
-    uint income; // per token
-    uint supply;
-    // after billing
+struct Cycle {
     uint adjust; // per token
     uint debt; // per token
 }
 
 struct AppStorage {
-    IDeMineNFT nft;
-
-    uint8 minDepositDaysRequired;
     IERC20 cost;
     IERC20 income;
+    address nft;
+
     uint tokenCost; // cost token
     uint deposit; // cost token
 
-    uint mining; // mining token
-    uint billing; // billing token
-    uint shrinked; // shrinking token
+    uint128 billing; // billing token
+    uint128 shrinked; // shrinking token
     uint8 shrinkSize; // num of tokens we shrink starting from next rewarding token
-
-    // mortgage
-    uint mortgage;
-    mapping(uint => Mortgage) mortgages; // mortgage index as key
-    mapping(uint => TokenInfo) info; // token id as key
+    uint8 minDepositDaysRequired;
+    uint128 mortgageId;
+    mapping(uint128 => Mortgage) mortgages;
+    mapping(uint128 => Cycles) cycles;
 
     // tokenId => account => price
     mapping(uint => mapping(address => uint)) balances;
     // owner => buyer => allowance
     mapping(address => mapping(address => mapping(uint => uint))) allowances;
-}
-
-library LibAppStorage {
-    function layout() internal pure returns(AppStorage storage s) {
-        assembly {
-            s.slot := 0
-        }
-    }
 }

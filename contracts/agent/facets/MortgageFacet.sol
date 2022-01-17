@@ -3,9 +3,9 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@solidstate/contracts/access/OwnableInternal.sol';
-import '@solidstate/contracts/introspection/ERC165.sol';
-import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
+import '@solcyclestate/contracts/access/OwnableInternal.sol';
+import '@solcyclestate/contracts/introspection/ERC165.sol';
+import '@solcyclestate/contracts/token/ERC1155/IERC1155Receiver.sol';
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -51,8 +51,8 @@ contract MortgageFacet is
      */
     function mortgage(
         address mortgager,
-        uint start,
-        uint end,
+        uint128 start,
+        uint128 end,
         uint supply
     ) external onlyOwner returns(uint mortgageId) {
         require(
@@ -60,53 +60,52 @@ contract MortgageFacet is
             'DeMine: token mined already or shrinked'
         );
         uint numCycles = end - start + 1;
-        uint[] memory ids = new uint[](numCycles);
+        uint[] memory cycles = new uint[](numCycles);
         uint[] memory supplies = new uint[](numCycles);
-        for (uint i = 0; i < numCycles; i++) {
-            uint id = start + i;
-            s.info[id].supply += supplies[i];
-            s.balances[id][mortgager] += supplies[i];
-            ids[i] = id;
+        for (uint128 i = 0; i < numCycles; i++) {
+            uint128 cycle = start + i;
+            s.balances[cycle][mortgager] += supplies[i];
+            cycles[i] = cycle;
             supplies[i] = supply;
         }
-        mortgageId = s.mortgage;
+        mortgageId = s.mortgageId;
         uint deposit = supply * s.tokenCost * s.minDepositDaysRequired;
         s.cost.safeTransferFrom(msg.sender, address(this), deposit);
         s.mortgages[mortgageId] = Mortgage(
             msg.sender, start, start + end, supply, deposit
         );
         s.deposit += deposit;
-        s.mortgage = mortgageId + 1;
-        s.nft.mintBatch(ids, supplies);
+        s.mortgageId = mortgageId + 1;
+        s.nft.mintBatch(cycles, supplies);
         emit NewMortgage(msg.sender, mortgageId);
     }
 
     /**
      * @notice Pay token cost and liquidize tokens
-     * @param ids DeMine nft token ids to redeem
+     * @param cycles DeMine nft token cycles to redeem
      * @param amounts Amount of each demine nft token
      */
     function redeem(
-        uint[] calldata ids,
+        uint128[] calldata cycles,
         uint[] calldata amounts
     ) external whenNotPaused {
         require(
-            ids.length == amounts.length,
+            cycles.length == amounts.length,
             "PoolOwnerFacet: array length mismatch"
         );
         uint tokenCost = s.tokenCost;
-        uint billing = s.billing;
+        uint128 billing = s.billing;
         uint totalCost;
-        for (uint i = 0; i < ids.length; i++) {
-            require(ids[i] >= billing, 'DeMineAgent: token not redeemable');
+        for (uint i = 0; i < cycles.length; i++) {
+            require(cycles[i] >= billing, 'DeMineAgent: token not redeemable');
             totalCost += tokenCost * amounts[i];
-            uint balance = s.balances[ids[i]][msg.sender];
+            uint balance = s.balances[cycles[i]][msg.sender];
             require(balance > amounts[i], 'DeMineAgent: no sufficient balance');
-            s.balances[ids[i]][msg.sender] = balance - amounts[i];
+            s.balances[cycles[i]][msg.sender] = balance - amounts[i];
         }
         s.cost.safeTransferFrom(msg.sender, address(this), totalCost);
-        emit Redeem(msg.sender, ids, amounts);
-        s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
+        emit Redeem(msg.sender, cycles, amounts);
+        s.nft.safeBatchTransferFrom(address(this), msg.sender, cycles, amounts, "");
     }
 
     /**
@@ -114,20 +113,20 @@ contract MortgageFacet is
      *         the all tokens are billed or liquidized
      * @param mortgageId The mortgage id returned by mortgage function
      */
-    function close(uint mortgageId) external whenNotPaused {
+    function close(uint128 mortgageId) external whenNotPaused {
         Mortgage memory m = s.mortgages[mortgageId];
         uint totalReward;
         uint totalDebt;
-        for (uint i = 0; i < m.end - m.start + 1; i ++) {
-            uint id = i + m.start;
-            uint balance = s.balances[id][msg.sender];
+        for (uint128 i = 0; i < m.end - m.start + 1; i ++) {
+            uint128 cycle = i + m.start;
+            uint balance = s.balances[cycle][msg.sender];
             if (balance > 0) {
-                require(id < s.billing, 'DeMineAgent: unliqudized token');
-                TokenInfo memory info = s.info[id];
+                require(cycle < s.billing, 'DeMineAgent: unliqudized token');
+                Cycle memory c = s.cycles[cycle];
                 uint min = Util.min2(balance, m.supply);
-                totalReward += (info.income - info.adjust) * min;
-                totalDebt += info.debt * min;
-                s.balances[id][msg.sender] = balance - min;
+                totalReward += (c.income - c.adjust) * min;
+                totalDebt += c.debt * min;
+                s.balances[cycle][msg.sender] = balance - min;
             }
         }
         s.cost.safeTransferFrom(msg.sender, address(this), m.deposit - totalDebt);
@@ -140,7 +139,7 @@ contract MortgageFacet is
      * @notice get mortgage info
      * @param mortgageId The mortgage id returned by mortgage function
      */
-    function getMortgage(uint mortgageId)
+    function getMortgage(uint128 mortgageId)
         external
         view
         returns(Mortgage memory)

@@ -10,13 +10,13 @@ library LibPricingLinearDecay {
     function priceOf(
         PricingStorage.Layout storage l,
         address account,
-        uint256 tokenId
+        uint128 cycle
     ) internal view returns(uint256) {
         PricingStorage.LinearDecay memory ld = l.linearDecay[account];
-        if (tokenId < ld.anchor) {
+        if (cycle < ld.anchor) {
             return ld.maxPrice;
         }
-        uint256 delta = tokenId - ld.anchor;
+        uint256 delta = cycle - ld.anchor;
         uint256 price = ld.maxPrice * (
             ld.slopeBase - delta * ld.slope
         ) / ld.slopeBase;
@@ -25,25 +25,11 @@ library LibPricingLinearDecay {
 
     function initialize(
         PricingStorage.Layout storage l,
-        uint256 tokenCost,
         address from,
         bytes memory args
     ) internal {
         PricingStorage.LinearDecay memory ld
             = abi.decode(args, (PricingStorage.LinearDecay));
-        setLinearDecay(l, from, tokenCost, ld);
-    }
-
-    function setLinearDecay(
-        PricingStorage.Layout storage l,
-        address from,
-        uint256 tokenCost,
-        PricingStorage.LinearDecay memory ld
-    ) internal {
-        require(
-            ld.minPrice > tokenCost,
-            'LibPricingLinear: price too low to cover cost'
-        );
         l.linearDecay[from] = ld;
     }
 }
@@ -53,28 +39,24 @@ abstract contract PricingLinearDecay {
 
     event SetLinerPricing(
         address indexed,
-        uint256,
-        uint256,
-        uint256,
-        uint256,
-        uint256
+        uint128,
+        uint64,
+        uint64
+        uint,
+        uint,
     );
 
     function setLinearDecay(
         PricingStorage.LinearDecay memory ld
     ) external {
-        PricingStorage.layout().setLinearDecay(
-            msg.sender,
-            LibAppStorage.layout().tokenCost,
-            ld
-        );
+        PricingStorage.layout().linearDecay[from] = ld;
         emit SetLinerPricing(
             msg.sender,
             ld.anchor,
-            ld.maxPrice,
-            ld.minPrice,
             ld.slope,
-            ld.slopeBase
+            ld.slopeBase,
+            ld.maxPrice,
+            ld.minPrice
         );
     }
 }

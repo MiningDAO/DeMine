@@ -6,18 +6,18 @@ library PricingStorage {
     enum PricingStrategy{ STATIC, LINEAR_DECAY }
 
     struct LinearDecay {
-        uint256 anchor;
+        uint128 anchor;
+        uint64 slope;
+        uint64 slopeBase;
         uint256 maxPrice;
         uint256 minPrice;
-        uint256 slope;
-        uint256 slopeBase;
     }
 
     struct Layout {
         mapping(address => PricingStrategy) strategy;
         // static pricing
         mapping(address => uint256) staticBase;
-        mapping(address => mapping(uint256 => uint256)) staticOverride;
+        mapping(address => mapping(uint128 => uint256)) staticOverride;
         // linear decay
         mapping(address => LinearDecay) linearDecay;
     }
