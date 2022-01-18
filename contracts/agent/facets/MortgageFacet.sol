@@ -3,16 +3,16 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@solcyclestate/contracts/access/OwnableInternal.sol';
-import '@solcyclestate/contracts/introspection/ERC165.sol';
-import '@solcyclestate/contracts/token/ERC1155/IERC1155Receiver.sol';
-import "@openzeppelin/contracts/interfaces/IERC1155.sol";
+import '@solidstate/contracts/access/OwnableInternal.sol';
+import '@solidstate/contracts/introspection/ERC165.sol';
+import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
+
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../shared/lib/Util.sol';
 import '../../shared/lib/LibPausable.sol';
-import '../../nft/interfaces/IPoolAgent.sol';
+import '../interfaces/IMortgage.sol';
 import '../lib/AppStorage.sol';
 
 /**
@@ -22,9 +22,9 @@ import '../lib/AppStorage.sol';
  * @dev the contract also implements IERC1155Receiver to receive and lock demine nft
  */
 contract MortgageFacet is
+    IMortgage,
     PausableModifier,
     OwnableInternal,
-    IERC1155Receiver,
     ERC165
 {
     AppStorage internal s;
@@ -34,51 +34,45 @@ contract MortgageFacet is
     event NewMortgage(address indexed, uint indexed);
     event Redeem(address indexed, uint[], uint[]);
 
-    modifier onlyMinted(address from) {
+    modifier onlyNFT() {
         require(
-            msg.sender == s.nft && from == address(0),
-            'DeMineAgent: only minted tokens from nft contract allowed'
+            msg.sender == s.nft,
+            'DeMineAgent: only nft contract allowed'
         );
         _;
     }
 
     /**
      * @notice Mortgage your computation power(offline) and mint demine nft.
-     *         Minted tokens are locked at DeMineAgent contract.
-     * @param mortgager Address of miner owning this mortgage
+     * Minted tokens are locked at DeMineAgent contract.
      * @param start DeMine nft id to mint
      * @param end DeMine nft id to mint
      * @param supply Amount for each token to mint. This also decide
-     *        amount of deposit mortgager has to pay
+     * amount of deposit mortgager has to pay
+     * @param data Extra data with mortgager address encoded
      */
     function mortgage(
-        address mortgager,
         uint128 start,
         uint128 end,
-        uint supply
-    ) external onlyOwner returns(uint mortgageId) {
+        uint supply,
+        bytes memory data
+    ) external onlyNFT returns(uint mortgageId) {
         require(
             start > s.mining && start > s.shrinked,
             'DeMine: token mined already or shrinked'
         );
-        uint numCycles = end - start + 1;
-        uint[] memory cycles = new uint[](numCycles);
-        uint[] memory supplies = new uint[](numCycles);
-        for (uint128 i = 0; i < numCycles; i++) {
-            uint128 cycle = start + i;
-            s.balances[cycle][mortgager] += supplies[i];
-            cycles[i] = cycle;
-            supplies[i] = supply;
+        (address mortgager) = abi.decode(data, (address));
+        for (uint128 cycle = start; i <= end; i++) {
+            s.balances[cycle][mortgager] += supply;
         }
         mortgageId = s.mortgageId;
         uint deposit = supply * s.tokenCost * s.minDepositDaysRequired;
         s.cost.safeTransferFrom(msg.sender, address(this), deposit);
         s.mortgages[mortgageId] = Mortgage(
-            msg.sender, start, start + end, supply, deposit
+            msg.sender, start, end, supply, deposit
         );
         s.deposit += deposit;
         s.mortgageId = mortgageId + 1;
-        IPoolAgent(s.nft).mintBatch(cycles, supplies);
         emit NewMortgage(msg.sender, mortgageId);
     }
 
@@ -147,25 +141,5 @@ contract MortgageFacet is
         returns(Mortgage memory)
     {
         return s.mortgages[mortgageId];
-    }
-
-    function onERC1155Received(
-        address,
-        address from,
-        uint,
-        uint,
-        bytes memory
-    ) external view onlyMinted(from) override returns (bytes4) {
-        return IERC1155Receiver.onERC1155Received.selector;
-    }
-
-    function onERC1155BatchReceived(
-        address,
-        address from,
-        uint[] calldata,
-        uint[] calldata,
-        bytes memory
-    ) external view onlyMinted(from) override returns (bytes4) {
-        return IERC1155Receiver.onERC1155BatchReceived.selector;
     }
 }

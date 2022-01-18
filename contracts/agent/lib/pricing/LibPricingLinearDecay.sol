@@ -43,9 +43,9 @@ abstract contract PricingLinearDecay {
         address indexed,
         uint128,
         uint64,
-        uint64
+        uint64,
         uint,
-        uint,
+        uint
     );
 
     function setLinearDecay(

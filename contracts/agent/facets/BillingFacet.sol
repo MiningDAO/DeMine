@@ -4,10 +4,12 @@ pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/access/OwnableInternal.sol';
-import "@openzeppelin/contracts/interfaces/IERC1155.sol";
+import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
+
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 

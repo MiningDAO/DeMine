@@ -2,10 +2,11 @@
 
 pragma solidity 0.8.4;
 
+import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
+
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import '../../nft/facets/ERC1155WithAgentFacet.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/Util.sol';
 import '../lib/pricing/LibPricingStatic.sol';

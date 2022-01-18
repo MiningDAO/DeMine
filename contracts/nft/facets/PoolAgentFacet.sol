@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/LibTokenId.sol';
+import '../../agent/interfaces/IMortgage.sol';
 import '../interfaces/IDeMineNFT.sol';
 import '../lib/AppStorage.sol';
 
@@ -24,8 +25,9 @@ contract PoolAgentFacet is
     using AddressUtils for address;
     using SafeERC20 for IERC20;
 
+    event Mint(uint128 indexed, uint128, uint128, uint);
+    event Shrink(uint128 indexed, uint128, uint128);
     event RegisterPool(uint128 indexed, address indexed);
-    event Finalize(uint128 indexed, address indexed, uint, uint);
 
     function registerPool(address agent, uint128 pool) external onlyOwner {
         // 0 is reserved for non-existence check
@@ -40,46 +42,40 @@ contract PoolAgentFacet is
     }
 
     function mintBatch(
-        uint128[] memory cycles,
-        uint[] memory amounts
-    ) external whenNotPaused {
-        uint128 pool = s.pools[msg.sender];
-        require(pool > 0, 'DeMineNFT: only registered agent is allowed');
-        require(
-            cycles.length == amounts.length,
-            'DeMineAgent: array length mismatch'
-        );
-        ERC1155BaseStorage.Layout storage balances = ERC1155BaseStorage.layout();
+        uint128 pool,
+        uint128 start,
+        uint128 end,
+        uint amount,
+        bytes memory data
+    ) external onlyOwner {
+        address agent = s.agents[pool];
+        require(agent != address(0), 'DeMineNFT: invalid pool');
+        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
         uint mining = s.mining;
-        uint[] memory ids = new uint[](cycles.length);
-        for (uint i; i < cycles.length; i++) {
-            require(cycles[i] > mining, 'DeMineNFT: outdated cycle');
-            uint id = LibTokenId.encode(pool, cycles[i]);
-            ids[i] = id;
-            balances[id][msg.sender] += amounts[i];
-            s.cycles[cycles[i]].supply += amounts[i];
+        for (uint cycle = start; cycle <= end; cycle++) {
+            require(cycle > mining, 'DeMineNFT: mined cycle');
+            uint id = LibTokenId.encode(pool, cycle);
+            l.balances[id][msg.sender] += amount;
+            s.cycles[cycle].supply += amount;
         }
-        emit TransferBatch(msg.sender, address(0), msg.sender, ids, amounts);
+        IMortgage(agent).mortgage(start, end, supply, data);
+        emit Mint(pool, start, end, amount);
     }
 
     function shrink(uint128 start, uint128 end) external whenNotPaused {
         require(end >= start, 'DeMineNFT: invalid input');
         uint128 pool = s.pools[msg.sender];
-        require(pool > 0, 'DeMineNFT: only registered agent is allowed');
-        ERC1155BaseStorage.Layout storage balances = ERC1155BaseStorage.layout();
-        uint[] memory ids = new uint[](end - start + 1);
-        uint[] memory amounts = new uint[](end - start + 1);
+        require(pool > 0, 'DeMineNFT: only registered pool agent is allowed');
+        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
         unchecked {
             uint mining = s.mining + 1; // plus one in case it's lagging
             for (uint128 cycle = start; cycle <= end; cycle++) {
-                require(cycle > mining, 'DeMineNFT: outdated cycle');
+                require(cycle > mining, 'DeMineNFT: mined cycle');
                 uint id = LibTokenId.encode(pool, cycle);
-                ids[i] = id;
-                amounts[i] = balances[id][msg.sender];
-                balances[id][msg.sender] = 0;
+                l.balances[id][msg.sender] = 0;
             }
         }
-        emit TransferBatch(msg.sender, msg.sender, address(0), ids, amounts);
+        emit Shrink(pool, start, end);
     }
 
     function getAgent(uint128 pool) external view returns(address) {

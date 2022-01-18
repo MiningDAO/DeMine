@@ -16,7 +16,7 @@ import './interfaces/IPoolAgent.sol';
 import './lib/LibERC2981.sol';
 import './facets/ERC2981Facet.sol';
 import './facets/ERC1155MetadataFacet.sol';
-import './facets/PoolAgent.sol';
+import './facets/PoolAgentFacet.sol';
 
 contract DeMineNFT is DiamondBase {
     using DiamondBaseStorage for DiamondBaseStorage.Layout;

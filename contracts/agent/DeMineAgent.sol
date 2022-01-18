@@ -9,11 +9,11 @@ import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondLoupe.sol';
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-import '../../shared/lib/LibDiamond.sol';
-import '../../nft/interfaces/IDeMineNFT.sol';
-import '../facets/MortgageFacet.sol';
-import '../facets/PrimaryMarketFacet.sol';
-import '../facets/BillingFacet.sol';
+import '../shared/lib/LibDiamond.sol';
+import '../nft/interfaces/IDeMineNFT.sol';
+import './facets/MortgageFacet.sol';
+import './facets/PrimaryMarketFacet.sol';
+import './facets/BillingFacet.sol';
 
 contract DeMineAgent is DiamondBase {
     using OwnableStorage for OwnableStorage.Layout;
