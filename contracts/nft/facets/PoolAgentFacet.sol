@@ -12,13 +12,10 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/LibTokenId.sol';
-import '../../agent/interfaces/IMortgage.sol';
-import '../interfaces/IDeMineNFT.sol';
-import '../interfaces/IPoolAgent.sol';
+import '../../agent/interfaces/IDeMineAgent.sol';
 import '../lib/AppStorage.sol';
 
 contract PoolAgentFacet is
-    IPoolAgent,
     OwnableInternal,
     PausableModifier
 {
@@ -27,7 +24,6 @@ contract PoolAgentFacet is
     using SafeERC20 for IERC20;
 
     event Mint(uint128 indexed, uint128, uint128, uint);
-    event Shrink(uint128 indexed, uint128, uint128);
     event RegisterPool(uint128 indexed, address indexed);
     event Finalize(uint128 indexed, address, uint, uint);
 
@@ -71,24 +67,8 @@ contract PoolAgentFacet is
             l.balances[id][msg.sender] += amount;
             s.cycles[cycle].supply += amount;
         }
-        IMortgage(agent).mortgage(start, end, amount, data);
+        IDeMineAgent(agent).postMint(start, end, amount, data);
         emit Mint(pool, start, end, amount);
-    }
-
-    function shrink(uint128 start, uint128 end) external override whenNotPaused {
-        require(end >= start, 'DeMineNFT: invalid input');
-        uint128 pool = s.pools[msg.sender];
-        require(pool > 0, 'DeMineNFT: only registered pool agent is allowed');
-        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
-        unchecked {
-            uint mining = s.mining + 1; // plus one in case it's lagging
-            for (uint128 cycle = start; cycle <= end; cycle++) {
-                require(cycle > mining, 'DeMineNFT: mined cycle');
-                uint id = LibTokenId.encode(pool, cycle);
-                l.balances[id][msg.sender] = 0;
-            }
-        }
-        emit Shrink(pool, start, end);
     }
 
     function getAgent(uint128 pool) external view returns(address) {

@@ -25,6 +25,29 @@ contract DeMineNFTFacet is
 
     event Alchemy(address indexed operator, address indexed account, uint income);
 
+    function shrink(address account, uint[] memory ids)
+        external
+        override
+        whenNotPaused
+    {
+        require(
+            msg.sender == account || isApprovedForAll(account, msg.sender),
+            'DeMineNFT: operator is not caller or approved'
+        );
+        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
+        uint[] memory amounts = new uint[](ids.length);
+        uint128 mining = s.mining;
+        for (uint i; i < ids.length; i++) {
+            uint128 cycle = LibTokenId.decode(ids[i]).cycle;
+            require(cycle >= mining, 'DeMineNFT: mined cycle');
+            uint balance = l.balances[ids[i]][account];
+            s.cycles[cycle].supply -= balance;
+            amounts[i] = balance;
+            l.balances[ids[i]][account] = 0;
+        }
+        emit TransferBatch(msg.sender, account, address(0), ids, amounts);
+    }
+
     function alchemize(address account, uint id)
         external
         whenNotPaused
@@ -54,10 +77,11 @@ contract DeMineNFTFacet is
             'DeMineNFT: operator is not caller or approved'
         );
         ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
+        uint mining = s.mining;
         uint[] memory amounts = new uint[](ids.length);
         for (uint i; i < ids.length; i++) {
             uint128 cycle = LibTokenId.decode(ids[i]).cycle;
-            require(cycle < s.mining, 'DeMineNFT: token not mined yet');
+            require(cycle < mining, 'DeMineNFT: token not mined yet');
             uint balance = l.balances[ids[i]][account];
             l.balances[ids[i]][account] = 0;
             income += balance * s.cycles[cycle].income;

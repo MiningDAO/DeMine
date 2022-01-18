@@ -12,7 +12,6 @@ import '@solidstate/contracts/proxy/diamond/IDiamondLoupe.sol';
 import '../shared/lib/LibDiamond.sol';
 import './interfaces/IERC2981.sol';
 import './interfaces/IDeMineNFT.sol';
-import './interfaces/IPoolAgent.sol';
 import './lib/LibERC2981.sol';
 import './facets/ERC2981Facet.sol';
 import './facets/ERC1155MetadataFacet.sol';
@@ -90,7 +89,7 @@ contract DeMineNFT is DiamondBase {
     ) internal returns(IDiamondCuttable.FacetCut memory) {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
 
-        bytes4[] memory selectors = new bytes4[](10);
+        bytes4[] memory selectors = new bytes4[](11);
         // register ERC1155
         selectors[0] = IERC1155.balanceOf.selector;
         selectors[1] = IERC1155.balanceOfBatch.selector;
@@ -101,32 +100,26 @@ contract DeMineNFT is DiamondBase {
         erc165.setSupportedInterface(type(IERC1155).interfaceId, true);
 
         // register IDeMineNFT
-        selectors[6] = IDeMineNFT.alchemize.selector;
+        selectors[6] = IDeMineNFT.shrink.selector;
         selectors[7] = IDeMineNFT.alchemizeBatch.selector;
         selectors[8] = IDeMineNFT.getMining.selector;
+        selectors[9] = IDeMineNFT.shrink.selector;
 
         // register DeMineNFTFacet
-        selectors[9] = DeMineNFTFacet.getCycle.selector;
+        selectors[10] = DeMineNFTFacet.getCycle.selector;
         erc165.setSupportedInterface(type(IDeMineNFT).interfaceId, true);
         return LibDiamond.genFacetCut(target, selectors);
     }
 
     function genCutPoolAgent(
         address target
-    ) internal returns(IDiamondCuttable.FacetCut memory) {
-        ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
-
-        bytes4[] memory selectors = new bytes4[](6);
-        // register IPoolAgent
-        selectors[0] = IPoolAgent.shrink.selector;
-        erc165.setSupportedInterface(type(IPoolAgent).interfaceId, true);
-
-        // register PoolAgent
-        selectors[1] = PoolAgentFacet.mint.selector;
-        selectors[2] = PoolAgentFacet.registerPool.selector;
-        selectors[3] = PoolAgentFacet.finalizeCycle.selector;
-        selectors[4] = PoolAgentFacet.getAgent.selector;
-        selectors[5] = PoolAgentFacet.getPool.selector;
+    ) internal pure returns(IDiamondCuttable.FacetCut memory) {
+        bytes4[] memory selectors = new bytes4[](5);
+        selectors[0] = PoolAgentFacet.mint.selector;
+        selectors[1] = PoolAgentFacet.registerPool.selector;
+        selectors[2] = PoolAgentFacet.finalizeCycle.selector;
+        selectors[3] = PoolAgentFacet.getAgent.selector;
+        selectors[4] = PoolAgentFacet.getPool.selector;
         return LibDiamond.genFacetCut(target, selectors);
     }
 }

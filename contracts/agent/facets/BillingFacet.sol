@@ -17,7 +17,6 @@ import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/Util.sol';
 import '../../shared/lib/LibTokenId.sol';
 import '../../nft/interfaces/IDeMineNFT.sol';
-import '../../nft/interfaces/IPoolAgent.sol';
 import '../lib/AppStorage.sol';
 import '../lib/BillingStorage.sol';
 
@@ -190,7 +189,12 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         uint128 start = shrinked > mining ? shrinked + 1 : mining + 1;
         uint128 end = mining + s.shrinkSize;
         if (start <= end) {
-            IPoolAgent(s.nft).shrink(start, end);
+            uint128 pool = s.id;
+            uint[] memory ids = new uint[](end - start + 1);
+            for (uint128 cycle = start; cycle <= end; cycle++) {
+                ids[cycle - start] = LibTokenId.encode(pool, cycle);
+            }
+            IDeMineNFT(s.nft).shrink(address(this), ids);
             s.shrinked = end;
         }
     }

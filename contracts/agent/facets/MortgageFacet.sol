@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import '../../shared/lib/Util.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/LibTokenId.sol';
-import '../interfaces/IMortgage.sol';
+import '../interfaces/IDeMineAgent.sol';
 import '../lib/AppStorage.sol';
 import '../lib/BillingStorage.sol';
 
@@ -24,7 +24,7 @@ import '../lib/BillingStorage.sol';
  * @dev the contract also implements IERC1155Receiver to receive and lock demine nft
  */
 contract MortgageFacet is
-    IMortgage,
+    IDeMineAgent,
     PausableModifier,
     OwnableInternal,
     ERC165
@@ -45,15 +45,14 @@ contract MortgageFacet is
     }
 
     /**
-     * @notice Mortgage your computation power(offline) and mint demine nft.
-     * Minted tokens are locked at DeMineAgent contract.
+     * @notice callback of mint function of DeMineNFT contract.
      * @param start DeMine nft id to mint
      * @param end DeMine nft id to mint
      * @param supply Amount for each token to mint. This also decide
      * amount of deposit mortgager has to pay
      * @param data Extra data with mortgager address encoded
      */
-    function mortgage(
+    function postMint(
         uint128 start,
         uint128 end,
         uint supply,
