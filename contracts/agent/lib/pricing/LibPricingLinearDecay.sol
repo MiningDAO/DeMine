@@ -3,6 +3,7 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
+import '../../../shared/lib/Util.sol';
 import '../AppStorage.sol';
 import './PricingStorage.sol';
 
@@ -10,7 +11,8 @@ library LibPricingLinearDecay {
     function priceOf(
         PricingStorage.Layout storage l,
         address account,
-        uint128 cycle
+        uint128 cycle,
+        uint tokenCost
     ) internal view returns(uint256) {
         PricingStorage.LinearDecay memory ld = l.linearDecay[account];
         if (cycle < ld.anchor) {
@@ -20,7 +22,7 @@ library LibPricingLinearDecay {
         uint256 price = ld.maxPrice * (
             ld.slopeBase - delta * ld.slope
         ) / ld.slopeBase;
-        return price > ld.minPrice ? price : ld.minPrice;
+        Util.max3(price, ld.minPrice, tokenCost);
     }
 
     function initialize(

@@ -14,26 +14,21 @@ struct Mortgage {
     uint deposit;
 }
 
-struct Cycle {
-    uint adjust; // per token
-    uint debt; // per token
-}
-
 struct AppStorage {
     IERC20 cost;
     IERC20 income;
-    address nft;
 
     uint tokenCost; // cost token
     uint deposit; // cost token
-
-    uint128 billing; // billing token
-    uint128 shrinked; // shrinking token
     uint8 shrinkSize; // num of tokens we shrink starting from next rewarding token
     uint8 minDepositDaysRequired;
+    address immutable nft;
+    uint128 immutable id;
+    uint128 billing; // billing token
+    uint128 shrinked; // shrinking token
+
     uint128 mortgageId;
     mapping(uint128 => Mortgage) mortgages;
-    mapping(uint128 => Cycles) cycles;
 
     // tokenId => account => price
     mapping(uint => mapping(address => uint)) balances;

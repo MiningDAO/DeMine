@@ -47,7 +47,7 @@ contract DeMineAgent is DiamondBase {
 
         // init storage
         AppStorage storage s = LibAppStorage.layout();
-        s.nft = IDeMineNFT(demineNFT);
+        s.nft = demineNFT;
         s.tokenCost = tokenCost;
         s.income = IERC20(income);
         s.cost = IERC20(cost);

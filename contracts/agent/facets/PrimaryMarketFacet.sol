@@ -129,7 +129,7 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         function(
             PricingStorage.Layout storage,
             address,
-            uint
+            uint128
         ) internal view returns(uint) f = priceF(l.strategy[from]);
         uint[] memory amounts = new uint[](cycles.length);
         for (uint i = 0; i < cycles.length; i++) {
@@ -137,11 +137,11 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             uint amount = maxAllowed(from, cycles[i], maxAmounts[i]);
             amounts[i] = amount;
             m.totalCost += m.tokenCost * amount;
-            m.totalPay += f(l, from, cycles[i]) * amount;
+            m.totalPay += f(l, from, cycles[i], m.tokenCost) * amount;
         }
         s.cost.safeTransferFrom(msg.sender, address(this), m.totalCost);
         s.cost.safeTransferFrom(msg.sender, from, m.totalPay - m.totalCost);
-        s.nft.safeBatchTransferFrom(address(this), msg.sender, cycles, amounts, "");
+        IERC1155(s.nft).safeBatchTransferFrom(address(this), msg.sender, cycles, amounts, "");
         emit Claim(msg.sender, from, cycles, amounts);
         return amounts;
     }
@@ -162,9 +162,10 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             address,
             uint
         ) internal view returns(uint) f = priceF(l.strategy[from]);
+        uint tokenCost = s.tokenCost;
         uint[] memory prices = new uint[](cycles.length);
         for (uint i = 0; i < cycles.length; i++) {
-            prices[i] = f(l, from, cycles[i]);
+            prices[i] = f(l, from, cycles[i], tokenCost);
         }
         return prices;
     }
@@ -219,7 +220,7 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         function(
             PricingStorage.Layout storage,
             address,
-            uint
+            uint128
         ) internal view returns(uint) f
     ) {
         if (strategy == PricingStorage.PricingStrategy.STATIC) {

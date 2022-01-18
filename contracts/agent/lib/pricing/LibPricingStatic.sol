@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.4;
+pragma experimental ABIEncoderV2;
 
+import '../../../shared/lib/Util.sol';
 import '../AppStorage.sol';
 import './PricingStorage.sol';
 
@@ -9,10 +11,14 @@ library LibPricingStatic {
     function priceOf(
         PricingStorage.Layout storage l,
         address account,
-        uint128 cycle
+        uint128 cycle,
+        uint tokenCost
     ) internal view returns(uint256) {
         uint256 tokenPrice = l.staticOverride[account][cycle];
-        return tokenPrice > 0 ? tokenPrice : l.staticBase[account];
+        Util.max2(
+            tokenPrice > 0 ? tokenPrice : l.staticBase[account],
+            tokenCost
+        );
     }
 
     function initialize(

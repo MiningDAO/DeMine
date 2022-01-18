@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.4;
+pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/access/OwnableInternal.sol';
 import '@solidstate/contracts/utils/AddressUtils.sol';
@@ -38,18 +39,6 @@ contract PoolAgentFacet is
         emit RegisterPool(pool, agent);
     }
 
-    function finalizeCycle(address source, uint income) external onlyOwner {
-        uint mining = s.mining;
-        s.cycles[mining].income = income;
-        uint supply = s.cycles[mining].supply;
-        uint total = supply * income;
-        if (total > 0) {
-            s.income.safeTransferFrom(source, address(this), total);
-        }
-        emit Finalize(mining, source, income, supply);
-        s.mining = mining + 1;
-    }
-
     function mintBatch(
         uint128[] memory cycles,
         uint[] memory amounts
@@ -61,8 +50,10 @@ contract PoolAgentFacet is
             'DeMineAgent: array length mismatch'
         );
         ERC1155BaseStorage.Layout storage balances = ERC1155BaseStorage.layout();
+        uint mining = s.mining;
         uint[] memory ids = new uint[](cycles.length);
         for (uint i; i < cycles.length; i++) {
+            require(cycles[i] > mining, 'DeMineNFT: outdated cycle');
             uint id = LibTokenId.encode(pool, cycles[i]);
             ids[i] = id;
             balances[id][msg.sender] += amounts[i];
@@ -71,23 +62,24 @@ contract PoolAgentFacet is
         emit TransferBatch(msg.sender, address(0), msg.sender, ids, amounts);
     }
 
-    function shrink(uint128[] cycles) external whenNotPaused returns(uint[] memory) {
+    function shrink(uint128 start, uint128 end) external whenNotPaused {
+        require(end >= start, 'DeMineNFT: invalid input');
         uint128 pool = s.pools[msg.sender];
         require(pool > 0, 'DeMineNFT: only registered agent is allowed');
         ERC1155BaseStorage.Layout storage balances = ERC1155BaseStorage.layout();
-        uint[] memory ids = new uint[](cycles.length);
-        uint[] memory amounts = new uint[](cycles.length);
+        uint[] memory ids = new uint[](end - start + 1);
+        uint[] memory amounts = new uint[](end - start + 1);
         unchecked {
-            for (uint256 i; i < cycles.length; i++) {
-                require(cycle > s.mining + 1, 'DeMineNFT: token already mined or mining');
-                uint id = LibTokenId.encode(pool, cycles[i]);
+            uint mining = s.mining + 1; // plus one in case it's lagging
+            for (uint128 cycle = start; cycle <= end; cycle++) {
+                require(cycle > mining, 'DeMineNFT: outdated cycle');
+                uint id = LibTokenId.encode(pool, cycle);
                 ids[i] = id;
                 amounts[i] = balances[id][msg.sender];
                 balances[id][msg.sender] = 0;
             }
         }
-        emit TransferBatch(msg.sender, account, address(0), ids, amounts);
-        return amounts;
+        emit TransferBatch(msg.sender, msg.sender, address(0), ids, amounts);
     }
 
     function getAgent(uint128 pool) external view returns(address) {
@@ -96,9 +88,5 @@ contract PoolAgentFacet is
 
     function getPool(address agent) external view returns(uint128) {
         return s.pools[agent];
-    }
-
-    function getCycle(uint128 cycle) external view returns(Cycle memory) {
-        return s.cycles[cycle];
     }
 }

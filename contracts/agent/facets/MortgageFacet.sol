@@ -6,11 +6,13 @@ pragma experimental ABIEncoderV2;
 import '@solcyclestate/contracts/access/OwnableInternal.sol';
 import '@solcyclestate/contracts/introspection/ERC165.sol';
 import '@solcyclestate/contracts/token/ERC1155/IERC1155Receiver.sol';
+import "@openzeppelin/contracts/interfaces/IERC1155.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../shared/lib/Util.sol';
 import '../../shared/lib/LibPausable.sol';
+import '../../nft/interfaces/IPoolAgent.sol';
 import '../lib/AppStorage.sol';
 
 /**
@@ -34,7 +36,7 @@ contract MortgageFacet is
 
     modifier onlyMinted(address from) {
         require(
-            msg.sender == address(s.nft) && from == address(0),
+            msg.sender == s.nft && from == address(0),
             'DeMineAgent: only minted tokens from nft contract allowed'
         );
         _;
@@ -76,7 +78,7 @@ contract MortgageFacet is
         );
         s.deposit += deposit;
         s.mortgageId = mortgageId + 1;
-        s.nft.mintBatch(cycles, supplies);
+        IPoolAgent(s.nft).mintBatch(cycles, supplies);
         emit NewMortgage(msg.sender, mortgageId);
     }
 
@@ -105,7 +107,7 @@ contract MortgageFacet is
         }
         s.cost.safeTransferFrom(msg.sender, address(this), totalCost);
         emit Redeem(msg.sender, cycles, amounts);
-        s.nft.safeBatchTransferFrom(address(this), msg.sender, cycles, amounts, "");
+        IERC1155(s.nft).safeBatchTransferFrom(address(this), msg.sender, cycles, amounts, "");
     }
 
     /**

@@ -13,9 +13,9 @@ interface IPoolAgent is IERC1155Internal {
     function mintBatch(uint128[] memory cycles, uint[] memory amounts) external;
 
     /**
-     * @dev burn tokens not mined and return balance of token, can only called by registered agent
-     * @param cycles List of cycle to burn with pool
-     * @return balance of token at pool and cycle
+     * @dev burn tokens not mined, can only called by registered agent
+     * @param start Start cycle
+     * @param end End cycle
      */
-    function shrink(uint128[] cycles) external returns(uint[] memory);
+    function shrink(uint128 start, uint128 end) external;
 }

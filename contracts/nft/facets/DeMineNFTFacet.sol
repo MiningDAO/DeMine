@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.4;
+pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/introspection/ERC165.sol';
 import '@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol';
@@ -19,6 +20,18 @@ contract ERC1155WithAgentFacet is
     using SafeERC20 for IERC20;
 
     event Alchemy(address indexed operator, address indexed account, uint income);
+
+    function finalizeCycle(address source, uint income) external onlyOwner {
+        uint mining = s.mining;
+        s.cycles[mining].income = income;
+        uint supply = s.cycles[mining].supply;
+        uint total = supply * income;
+        if (total > 0) {
+            s.income.safeTransferFrom(source, address(this), total);
+        }
+        emit Finalize(mining, source, income, supply);
+        s.mining = mining + 1;
+    }
 
     function alchemize(address account, uint id) external whenNotPaused override {
         TokenId memory id = LibTokenId.decode(id);
@@ -58,6 +71,14 @@ contract ERC1155WithAgentFacet is
         emit TransferBatch(msg.sender, account, address(0), ids, amounts);
         emit Alchemy(msg.sender, account, income);
         return income;
+    }
+
+    function getMining() external view returns(uint128) {
+        return s.mining;
+    }
+
+    function getCycle(uint128 cycle) external view returns(Cycle memory) {
+        return s.cycles[cycle];
     }
 
     function _beforeTokenTransfer(

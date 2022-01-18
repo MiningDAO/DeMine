@@ -103,6 +103,8 @@ contract DeMineNFT is DiamondBase {
         // register ERC1155WithAgent
         selectors[6] = IDeMineNFT.alchemize.selector;
         selectors[7] = IDeMineNFT.alchemizeBatch.selector;
+        selectors[8] = IDeMineNFT.getMining.selector;
+        selectors[9] = IDeMineNFT.getCycle.selector;
         erc165.setSupportedInterface(type(IDeMineNFT).interfaceId, true);
         return LibDiamond.genFacetCut(target, selectors);
     }
@@ -112,7 +114,7 @@ contract DeMineNFT is DiamondBase {
     ) internal returns(IDiamondCuttable.FacetCut memory) {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
 
-        bytes4[] memory selectors = new bytes4[](10);
+        bytes4[] memory selectors = new bytes4[](6);
         // register IPoolAgent
         selectors[0] = IPoolAgent.mintBatch.selector;
         selectors[1] = IPoolAgent.shrink.selector;
@@ -123,7 +125,6 @@ contract DeMineNFT is DiamondBase {
         selectors[3] = PoolAgentFacet.finalizeCycle.selector;
         selectors[4] = PoolAgentFacet.getAgent.selector;
         selectors[5] = PoolAgentFacet.getPool.selector;
-        selectors[6] = PoolAgentFacet.getCycle.selector;
         return LibDiamond.genFacetCut(target, selectors);
     }
 }

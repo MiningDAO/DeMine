@@ -5,25 +5,31 @@ pragma solidity 0.8.4;
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 library BillingStorage {
+    enum Stage{ NOT_STARTED, SALE_ONGOING }
+
     struct LockedPrice {
         uint256 unitSize;
         uint256 unitPrice;
         uint expireAt;
     }
 
+    // do not add field to this struct,
+    // migrate to new struct if needed
+    struct Statement {
+        uint balance;
+        uint income;
+        uint debt;
+    }
+
     struct Layout {
-        uint sold;
-        uint saleExpireAt;
+        Stage stage;
         uint16 discount; // 10000 based
         uint16 saleDuration; // as second
         uint16 priceLockDuration; // as second
-        uint startAt; // timestamp
-        uint billing; // tokenId
-        uint balance; // balance of billing token agent holds
-        uint income;
-        uint debt;
+        uint saleExpireAt; // timestamp
         AggregatorV3Interface chainlink;
         address swapRouter;
+        mapping(uint128 => Statement) statements;
         mapping(address => LockedPrice) lockedPrices;
     }
 
