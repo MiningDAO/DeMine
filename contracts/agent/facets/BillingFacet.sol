@@ -17,6 +17,7 @@ import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/Util.sol';
 import '../../shared/lib/LibTokenId.sol';
 import '../../nft/interfaces/IDeMineNFT.sol';
+import '../../nft/interfaces/IPoolAgent.sol';
 import '../lib/AppStorage.sol';
 import '../lib/BillingStorage.sol';
 
@@ -40,20 +41,21 @@ contract BillingFacet is PausableModifier, OwnableInternal {
      *         It will try to sell income token at Uniswap
      *         and start an income token sale if it fails
      */
-    function billing() external onlyOwner {
+    function finalize() external onlyOwner {
         BillingStorage.Layout storage l = BillingStorage.layout();
         require(
             l.stage == BillingStorage.Stage.NOT_STARTED,
             'DeMineAgent: billing in progress'
         );
         uint128 billing = s.billing;
-        uint tokenId = LibTokenId(s.pool, billing);
+        uint tokenId = LibTokenId.encode(s.id, billing);
         uint balance = IERC1155(s.nft).balanceOf(address(this), tokenId);
         if (balance > 0) {
             uint income = IDeMineNFT(s.nft).alchemize(address(this), tokenId);
             uint debt = s.tokenCost * balance;
             (bool success, uint sold) = trySwap(l.swapRouter, income, debt);
             if (success) {
+                l.statements[billing] = BillingStorage.Statement(balance, income - sold, 0);
                 close(billing);
             } else {
                 l.statements[billing] = BillingStorage.Statement(balance, income, debt);
@@ -106,10 +108,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             'DeMineAgent: no sale on-going'
         );
         BillingStorage.LockedPrice memory p = l.lockedPrices[msg.sender];
-        require(
-            block.timestamp < p.expireAt,
-            'DeMineAgent: price expired'
-        );
+        require(block.timestamp < p.expireAt, 'DeMineAgent: price expired');
         uint128 billing = s.billing;
         BillingStorage.Statement memory st = l.statements[billing];
         uint unitToBuy = Util.min3(
@@ -124,7 +123,6 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             l.statements[billing].debt = st.debt - subtotal;
         } else {
             l.statements[billing].debt = 0;
-            l.stage = BillingStorage.Stage.NOT_STARTED;
             close(billing);
         }
         s.cost.safeTransferFrom(msg.sender, address(this), subtotal);
@@ -166,34 +164,33 @@ contract BillingFacet is PausableModifier, OwnableInternal {
      * @param cycles DeMine NFT cycles to withdraw
      */
     function withdraw(uint128[] calldata cycles) external whenNotPaused {
-        uint256 totalReward;
-        uint256 totalDebt;
+        BillingStorage.Layout storage l = BillingStorage.layout();
+        uint256 income;
+        uint256 debt;
         for (uint i = 0; i < cycles.length; i++) {
             require(cycles[i] < s.billing, 'DeMineAgent: not billed yet');
             BillingStorage.Statement memory st = l.statements[cycles[i]];
             uint256 balance = s.balances[cycles[i]][msg.sender];
-            totalReward += st.income * balance / st.balance;
-            totalDebt += Util.ceil(st.debt * balance, st.balance);
-            s.balances[cycles[i]][msg.sender] = 0;
+            if (balance > 0) {
+                income += st.income * balance / st.balance;
+                debt += Util.ceil(st.debt * balance, st.balance);
+                s.balances[cycles[i]][msg.sender] = 0;
+            }
         }
-        s.cost.safeTransferFrom(msg.sender, address(this), totalDebt);
-        s.income.safeTransfer(msg.sender, totalReward);
-    }
-
-    function close(uint128 billing) private {
-        s.billing = billing + 1;
-        emit CloseBilling(billing);
+        s.cost.safeTransferFrom(msg.sender, address(this), debt);
+        s.income.safeTransfer(msg.sender, income);
     }
 
     /**
      * @dev shrink to current mining cycle + s.shrinkSize
      */
     function shrink() private {
-        uint mining = IDeMineNFT(s.nft).getMining();
-        uint start = Util.max(s.shrinked, mining) + 1;
-        uint end = mining + s.shrinkSize;
+        uint128 mining = IDeMineNFT(s.nft).getMining();
+        uint128 shrinked = s.shrinked;
+        uint128 start = shrinked > mining ? shrinked + 1 : mining + 1;
+        uint128 end = mining + s.shrinkSize;
         if (start <= end) {
-            s.nft.shrink(start, end);
+            IPoolAgent(s.nft).shrink(start, end);
             s.shrinked = end;
         }
     }
@@ -265,5 +262,10 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             uint unitSize = Util.ceil(income, cost);
             return (unitSize, Util.ceil(cost, income / unitSize));
         }
+    }
+
+    function close(uint128 billing) private {
+        s.billing = billing + 1;
+        emit CloseBilling(billing);
     }
 }

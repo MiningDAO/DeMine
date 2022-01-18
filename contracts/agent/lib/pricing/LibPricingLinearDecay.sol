@@ -22,7 +22,7 @@ library LibPricingLinearDecay {
         uint256 price = ld.maxPrice * (
             ld.slopeBase - delta * ld.slope
         ) / ld.slopeBase;
-        Util.max3(price, ld.minPrice, tokenCost);
+        return Util.max3(price, ld.minPrice, tokenCost);
     }
 
     function initialize(
@@ -51,7 +51,7 @@ abstract contract PricingLinearDecay {
     function setLinearDecay(
         PricingStorage.LinearDecay memory ld
     ) external {
-        PricingStorage.layout().linearDecay[from] = ld;
+        PricingStorage.layout().linearDecay[msg.sender] = ld;
         emit SetLinerPricing(
             msg.sender,
             ld.anchor,

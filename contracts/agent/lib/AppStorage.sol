@@ -4,7 +4,6 @@ pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import '../../nft/interfaces/IDeMineNFT.sol';
 
 struct Mortgage {
     address owner;
@@ -22,8 +21,8 @@ struct AppStorage {
     uint deposit; // cost token
     uint8 shrinkSize; // num of tokens we shrink starting from next rewarding token
     uint8 minDepositDaysRequired;
-    address immutable nft;
-    uint128 immutable id;
+    address nft;
+    uint128 id;
     uint128 billing; // billing token
     uint128 shrinked; // shrinking token
 

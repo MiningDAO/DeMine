@@ -16,7 +16,9 @@ import './facets/PrimaryMarketFacet.sol';
 import './facets/BillingFacet.sol';
 
 contract DeMineAgent is DiamondBase {
+    AppStorage internal s;
     using OwnableStorage for OwnableStorage.Layout;
+
     constructor(
         address diamondFacet,
         address mortgageFacet,
@@ -46,7 +48,6 @@ contract DeMineAgent is DiamondBase {
         require(success, string(returndata));
 
         // init storage
-        AppStorage storage s = LibAppStorage.layout();
         s.nft = demineNFT;
         s.tokenCost = tokenCost;
         s.income = IERC20(income);
@@ -56,13 +57,11 @@ contract DeMineAgent is DiamondBase {
     function genCutMortagage(
         address target
     ) internal pure returns(IDiamondCuttable.FacetCut memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = MortgageFacet.mortgage.selector;
         selectors[1] = MortgageFacet.redeem.selector;
         selectors[2] = MortgageFacet.close.selector;
         selectors[3] = MortgageFacet.getMortgage.selector;
-        selectors[4] = MortgageFacet.onERC1155Received.selector;
-        selectors[5] = MortgageFacet.onERC1155BatchReceived.selector;
         return LibDiamond.genFacetCut(target, selectors);
     }
 
@@ -86,10 +85,10 @@ contract DeMineAgent is DiamondBase {
         address target
     ) internal pure returns(IDiamondCuttable.FacetCut memory) {
         bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = BillingFacet.finalize.selector;
-        selectors[1] = BillingFacet.lockPrice.selector;
-        selectors[2] = BillingFacet.buyWithLockedPrice.selector;
-        selectors[3] = BillingFacet.manualCloseBilling.selector;
+        selectors[0] = BillingFacet.lockPrice.selector;
+        selectors[1] = BillingFacet.buyWithLockedPrice.selector;
+        selectors[2] = BillingFacet.closeBilling.selector;
+        selectors[3] = BillingFacet.withdraw.selector;
         return LibDiamond.genFacetCut(target, selectors);
     }
 }

@@ -16,11 +16,11 @@ import './interfaces/IPoolAgent.sol';
 import './lib/LibERC2981.sol';
 import './facets/ERC2981Facet.sol';
 import './facets/ERC1155MetadataFacet.sol';
+import './facets/DeMineNFTFacet.sol';
 import './facets/PoolAgentFacet.sol';
 
 contract DeMineNFT is DiamondBase {
     using DiamondBaseStorage for DiamondBaseStorage.Layout;
-    using LibERC1155WithAgent for LibERC1155WithAgent.Layout;
     using OwnableStorage for OwnableStorage.Layout;
     using ERC165Storage for ERC165Storage.Layout;
 
@@ -100,11 +100,13 @@ contract DeMineNFT is DiamondBase {
         selectors[5] = IERC1155.safeBatchTransferFrom.selector;
         erc165.setSupportedInterface(type(IERC1155).interfaceId, true);
 
-        // register ERC1155WithAgent
+        // register IDeMineNFT
         selectors[6] = IDeMineNFT.alchemize.selector;
         selectors[7] = IDeMineNFT.alchemizeBatch.selector;
         selectors[8] = IDeMineNFT.getMining.selector;
-        selectors[9] = IDeMineNFT.getCycle.selector;
+
+        // register DeMineNFTFacet
+        selectors[9] = DeMineNFTFacet.getCycle.selector;
         erc165.setSupportedInterface(type(IDeMineNFT).interfaceId, true);
         return LibDiamond.genFacetCut(target, selectors);
     }
@@ -116,11 +118,11 @@ contract DeMineNFT is DiamondBase {
 
         bytes4[] memory selectors = new bytes4[](6);
         // register IPoolAgent
-        selectors[0] = IPoolAgent.mintBatch.selector;
-        selectors[1] = IPoolAgent.shrink.selector;
+        selectors[0] = IPoolAgent.shrink.selector;
         erc165.setSupportedInterface(type(IPoolAgent).interfaceId, true);
 
         // register PoolAgent
+        selectors[1] = PoolAgentFacet.mint.selector;
         selectors[2] = PoolAgentFacet.registerPool.selector;
         selectors[3] = PoolAgentFacet.finalizeCycle.selector;
         selectors[4] = PoolAgentFacet.getAgent.selector;

@@ -6,11 +6,15 @@ pragma experimental ABIEncoderV2;
 import '@solidstate/contracts/introspection/ERC165.sol';
 import '@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol';
 
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/LibTokenId.sol';
 import '../interfaces/IDeMineNFT.sol';
+import '../lib/AppStorage.sol';
 
-contract ERC1155WithAgentFacet is
+contract DeMineNFTFacet is
     IDeMineNFT,
     ERC1155Base,
     PausableModifier,
@@ -21,28 +25,21 @@ contract ERC1155WithAgentFacet is
 
     event Alchemy(address indexed operator, address indexed account, uint income);
 
-    function finalizeCycle(address source, uint income) external onlyOwner {
-        uint mining = s.mining;
-        s.cycles[mining].income = income;
-        uint supply = s.cycles[mining].supply;
-        uint total = supply * income;
-        if (total > 0) {
-            s.income.safeTransferFrom(source, address(this), total);
-        }
-        emit Finalize(mining, source, income, supply);
-        s.mining = mining + 1;
-    }
-
-    function alchemize(address account, uint id) external whenNotPaused override {
-        TokenId memory id = LibTokenId.decode(id);
-        require(id.cycle < s.mining, 'DeMineNFT: token not mined yet');
+    function alchemize(address account, uint id)
+        external
+        whenNotPaused
+        override
+        returns(uint income)
+    {
+        uint128 cycle = LibTokenId.decode(id).cycle;
+        require(cycle < s.mining, 'DeMineNFT: token not mined yet');
         require(
             msg.sender == account || isApprovedForAll(account, msg.sender),
             'DeMineNFT: operator is not caller or approved'
         );
-        ERC1155BaseStorage.Layout storage balances = ERC1155BaseStorage.layout();
-        balance = balances[id][account];
-        uint income = balance * s.cycles[id.cycle].income * balance;
+        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
+        uint balance = l.balances[id][account];
+        income = s.cycles[cycle].income * balance;
         s.income.safeTransfer(account, income);
         emit TransferSingle(msg.sender, account, address(0), id, balance);
         emit Alchemy(msg.sender, account, income);
@@ -51,20 +48,19 @@ contract ERC1155WithAgentFacet is
     function alchemizeBatch(
         address account,
         uint[] memory ids
-    ) external override whenNotPaused returns(uint) {
+    ) external override whenNotPaused returns(uint income) {
         require(
             msg.sender == account || isApprovedForAll(account, msg.sender),
             'DeMineNFT: operator is not caller or approved'
         );
-        ERC1155BaseStorage.Layout storage balances = ERC1155BaseStorage.layout();
-        uint income;
+        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
         uint[] memory amounts = new uint[](ids.length);
         for (uint i; i < ids.length; i++) {
-            TokenId memory id = LibTokenId.decode(ids[i]);
-            require(id.cycle < s.mining, 'DeMineNFT: token not mined yet');
-            uint balane = balances[id][account];
-            balances[id][account] = 0;
-            income += balance * s.cycles[id.cycle].income;
+            uint128 cycle = LibTokenId.decode(ids[i]).cycle;
+            require(cycle < s.mining, 'DeMineNFT: token not mined yet');
+            uint balance = l.balances[ids[i]][account];
+            l.balances[ids[i]][account] = 0;
+            income += balance * s.cycles[cycle].income;
             amounts[i] = balance;
         }
         s.income.safeTransfer(account, income);
@@ -73,7 +69,7 @@ contract ERC1155WithAgentFacet is
         return income;
     }
 
-    function getMining() external view returns(uint128) {
+    function getMining() external view override returns(uint128) {
         return s.mining;
     }
 

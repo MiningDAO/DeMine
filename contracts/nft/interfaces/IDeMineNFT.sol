@@ -4,7 +4,6 @@ pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/token/ERC1155/IERC1155Internal.sol';
-import '../lib/AppStorage.sol';
 
 /**
  * @dev Interface for DeMineNFT for DeMineAgent
@@ -24,9 +23,7 @@ interface IDeMineNFT is IERC1155Internal {
      * @param ids List of token ids to alchemize
      * @return total income
      */
-    function alchemizeBatch(address account, uint[] ids) external returns(uint);
+    function alchemizeBatch(address account, uint[] memory ids) external returns(uint);
 
     function getMining() external view returns(uint128);
-
-    function getCycle(uint128 cycle) external view returns(Cycle);
 }

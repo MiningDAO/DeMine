@@ -12,5 +12,5 @@ interface IMortgage {
      * amount of deposit mortgager has to pay
      * @param data Extra data with mortgager address encoded
      */
-    function mortgage(uint128 start, uint128 end, uint supply, bytes memory data) external;
+    function mortgage(uint128 start, uint128 end, uint supply, bytes memory data) external returns(uint128);
 }

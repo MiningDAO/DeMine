@@ -9,7 +9,7 @@ struct Cycle {
     uint income;
 }
 
-struct Layout {
+struct AppStorage {
     // pool/agent registration
     mapping(address => uint128) pools;
     mapping(uint128 => address) agents;

@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../shared/lib/LibPausable.sol';
+import '../../shared/lib/LibTokenId.sol';
 import '../../shared/lib/Util.sol';
 import '../lib/pricing/LibPricingStatic.sol';
 import '../lib/pricing/LibPricingLinearDecay.sol';
@@ -22,21 +23,22 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
 
     using SafeERC20 for IERC20;
 
-    event Claim(address indexed, address indexed, uint[], uint[]);
+    event Claim(address indexed, address indexed, uint128[], uint[]);
     event IncreaseAllowance(
         address indexed,
         address indexed,
-        uint[],
+        uint128[],
         uint[]
     );
     event DecreaseAllowance(
         address indexed,
         address indexed,
-        uint[],
+        uint128[],
         uint[]
     );
 
     struct ClaimMetadata {
+        uint128 pool;
         uint128 billing;
         uint tokenCost;
         uint totalCost;
@@ -55,9 +57,9 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         PricingStorage.Layout storage l = PricingStorage.layout();
         l.strategy[msg.sender] = strategy;
         if (strategy == PricingStorage.PricingStrategy.STATIC) {
-            LibPricingStatic.initialize(l, s.tokenCost, msg.sender, args);
+            LibPricingStatic.initialize(l, msg.sender, args);
         } else if (strategy == PricingStorage.PricingStrategy.LINEAR_DECAY) {
-            LibPricingLinearDecay.initialize(l, s.tokenCost, msg.sender, args);
+            LibPricingLinearDecay.initialize(l, msg.sender, args);
         }
     }
 
@@ -125,16 +127,19 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             cycles.length == maxAmounts.length,
             "TokenLocker: array length mismatch"
         );
-        ClaimMetadata memory m = ClaimMetadata(s.billing, s.tokenCost, 0, 0);
+        ClaimMetadata memory m = ClaimMetadata(s.id, s.billing, s.tokenCost, 0, 0);
         PricingStorage.Layout storage l = PricingStorage.layout();
         function(
             PricingStorage.Layout storage,
             address,
-            uint128
+            uint128,
+            uint
         ) internal view returns(uint) f = priceF(l.strategy[from]);
+        uint[] memory ids = new uint[](cycles.length);
         uint[] memory amounts = new uint[](cycles.length);
         for (uint i = 0; i < cycles.length; i++) {
             require(cycles[i] > m.billing, 'DeMineAgent: billing token');
+            ids[i] = LibTokenId.encode(m.pool, cycles[i]);
             uint amount = maxAllowed(from, cycles[i], maxAmounts[i]);
             amounts[i] = amount;
             m.totalCost += m.tokenCost * amount;
@@ -142,7 +147,7 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         }
         s.cost.safeTransferFrom(msg.sender, address(this), m.totalCost);
         s.cost.safeTransferFrom(msg.sender, from, m.totalPay - m.totalCost);
-        IERC1155(s.nft).safeBatchTransferFrom(address(this), msg.sender, cycles, amounts, "");
+        IERC1155(s.nft).safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
         emit Claim(msg.sender, from, cycles, amounts);
         return amounts;
     }
@@ -161,6 +166,7 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         function(
             PricingStorage.Layout storage,
             address,
+            uint128,
             uint
         ) internal view returns(uint) f = priceF(l.strategy[from]);
         uint tokenCost = s.tokenCost;
@@ -221,7 +227,8 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         function(
             PricingStorage.Layout storage,
             address,
-            uint128
+            uint128,
+            uint
         ) internal view returns(uint) f
     ) {
         if (strategy == PricingStorage.PricingStrategy.STATIC) {

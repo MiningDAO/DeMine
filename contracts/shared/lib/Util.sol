@@ -7,6 +7,10 @@ library Util {
         return ((a + m - 1) / m) * m;
     }
 
+    function max3(uint a, uint b, uint c) internal pure returns(uint) {
+        return a > b ? max2(a, c) : max2(b, c);
+    }
+
     function max2(uint a, uint b) internal pure returns(uint) {
         return a > b ? a : b;
     }
