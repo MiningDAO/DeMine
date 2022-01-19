@@ -5,30 +5,30 @@ pragma solidity 0.8.4;
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-struct Mortgage {
-    address owner;
-    uint128 start;
-    uint128 end;
-    uint supply;
-    uint deposit;
+struct Account {
+    uint start; // starting from 2**256 - 1 - start
+    uint end;
+    uint maxBalance;
+}
+
+struct Statement {
+    uint balance;
+    uint income;
+    uint debt;
 }
 
 struct AppStorage {
     IERC20 cost;
     IERC20 income;
-
-    uint tokenCost; // cost token
-    uint deposit; // cost token
-    uint8 shrinkSize; // num of tokens we shrink starting from next rewarding token
-    uint8 minDepositDaysRequired;
     address nft;
-    uint128 id;
-    uint128 billing; // billing token
-    uint128 shrinked; // shrinking token
 
-    uint128 mortgageId;
-    mapping(uint128 => Mortgage) mortgages;
+    uint8 depositMultiplier; // deposit = maxBalance * tokenCost * depositMultiplier
+    uint tokenCost; // cost per nft in cost token
+    uint deposit; // total deposit in cost token
 
+    uint billing; // billing token
+    mapping(uint => Statement) statements;
+    mapping(address => Account) accounts;
     // tokenId => account => price
     mapping(uint => mapping(address => uint)) balances;
     // owner => buyer => allowance

@@ -11,10 +11,10 @@ library LibPricingStatic {
     function priceOf(
         PricingStorage.Layout storage l,
         address account,
-        uint128 cycle,
+        uint id,
         uint tokenCost
     ) internal view returns(uint) {
-        uint tokenPrice = l.staticOverride[account][cycle];
+        uint tokenPrice = l.staticOverride[account][id];
         return Util.max2(
             tokenPrice > 0 ? tokenPrice : l.staticBase[account],
             tokenCost
@@ -28,25 +28,25 @@ library LibPricingStatic {
     ) internal {
         (
             uint basePrice,
-            uint128[] memory cycles,
+            uint[] memory ids,
             uint[] memory prices
-        ) = abi.decode(args, (uint, uint128[], uint[]));
+        ) = abi.decode(args, (uint, uint[], uint[]));
         l.staticBase[from] = basePrice;
-        setOverride(l, from, cycles, prices);
+        setOverride(l, from, ids, prices);
     }
 
     function setOverride(
         PricingStorage.Layout storage l,
         address from,
-        uint128[] memory cycles,
+        uint[] memory ids,
         uint[] memory prices
     ) internal {
         require(
-            cycles.length == prices.length,
+            ids.length == prices.length,
             "LibPricingStatic: base price is lower than token cost"
         );
-        for (uint i = 0; i < cycles.length; i++) {
-            l.staticOverride[from][cycles[i]] = prices[i];
+        for (uint i = 0; i < ids.length; i++) {
+            l.staticOverride[from][ids[i]] = prices[i];
         }
     }
 }
@@ -55,7 +55,7 @@ abstract contract PricingStatic {
     using LibPricingStatic for PricingStorage.Layout;
 
     event SetStaticBase(address indexed, uint);
-    event SetStaticOverride(address indexed, uint128[], uint[]);
+    event SetStaticOverride(address indexed, uint[], uint[]);
 
     function setStaticBase(uint price) external {
         PricingStorage.layout().staticBase[msg.sender] = price;
@@ -63,10 +63,10 @@ abstract contract PricingStatic {
     }
 
     function setStaticOverride(
-        uint128[] memory cycles,
+        uint[] memory ids,
         uint[] memory prices
     ) external {
-        PricingStorage.layout().setOverride(msg.sender, cycles, prices);
-        emit SetStaticOverride(msg.sender, cycles, prices);
+        PricingStorage.layout().setOverride(msg.sender, ids, prices);
+        emit SetStaticOverride(msg.sender, ids, prices);
     }
 }

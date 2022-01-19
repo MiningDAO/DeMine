@@ -8,28 +8,21 @@ library BillingStorage {
     enum Stage{ NOT_STARTED, SALE_ONGOING }
 
     struct LockedPrice {
-        uint256 unitSize;
-        uint256 unitPrice;
+        uint unitSize;
+        uint unitPrice;
         uint expireAt;
     }
 
-    // do not add field to this struct,
-    // migrate to new struct if needed
-    struct Statement {
-        uint balance;
-        uint income;
-        uint debt;
-    }
-
     struct Layout {
+        AggregatorV3Interface chainlink;
+        address swapRouter;
         Stage stage;
+        uint8 shrinkSize; // num of tokens we shrink starting from mining
         uint16 discount; // 10000 based
         uint16 saleDuration; // as second
         uint16 priceLockDuration; // as second
+        uint shrinked; // latest token shrinked
         uint saleExpireAt; // timestamp
-        AggregatorV3Interface chainlink;
-        address swapRouter;
-        mapping(uint128 => Statement) statements;
         mapping(address => LockedPrice) lockedPrices;
     }
 

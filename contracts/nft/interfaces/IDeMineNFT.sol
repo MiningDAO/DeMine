@@ -25,12 +25,12 @@ interface IDeMineNFT is IERC1155Internal {
     function alchemize(address account, uint id) external returns(uint);
 
     /**
-     * @dev burn tokens mined for one pool in batch and cashout income
+     * @dev burn tokens in batch and cashout income
      * @param account Address of token holder
      * @param ids List of token ids to alchemize
      * @return total income
      */
     function alchemizeBatch(address account, uint[] memory ids) external returns(uint);
 
-    function getMining() external view returns(uint128);
+    function getMining() external view returns(uint);
 }

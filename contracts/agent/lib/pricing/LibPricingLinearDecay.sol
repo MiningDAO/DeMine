@@ -11,17 +11,14 @@ library LibPricingLinearDecay {
     function priceOf(
         PricingStorage.Layout storage l,
         address account,
-        uint128 cycle,
+        uint id,
         uint tokenCost
-    ) internal view returns(uint256) {
+    ) internal view returns(uint) {
         PricingStorage.LinearDecay memory ld = l.linearDecay[account];
-        if (cycle < ld.anchor) {
+        if (id < ld.anchor) {
             return ld.maxPrice;
         }
-        uint256 delta = cycle - ld.anchor;
-        uint256 price = ld.maxPrice * (
-            ld.slopeBase - delta * ld.slope
-        ) / ld.slopeBase;
+        uint price = ld.maxPrice - (id - ld.anchor) * ld.slope / ld.slopeBase;
         return Util.max3(price, ld.minPrice, tokenCost);
     }
 
@@ -41,9 +38,9 @@ abstract contract PricingLinearDecay {
 
     event SetLinerPricing(
         address indexed,
+        uint,
         uint128,
-        uint64,
-        uint64,
+        uint128,
         uint,
         uint
     );

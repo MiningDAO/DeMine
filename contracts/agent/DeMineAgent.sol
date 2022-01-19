@@ -7,11 +7,13 @@ import '@solidstate/contracts/access/OwnableStorage.sol';
 import '@solidstate/contracts/proxy/diamond/DiamondBase.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondLoupe.sol';
+import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
+
+// use IERC20 from openzeppelin so we can use SafeERC20 lib
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import '../shared/lib/LibDiamond.sol';
 import '../nft/interfaces/IDeMineNFT.sol';
-import './interfaces/IDeMineAgent.sol';
 import './facets/MortgageFacet.sol';
 import './facets/PrimaryMarketFacet.sol';
 import './facets/BillingFacet.sol';
@@ -61,13 +63,16 @@ contract DeMineAgent is DiamondBase {
     ) internal returns(IDiamondCuttable.FacetCut memory) {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
 
-        bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = IDeMineAgent.postMint.selector;
-        erc165.setSupportedInterface(type(IDeMineAgent).interfaceId, true);
+        bytes4[] memory selectors = new bytes4[](7);
+        selectors[0] = IERC1155Receiver.onERC1155Received.selector;
+        selectors[1] = IERC1155Receiver.onERC1155BatchReceived.selector;
+        erc165.setSupportedInterface(type(IERC1155Receiver).interfaceId, true);
 
-        selectors[1] = MortgageFacet.redeem.selector;
-        selectors[2] = MortgageFacet.close.selector;
-        selectors[3] = MortgageFacet.getMortgage.selector;
+        selectors[2] = MortgageFacet.redeem.selector;
+        selectors[3] = MortgageFacet.payoff.selector;
+        selectors[4] = MortgageFacet.adjustDeposit.selector;
+        selectors[5] = MortgageFacet.getAccountInfo.selector;
+        selectors[6] = MortgageFacet.balanceOfBatch.selector;
         return LibDiamond.genFacetCut(target, selectors);
     }
 
@@ -90,11 +95,13 @@ contract DeMineAgent is DiamondBase {
     function genCutBilling(
         address target
     ) internal pure returns(IDiamondCuttable.FacetCut memory) {
-        bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = BillingFacet.lockPrice.selector;
-        selectors[1] = BillingFacet.buyWithLockedPrice.selector;
-        selectors[2] = BillingFacet.closeBilling.selector;
-        selectors[3] = BillingFacet.withdraw.selector;
+        bytes4[] memory selectors = new bytes4[](6);
+        selectors[0] = BillingFacet.tryBilling.selector;
+        selectors[1] = BillingFacet.lockPrice.selector;
+        selectors[2] = BillingFacet.buyWithLockedPrice.selector;
+        selectors[3] = BillingFacet.closeBilling.selector;
+        selectors[4] = BillingFacet.resetShrink.selector;
+        selectors[5] = BillingFacet.getStatement.selector;
         return LibDiamond.genFacetCut(target, selectors);
     }
 }

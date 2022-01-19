@@ -16,7 +16,6 @@ import './lib/LibERC2981.sol';
 import './facets/ERC2981Facet.sol';
 import './facets/ERC1155MetadataFacet.sol';
 import './facets/DeMineNFTFacet.sol';
-import './facets/PoolAgentFacet.sol';
 
 contract DeMineNFT is DiamondBase {
     using DiamondBaseStorage for DiamondBaseStorage.Layout;
@@ -29,7 +28,6 @@ contract DeMineNFT is DiamondBase {
         address erc2981Facet,
         address erc1155MetadataFacet,
         address nftFacet,
-        address poolAgentFacet,
         // for ERC2981
         address royaltyRecipient,
         uint16 royaltyBps,
@@ -38,12 +36,11 @@ contract DeMineNFT is DiamondBase {
     ) {
         OwnableStorage.layout().setOwner(msg.sender);
 
-        IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](5);
+        IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](4);
         facetCuts[0] = LibDiamond.genCutDiamond(diamondFacet);
         facetCuts[1] = genCutERC2981(erc2981Facet);
         facetCuts[2] = genCutERC1155Metadata(erc1155MetadataFacet);
         facetCuts[3] = genCutDeMineNFT(nftFacet);
-        facetCuts[4] = genCutPoolAgent(poolAgentFacet);
         (bool success, bytes memory returndata) = diamondFacet.delegatecall(
             abi.encodeWithSelector(
                 IDiamondCuttable.diamondCut.selector,
@@ -89,7 +86,7 @@ contract DeMineNFT is DiamondBase {
     ) internal returns(IDiamondCuttable.FacetCut memory) {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
 
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](15);
         // register ERC1155
         selectors[0] = IERC1155.balanceOf.selector;
         selectors[1] = IERC1155.balanceOfBatch.selector;
@@ -100,13 +97,18 @@ contract DeMineNFT is DiamondBase {
         erc165.setSupportedInterface(type(IERC1155).interfaceId, true);
 
         // register IDeMineNFT
-        selectors[6] = IDeMineNFT.shrink.selector;
+        selectors[6] = IDeMineNFT.alchemize.selector;
         selectors[7] = IDeMineNFT.alchemizeBatch.selector;
         selectors[8] = IDeMineNFT.getMining.selector;
         selectors[9] = IDeMineNFT.shrink.selector;
 
         // register DeMineNFTFacet
-        selectors[10] = DeMineNFTFacet.getCycle.selector;
+        selectors[10] = DeMineNFTFacet.finalize.selector;
+        selectors[11] = DeMineNFTFacet.registerAgent.selector;
+        selectors[12] = DeMineNFTFacet.mint.selector;
+        selectors[13] = DeMineNFTFacet.getTokenInfo.selector;
+        selectors[14] = DeMineNFTFacet.isAgentRegistered.selector;
+
         erc165.setSupportedInterface(type(IDeMineNFT).interfaceId, true);
         return LibDiamond.genFacetCut(target, selectors);
     }
@@ -115,11 +117,6 @@ contract DeMineNFT is DiamondBase {
         address target
     ) internal pure returns(IDiamondCuttable.FacetCut memory) {
         bytes4[] memory selectors = new bytes4[](5);
-        selectors[0] = PoolAgentFacet.mint.selector;
-        selectors[1] = PoolAgentFacet.registerPool.selector;
-        selectors[2] = PoolAgentFacet.finalizeCycle.selector;
-        selectors[3] = PoolAgentFacet.getAgent.selector;
-        selectors[4] = PoolAgentFacet.getPool.selector;
         return LibDiamond.genFacetCut(target, selectors);
     }
 }

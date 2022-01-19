@@ -6,14 +6,13 @@ pragma experimental ABIEncoderV2;
 import '@solidstate/contracts/access/OwnableInternal.sol';
 import '@solidstate/contracts/introspection/ERC165.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
+import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../shared/lib/Util.sol';
 import '../../shared/lib/LibPausable.sol';
-import '../../shared/lib/LibTokenId.sol';
-import '../interfaces/IDeMineAgent.sol';
 import '../lib/AppStorage.sol';
 import '../lib/BillingStorage.sol';
 
@@ -24,124 +23,198 @@ import '../lib/BillingStorage.sol';
  * @dev the contract also implements IERC1155Receiver to receive and lock demine nft
  */
 contract MortgageFacet is
-    IDeMineAgent,
     PausableModifier,
     OwnableInternal,
+    IERC1155Receiver,
     ERC165
 {
     AppStorage internal s;
 
     using SafeERC20 for IERC20;
 
-    event NewMortgage(address indexed, uint128 indexed);
-    event Redeem(address indexed, uint128[], uint[]);
-
-    modifier onlyNFT() {
-        require(
-            msg.sender == s.nft,
-            'DeMineAgent: only nft contract allowed'
-        );
-        _;
-    }
-
-    /**
-     * @notice callback of mint function of DeMineNFT contract.
-     * @param start DeMine nft id to mint
-     * @param end DeMine nft id to mint
-     * @param supply Amount for each token to mint. This also decide
-     * amount of deposit mortgager has to pay
-     * @param data Extra data with mortgager address encoded
-     */
-    function postMint(
-        uint128 start,
-        uint128 end,
-        uint supply,
-        bytes memory data
-    ) external override onlyNFT returns(uint128 mortgageId) {
-        require(start > s.shrinked, 'DeMine: token shrinked');
-        (address mortgager) = abi.decode(data, (address));
-        for (uint128 cycle = start; cycle <= end; cycle++) {
-            s.balances[cycle][mortgager] += supply;
-        }
-        mortgageId = s.mortgageId;
-        uint deposit = supply * s.tokenCost * s.minDepositDaysRequired;
-        s.cost.safeTransferFrom(msg.sender, address(this), deposit);
-        s.mortgages[mortgageId] = Mortgage(
-            msg.sender, start, end, supply, deposit
-        );
-        s.deposit += deposit;
-        s.mortgageId = mortgageId + 1;
-        emit NewMortgage(msg.sender, mortgageId);
-    }
+    event Redeem(address indexed, uint[], uint[]);
 
     /**
      * @notice Pay token cost and liquidize tokens
-     * @param cycles DeMine nft token cycles to redeem
+     * @param ids DeMine nft token ids to redeem
      * @param amounts Amount of each demine nft token
      */
     function redeem(
-        uint128[] calldata cycles,
+        uint[] calldata ids,
         uint[] calldata amounts
     ) external whenNotPaused {
         require(
-            cycles.length == amounts.length,
+            ids.length == amounts.length,
             "PoolOwnerFacet: array length mismatch"
         );
         uint tokenCost = s.tokenCost;
-        uint128 billing = s.billing;
-        uint128 pool = s.id;
+        uint billing = s.billing;
         uint totalCost;
-        uint[] memory ids = new uint[](cycles.length);
-        for (uint i = 0; i < cycles.length; i++) {
-            require(cycles[i] >= billing, 'DeMineAgent: token not redeemable');
-            ids[i] = LibTokenId.encode(pool, cycles[i]);
+        for (uint i = 0; i < ids.length; i++) {
+            require(ids[i] >= billing, 'DeMineAgent: token not redeemable');
             totalCost += tokenCost * amounts[i];
-            uint balance = s.balances[cycles[i]][msg.sender];
+            uint balance = s.balances[ids[i]][msg.sender];
             require(balance > amounts[i], 'DeMineAgent: no sufficient balance');
-            s.balances[cycles[i]][msg.sender] = balance - amounts[i];
+            s.balances[ids[i]][msg.sender] = balance - amounts[i];
         }
         s.cost.safeTransferFrom(msg.sender, address(this), totalCost);
-        emit Redeem(msg.sender, cycles, amounts);
+        emit Redeem(msg.sender, ids, amounts);
         IERC1155(s.nft).safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
     }
 
     /**
-     * @notice close finished mortgage, a mortgage can be closed if
-     *         the all tokens are billed or liquidized
-     * @param mortgageId The mortgage id returned by mortgage function
+     * @notice payoff debt from billing
      */
-    function close(uint128 mortgageId) external whenNotPaused {
-        BillingStorage.Layout storage l = BillingStorage.layout();
-        Mortgage memory m = s.mortgages[mortgageId];
+    function payoff() external whenNotPaused {
         uint income;
         uint debt;
-        for (uint128 i = 0; i < m.end - m.start + 1; i ++) {
-            uint128 cycle = i + m.start;
-            uint balance = s.balances[cycle][msg.sender];
+        Account memory account = readAccount(msg.sender);
+        for (uint id = account.start; id < s.billing; id++) {
+            uint balance = s.balances[id][msg.sender];
             if (balance > 0) {
-                require(cycle < s.billing, 'DeMineAgent: unliqudized token');
-                BillingStorage.Statement memory st = l.statements[cycle];
-                uint min = Util.min2(balance, m.supply);
-                income += st.income * min / st.balance;
-                debt += Util.ceil(st.debt * min, st.balance);
-                s.balances[cycle][msg.sender] = balance - min;
+                Statement memory st = s.statements[id];
+                income += st.income * balance / st.balance;
+                debt += Util.ceil(st.debt * balance, st.balance);
+                s.balances[id][msg.sender] = 0;
             }
         }
-        s.cost.safeTransferFrom(msg.sender, address(this), m.deposit - debt);
+        s.cost.safeTransferFrom(address(this), msg.sender, debt);
+        s.deposit += debt;
         s.income.safeTransfer(msg.sender, income);
-        s.mortgages[mortgageId].supply = 0;
-        s.mortgages[mortgageId].deposit = 0;
     }
 
     /**
-     * @notice get mortgage info
-     * @param mortgageId The mortgage id returned by mortgage function
+     * @notice adjust deposit for msg sender and update account info
      */
-    function getMortgage(uint128 mortgageId)
-        external
-        view
-        returns(Mortgage memory)
-    {
-        return s.mortgages[mortgageId];
+    function adjustDeposit() external whenNotPaused {
+        Account memory account = readAccount(msg.sender);
+        require(account.start < s.billing, 'DeMineAgent: clear billed tokens first');
+        require(account.maxBalance > 0, 'DeMineAgent: no need to adjust');
+
+        Account memory update = Account(account.start, account.end, 0);
+        while (update.start <= update.end && s.balances[update.start][msg.sender] == 0) {
+            update.start += 1;
+        }
+        while (update.end >= update.start && s.balances[update.end][msg.sender] == 0) {
+            update.end -= 1;
+        }
+        if (update.start > update.end) {
+            updateAccount(msg.sender, account, Account(type(uint).max, 0, 0));
+        } else {
+            for (uint id = update.start; id <= update.end; id++) {
+                update.maxBalance = Util.max2(update.maxBalance, s.balances[id][msg.sender]);
+            }
+            updateAccount(msg.sender, account, update);
+        }
+    }
+
+    /**
+     * @notice get account info
+     * @param account Address of account to query
+     */
+    function getAccountInfo(address account) external view returns(Account memory) {
+        return s.accounts[account];
+    }
+
+    function balanceOfBatch(
+        address account,
+        uint[] calldata ids
+    ) external view returns(uint[] memory) {
+        uint[] memory balances = new uint[](ids.length);
+        for (uint i = 0; i < ids.length; i++) {
+            balances[i] = s.balances[ids[i]][account];
+        }
+        return balances;
+    }
+
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return 0; // reject
+    }
+
+    // @dev the function should only be called by mint function of DeMineNFT
+    // @param from Must be address(0)
+    // @param data Must be encoded address of mortagager
+    function onERC1155BatchReceived(
+        address,
+        address from,
+        uint256[] calldata ids,
+        uint256[] calldata amounts,
+        bytes calldata data
+    ) external override returns (bytes4) {
+        require(
+            msg.sender == s.nft && from == address(0),
+            'DeMineAgent: only minted tokens from DeMineNFT allowed'
+        );
+        (address mortgager) = abi.decode(data, (address));
+        Account memory account = readAccount(mortgager);
+        Account memory update = Account(type(uint).max, 0, 0);
+        for (uint i = 0; i < ids.length; i++) {
+            uint balance = s.balances[ids[i]][mortgager] + amounts[i];
+            s.balances[ids[i]][mortgager] = balance;
+            update.maxBalance = Util.max2(balance, update.maxBalance);
+            update.start = Util.min2(ids[i], update.start);
+            update.end = Util.max2(ids[i], update.end);
+        }
+        mergeAccount(mortgager, account, update);
+        return IERC1155Receiver.onERC1155BatchReceived.selector;
+    }
+
+    function readAccount(
+        address account
+    ) private view returns(Account memory acc) {
+        acc = s.accounts[account];
+        acc.start = type(uint).max - acc.start;
+        return acc;
+    }
+
+    function updateAccount(
+        address account,
+        Account memory current,
+        Account memory update
+    ) private {
+        if (update.start > current.start) {
+            s.accounts[account].start = type(uint).max - update.start;
+        }
+        if (update.end < current.end) {
+            s.accounts[account].end = update.end;
+        }
+        if (update.maxBalance < current.maxBalance) {
+            s.accounts[account].maxBalance = update.maxBalance;
+            uint delta = (current.maxBalance - update.maxBalance) * depositBase();
+            s.cost.safeTransfer(account, delta);
+            s.deposit -= delta;
+        }
+    }
+
+    function mergeAccount(
+        address account,
+        Account memory current,
+        Account memory update
+    ) private {
+        if (update.start < current.start) {
+            s.accounts[account].start = type(uint).max - update.start;
+            current.start = update.start;
+        }
+        if (update.end > current.end) {
+            s.accounts[account].start = update.start;
+            current.end = update.end;
+        }
+        if (update.maxBalance > current.maxBalance) {
+            s.accounts[account].maxBalance = update.maxBalance;
+            current.maxBalance = update.maxBalance;
+            uint delta = (update.maxBalance - current.maxBalance) * depositBase();
+            s.cost.safeTransferFrom(msg.sender, address(this), delta);
+            s.deposit += delta;
+        }
+    }
+
+    function depositBase() private view returns(uint) {
+        return s.tokenCost * s.depositMultiplier;
     }
 }
