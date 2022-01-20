@@ -46,13 +46,11 @@ task('clone-demine', 'Deploy clone of demine nft and agent')
         // ensure wrapped tokens are deployed
         const tokens = localNetworkConfig.wrappedToken?.tokens || {};
         const tokenMeta = localConfig.wrappedTokenMeta;
-        const reward = tokens.reward || await cloneWrappedToken(
-            ethers, deployments, tokenMeta.reward
+        const income = tokens.income || await cloneWrappedToken(
+            ethers, deployments, tokenMeta.income
         );
-        const payments = tokens.payments || await Promise.all(
-            tokenMeta.payments.map(
-                p => cloneWrappedToken(ethers, deployments, p)
-            )
+        const payment = tokens.income || await cloneWrappedToken(
+            ethers, deployments, tokenMeta.payment
         );
 
         // clone nft and agent contract
@@ -63,8 +61,8 @@ task('clone-demine', 'Deploy clone of demine nft and agent')
             localConfig.tokenUri,
             custodian.address,
             localConfig.royaltyBps,
-            reward,
-            payments,
+            income,
+            payment,
             custodian.address,
             admin.address
         );

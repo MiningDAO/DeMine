@@ -1,21 +1,14 @@
 require('dotenv').config();
 
 const wrappedTokenMeta = {
-    payments: [
-        {
-            name: 'DeMine Test USD Token',
-            symbol: 'DMTU',
-            decimals: 6
-        },
-        {
-            name: 'DeMine Test DAI Token',
-            symbol: 'DMTD',
-            decimals: 6
-        }
-    ],
+    payment: {
+        name: 'DeMine Test Payment Token',
+        symbol: 'DMTP',
+        decimals: 6
+    },
     reward: {
-        name: 'DeMine Test Reward Token',
-        symbol: 'DMTR',
+        name: 'DeMine Test Income Token',
+        symbol: 'DMTI',
         decimals: 8
     }
 };
@@ -32,13 +25,8 @@ const config = {
     maticdev: {
         alchemy: process.env.ALCHEMY_API_KEY_POLYGON_DEV,
         scan: process.env.POLYGON_SCAN_API_KEY,
-        wrappedToken: {
-            reward: process.env.DMTR_POLYGON_DEV,
-            payments: [
-                process.env.DMTU_POLYGON_DEV,
-                process.env.DMTD_POLYGON_DEV
-            ]
-        }
+        income: process.env.DMTR_POLYGON_DEV,
+        payment: process.env.DMTP_POLYGON_DEV,
     },
     arbitrumdev: {
         alchemy: process.env.ALCHEMY_API_KEY_ARBITRUM_DEV

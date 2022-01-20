@@ -121,7 +121,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             s.statements[billing].debt = 0;
             close(billing);
         }
-        s.cost.safeTransferFrom(msg.sender, address(this), subtotal);
+        s.payment.safeTransferFrom(msg.sender, address(this), subtotal);
         s.income.safeTransfer(msg.sender, incomeTokenSold);
         emit RewardTokenSold(msg.sender, incomeTokenSold, subtotal);
     }
@@ -182,11 +182,12 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         uint amountInMaximum,
         uint amountOut
     ) internal returns(bool, uint) {
-        TransferHelper.safeApprove(address(s.income), swapRouter, amountInMaximum);
+        address income = address(s.income);
+        TransferHelper.safeApprove(income, swapRouter, amountInMaximum);
         ISwapRouter.ExactOutputSingleParams memory param =
             ISwapRouter.ExactOutputSingleParams({
-                tokenIn: address(s.income),
-                tokenOut: address(s.cost),
+                tokenIn: income,
+                tokenOut: address(s.payment),
                 fee: 3000, // 0.3%
                 recipient: address(this),
                 deadline: block.timestamp,
@@ -200,7 +201,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
                 param
             )
         );
-        TransferHelper.safeApprove(address(s.income), swapRouter, 0);
+        TransferHelper.safeApprove(income, swapRouter, 0);
         if (success) {
             (uint amountIn) = abi.decode(encoded, (uint));
             return (true, amountIn);
@@ -215,7 +216,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         (,int price, , ,) = l.chainlink.latestRoundData();
         if (price <= 0) { return 0; }
         uint chainlinkBase = 10 ** (l.chainlink.decimals());
-        uint normalized = uint(price) * base(s.cost) / chainlinkBase;
+        uint normalized = uint(price) * base(s.payment) / chainlinkBase;
         return normalized * l.discount / 10000;
     }
 

@@ -3,26 +3,24 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@solidstate/contracts/proxy/diamond/DiamondBase.sol';
-import '@solidstate/contracts/access/OwnableStorage.sol';
-import '@solidstate/contracts/token/ERC1155/metadata/ERC1155MetadataStorage.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondLoupe.sol';
+import '@solidstate/contracts/token/ERC1155/metadata/ERC1155MetadataStorage.sol';
 
 import '../shared/lib/LibDiamond.sol';
+import '../shared/lib/DeMineBase.sol';
 import './interfaces/IERC2981.sol';
 import './interfaces/IDeMineNFT.sol';
-import './lib/LibERC2981.sol';
 import './facets/ERC2981Facet.sol';
 import './facets/ERC1155MetadataFacet.sol';
 import './facets/DeMineNFTFacet.sol';
 
-contract DeMineNFT is DiamondBase {
+
+contract DeMineNFT is DeMineBase {
     using DiamondBaseStorage for DiamondBaseStorage.Layout;
-    using OwnableStorage for OwnableStorage.Layout;
     using ERC165Storage for ERC165Storage.Layout;
 
-    constructor(
+    function initialize(
         // facets
         address diamondFacet,
         address erc2981Facet,
@@ -31,11 +29,10 @@ contract DeMineNFT is DiamondBase {
         // for ERC2981
         address royaltyRecipient,
         uint16 royaltyBps,
-        // for ERC1155Metadata
+        // for ERC1155
         string memory uri
-    ) {
-        OwnableStorage.layout().setOwner(msg.sender);
-
+    ) external initializer {
+        __DeMineBase_init();
         IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](4);
         facetCuts[0] = LibDiamond.genCutDiamond(diamondFacet);
         facetCuts[1] = genCutERC2981(erc2981Facet);
@@ -99,8 +96,8 @@ contract DeMineNFT is DiamondBase {
         // register IDeMineNFT
         selectors[6] = IDeMineNFT.alchemize.selector;
         selectors[7] = IDeMineNFT.alchemizeBatch.selector;
-        selectors[8] = IDeMineNFT.getMining.selector;
-        selectors[9] = IDeMineNFT.shrink.selector;
+        selectors[8] = IDeMineNFT.shrink.selector;
+        selectors[9] = IDeMineNFT.getMining.selector;
 
         // register DeMineNFTFacet
         selectors[10] = DeMineNFTFacet.finalize.selector;

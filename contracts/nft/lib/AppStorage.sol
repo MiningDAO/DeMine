@@ -10,9 +10,8 @@ struct Token {
 }
 
 struct AppStorage {
-    mapping(address => bool) agents;
-    // mining
     IERC20 income;
     uint mining;
     mapping(uint => Token) tokens;
+    mapping(address => bool) agents;
 }

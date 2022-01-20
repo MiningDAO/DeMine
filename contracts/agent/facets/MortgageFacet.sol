@@ -57,7 +57,7 @@ contract MortgageFacet is
             require(balance > amounts[i], 'DeMineAgent: no sufficient balance');
             s.balances[ids[i]][msg.sender] = balance - amounts[i];
         }
-        s.cost.safeTransferFrom(msg.sender, address(this), totalCost);
+        s.payment.safeTransferFrom(msg.sender, address(this), totalCost);
         emit Redeem(msg.sender, ids, amounts);
         IERC1155(s.nft).safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
     }
@@ -78,7 +78,7 @@ contract MortgageFacet is
                 s.balances[id][msg.sender] = 0;
             }
         }
-        s.cost.safeTransferFrom(address(this), msg.sender, debt);
+        s.payment.safeTransferFrom(address(this), msg.sender, debt);
         s.deposit += debt;
         s.income.safeTransfer(msg.sender, income);
     }
@@ -187,7 +187,7 @@ contract MortgageFacet is
         if (update.maxBalance < current.maxBalance) {
             s.accounts[account].maxBalance = update.maxBalance;
             uint delta = (current.maxBalance - update.maxBalance) * depositBase();
-            s.cost.safeTransfer(account, delta);
+            s.payment.safeTransfer(account, delta);
             s.deposit -= delta;
         }
     }
@@ -209,7 +209,7 @@ contract MortgageFacet is
             s.accounts[account].maxBalance = update.maxBalance;
             current.maxBalance = update.maxBalance;
             uint delta = (update.maxBalance - current.maxBalance) * depositBase();
-            s.cost.safeTransferFrom(msg.sender, address(this), delta);
+            s.payment.safeTransferFrom(msg.sender, address(this), delta);
             s.deposit += delta;
         }
     }

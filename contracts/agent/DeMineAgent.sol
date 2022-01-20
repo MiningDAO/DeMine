@@ -3,27 +3,24 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@solidstate/contracts/access/OwnableStorage.sol';
-import '@solidstate/contracts/proxy/diamond/DiamondBase.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/proxy/diamond/IDiamondLoupe.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
-
 // use IERC20 from openzeppelin so we can use SafeERC20 lib
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import '../shared/lib/LibDiamond.sol';
+import '../shared/lib/DeMineBase.sol';
 import '../nft/interfaces/IDeMineNFT.sol';
 import './facets/MortgageFacet.sol';
 import './facets/PrimaryMarketFacet.sol';
 import './facets/BillingFacet.sol';
 
-contract DeMineAgent is DiamondBase {
+contract DeMineAgent is DeMineBase {
     AppStorage internal s;
-    using OwnableStorage for OwnableStorage.Layout;
     using ERC165Storage for ERC165Storage.Layout;
 
-    constructor(
+    function initialize(
         address diamondFacet,
         address mortgageFacet,
         address primaryMarketFacet,
@@ -31,16 +28,16 @@ contract DeMineAgent is DiamondBase {
         // AgentAdmin initialization args
         uint256 tokenCost,
         address income,
-        address cost,
-        address demineNFT
-    ) {
+        address payment,
+        address nft
+    ) external initializer {
+        __DeMineBase_init();
         IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](4);
         facetCuts[0] = LibDiamond.genCutDiamond(diamondFacet);
         facetCuts[1] = genCutMortagage(mortgageFacet);
         facetCuts[2] = genCutPrimaryMarket(primaryMarketFacet);
         facetCuts[3] = genCutBilling(billingFacet);
 
-        OwnableStorage.layout().setOwner(msg.sender);
         (bool success, bytes memory returndata) = diamondFacet.delegatecall(
             abi.encodeWithSelector(
                 IDiamondCuttable.diamondCut.selector,
@@ -52,10 +49,10 @@ contract DeMineAgent is DiamondBase {
         require(success, string(returndata));
 
         // init storage
-        s.nft = demineNFT;
+        s.nft = nft;
         s.tokenCost = tokenCost;
         s.income = IERC20(income);
-        s.cost = IERC20(cost);
+        s.payment = IERC20(payment);
     }
 
     function genCutMortagage(

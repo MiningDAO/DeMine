@@ -18,10 +18,11 @@ struct Statement {
 }
 
 struct AppStorage {
-    IERC20 cost;
     IERC20 income;
+    IERC20 payment;
     address nft;
 
+    bool initialized;
     uint8 depositMultiplier; // deposit = maxBalance * tokenCost * depositMultiplier
     uint tokenCost; // cost per nft in cost token
     uint deposit; // total deposit in cost token

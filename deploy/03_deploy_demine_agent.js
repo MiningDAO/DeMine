@@ -1,33 +1,24 @@
-module.exports = async ({ ethers, deployments }) => {
+module.exports = async ({ ethers, deployments, localConfig }) => {
     const { deployer, admin } = await ethers.getNamedSigners();
     const { deploy } = deployments;
 
-    const { address: diamond } = await deployments.get('DiamondFacet');
-    const { address: demineNFT } = await deployments.get('DeMineNFT');
-
-    const { address: agentAdmin } = await deploy('AgentAdminFacet', {
+    await deploy('MortgageFacet', {
         from: deployer.address,
         log: true
     });
 
-    const { address: poolAdmin } = await deploy('PoolAdminFacet', {
+    await deploy('PrimaryMarketFacet', {
         from: deployer.address,
         log: true
     });
 
-    const { address: external } = await deploy('ExternalFacet', {
+    await deploy('BillingFacet', {
         from: deployer.address,
         log: true
     });
 
-    const { address: libDeMineAgent } = await deploy('LibDeMineAgent', {
+    const { address: agent } = await deploy('DeMineAgent', {
         from: deployer.address,
-        log: true
-    });
-    const { address: demine } = await deploy('DeMineAgent', {
-        libraries: {'LibDeMineAgent': libDeMineAgent},
-        from: deployer.address,
-        args: [demineNFT, diamond, erc2981, erc1155Metadata, erc1155],
         log: true
     });
 };

@@ -10,7 +10,7 @@ import '@solidstate/contracts/token/ERC1155/IERC1155Internal.sol';
  */
 interface IDeMineNFT is IERC1155Internal {
     /**
-     * @dev burn token not mined yet
+     * @dev shrink mining pool by burning token not mined
      * @param account Address of token holder
      * @param ids List of token ids to burn
      */
