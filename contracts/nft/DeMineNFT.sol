@@ -5,21 +5,30 @@ pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/introspection/ERC165Storage.sol';
 import '@solidstate/contracts/token/ERC1155/metadata/ERC1155MetadataStorage.sol';
+// use IERC20 from openzeppelin so we can use SafeERC20 lib
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import '../shared/lib/DeMineBase.sol';
 import '../shared/interfaces/IDiamondFacet.sol';
 import './interfaces/IDeMineNFT.sol';
 import './facets/ERC1155Facet.sol';
 import './facets/DeMineNFTFacet.sol';
+import './lib/AppStorage.sol';
 
 contract DeMineNFT is DeMineBase {
+    AppStorage internal s;
     using ERC165Storage for ERC165Storage.Layout;
 
     function initialize(
         address baseFacet,
         address diamondFacet,
         address erc1155Facet,
-        address nftFacet
+        address nftFacet,
+        // initialization args
+        address income,
+        address recipient,
+        uint16 bps,
+        string memory uri
     ) external initializer {
         __DeMineBase_init();
         IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](4);
@@ -28,6 +37,10 @@ contract DeMineNFT is DeMineBase {
         facetCuts[2] = genCutERC1155(erc1155Facet);
         facetCuts[3] = genCutDeMineNFT(nftFacet);
         cutFacets(facetCuts, diamondFacet);
+
+        ERC1155MetadataStorage.layout().baseURI = uri;
+        s.royalty = RoyaltyInfo(recipient, bps);
+        s.income = IERC20(income);
     }
 
     function genCutERC1155(

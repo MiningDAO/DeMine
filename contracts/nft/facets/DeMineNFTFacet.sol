@@ -7,7 +7,6 @@ import '@solidstate/contracts/access/OwnableInternal.sol';
 import '@solidstate/contracts/token/ERC1155/base/ERC1155BaseStorage.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Internal.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
-import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/introspection/ERC165Storage.sol';
 import '@solidstate/contracts/utils/AddressUtils.sol';
 
