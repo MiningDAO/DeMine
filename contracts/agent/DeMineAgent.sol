@@ -3,14 +3,13 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
-import '@solidstate/contracts/proxy/diamond/IDiamondLoupe.sol';
+import '@solidstate/contracts/introspection/ERC165Storage.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 // use IERC20 from openzeppelin so we can use SafeERC20 lib
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-import '../shared/lib/LibDiamond.sol';
 import '../shared/lib/DeMineBase.sol';
+import '../shared/interfaces/IDiamondFacet.sol';
 import '../nft/interfaces/IDeMineNFT.sol';
 import './facets/MortgageFacet.sol';
 import './facets/PrimaryMarketFacet.sol';
@@ -21,32 +20,25 @@ contract DeMineAgent is DeMineBase {
     using ERC165Storage for ERC165Storage.Layout;
 
     function initialize(
+        address baseFacet,
         address diamondFacet,
         address mortgageFacet,
         address primaryMarketFacet,
         address billingFacet,
-        // AgentAdmin initialization args
+        // initialization args
         uint256 tokenCost,
         address income,
         address payment,
         address nft
     ) external initializer {
         __DeMineBase_init();
-        IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](4);
-        facetCuts[0] = LibDiamond.genCutDiamond(diamondFacet);
-        facetCuts[1] = genCutMortagage(mortgageFacet);
-        facetCuts[2] = genCutPrimaryMarket(primaryMarketFacet);
-        facetCuts[3] = genCutBilling(billingFacet);
-
-        (bool success, bytes memory returndata) = diamondFacet.delegatecall(
-            abi.encodeWithSelector(
-                IDiamondCuttable.diamondCut.selector,
-                facetCuts,
-                address(0),
-                ""
-            )
-        );
-        require(success, string(returndata));
+        IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](5);
+        facetCuts[0] = IDiamondFacet(baseFacet).genFacetCutAdd();
+        facetCuts[1] = IDiamondFacet(diamondFacet).genFacetCutAdd();
+        facetCuts[2] = genCutMortagage(mortgageFacet);
+        facetCuts[3] = genCutPrimaryMarket(primaryMarketFacet);
+        facetCuts[4] = genCutBilling(billingFacet);
+        cutFacets(facetCuts, diamondFacet);
 
         // init storage
         s.nft = nft;
@@ -70,7 +62,7 @@ contract DeMineAgent is DeMineBase {
         selectors[4] = MortgageFacet.adjustDeposit.selector;
         selectors[5] = MortgageFacet.getAccountInfo.selector;
         selectors[6] = MortgageFacet.balanceOfBatch.selector;
-        return LibDiamond.genFacetCut(target, selectors);
+        return genFacetCut(target, selectors);
     }
 
     function genCutPrimaryMarket(
@@ -86,7 +78,7 @@ contract DeMineAgent is DeMineBase {
         selectors[6] = PricingStatic.setStaticBase.selector;
         selectors[7] = PricingStatic.setStaticOverride.selector;
         selectors[8] = PricingLinearDecay.setLinearDecay.selector;
-        return LibDiamond.genFacetCut(target, selectors);
+        return genFacetCut(target, selectors);
     }
 
     function genCutBilling(
@@ -99,6 +91,6 @@ contract DeMineAgent is DeMineBase {
         selectors[3] = BillingFacet.closeBilling.selector;
         selectors[4] = BillingFacet.resetShrink.selector;
         selectors[5] = BillingFacet.getStatement.selector;
-        return LibDiamond.genFacetCut(target, selectors);
+        return genFacetCut(target, selectors);
     }
 }
