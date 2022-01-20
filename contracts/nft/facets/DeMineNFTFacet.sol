@@ -4,8 +4,11 @@ pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/access/OwnableInternal.sol';
-import '@solidstate/contracts/introspection/ERC165.sol';
-import '@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol';
+import '@solidstate/contracts/token/ERC1155/base/ERC1155BaseStorage.sol';
+import '@solidstate/contracts/token/ERC1155/IERC1155Internal.sol';
+import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
+import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
+import '@solidstate/contracts/introspection/ERC165Storage.sol';
 import '@solidstate/contracts/utils/AddressUtils.sol';
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -16,15 +19,15 @@ import '../interfaces/IDeMineNFT.sol';
 import '../lib/AppStorage.sol';
 
 contract DeMineNFTFacet is
+    IERC1155Internal,
     IDeMineNFT,
     OwnableInternal,
-    ERC1155Base,
-    PausableModifier,
-    ERC165
+    PausableModifier
 {
     AppStorage internal s;
-    using SafeERC20 for IERC20;
     using AddressUtils for address;
+    using SafeERC20 for IERC20;
+    using ERC165Storage for ERC165Storage.Layout;
 
     event Alchemy(address indexed operator, address indexed account, uint income);
     event RegisterAgent(address indexed);
@@ -48,11 +51,16 @@ contract DeMineNFTFacet is
         uint[] calldata amounts,
         bytes memory data
     ) external onlyOwner {
-        _safeMintBatch(recipient, ids, amounts, data);
+        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
         for (uint i; i < ids.length; i++) {
             require(ids[i] > s.mining, 'DeMineNFT: mined or mining token');
             s.tokens[ids[i]].supply += amounts[i];
+            l.balances[ids[i]][recipient] += amounts[i];
         }
+        _doSafeBatchTransferAcceptanceCheck(
+            msg.sender, address(0), recipient, ids, amounts, data
+        );
+        emit TransferBatch(msg.sender, address(0), recipient, ids, amounts);
     }
 
     function shrink(address account, uint[] calldata ids)
@@ -60,11 +68,11 @@ contract DeMineNFTFacet is
         override
         whenNotPaused
     {
+        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
         require(
-            msg.sender == account || isApprovedForAll(account, msg.sender),
+            msg.sender == account || l.operatorApprovals[account][msg.sender],
             'DeMineNFT: operator is not caller or approved'
         );
-        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
         uint[] memory amounts = new uint[](ids.length);
         uint mining = s.mining;
         for (uint i; i < ids.length; i++) {
@@ -77,34 +85,15 @@ contract DeMineNFTFacet is
         emit TransferBatch(msg.sender, account, address(0), ids, amounts);
     }
 
-    function alchemize(address account, uint id)
-        external
-        whenNotPaused
-        override
-        returns(uint income)
-    {
-        require(id < s.mining, 'DeMineNFT: token not mined yet');
-        require(
-            msg.sender == account || isApprovedForAll(account, msg.sender),
-            'DeMineNFT: operator is not caller or approved'
-        );
-        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
-        uint balance = l.balances[id][account];
-        income = s.tokens[id].income * balance;
-        s.income.safeTransfer(account, income);
-        emit TransferSingle(msg.sender, account, address(0), id, balance);
-        emit Alchemy(msg.sender, account, income);
-    }
-
-    function alchemizeBatch(
+    function alchemize(
         address account,
         uint[] calldata ids
     ) external override whenNotPaused returns(uint income) {
+        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
         require(
-            msg.sender == account || isApprovedForAll(account, msg.sender),
+            msg.sender == account || l.operatorApprovals[account][msg.sender],
             'DeMineNFT: operator is not caller or approved'
         );
-        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
         uint mining = s.mining;
         uint[] memory amounts = new uint[](ids.length);
         for (uint i; i < ids.length; i++) {
@@ -128,14 +117,26 @@ contract DeMineNFTFacet is
         return s.tokens[id];
     }
 
-    function _beforeTokenTransfer(
+    function _doSafeBatchTransferAcceptanceCheck(
         address operator,
         address from,
         address to,
-        uint[] memory ids,
-        uint[] memory amounts,
+        uint256[] memory ids,
+        uint256[] memory amounts,
         bytes memory data
-    ) internal whenNotPaused virtual override(ERC1155BaseInternal) {
-        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+    ) private {
+        if (to.isContract()) {
+            try IERC1155Receiver(to).onERC1155BatchReceived(operator, from, ids, amounts, data) returns (
+                bytes4 response
+            ) {
+                if (response != IERC1155Receiver.onERC1155BatchReceived.selector) {
+                    revert("ERC1155: ERC1155Receiver rejected tokens");
+                }
+            } catch Error(string memory reason) {
+                revert(reason);
+            } catch {
+                revert("ERC1155: transfer to non ERC1155Receiver implementer");
+            }
+        }
     }
 }

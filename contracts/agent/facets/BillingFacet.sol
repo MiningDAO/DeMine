@@ -47,7 +47,9 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         uint billing = s.billing;
         uint balance = IERC1155(s.nft).balanceOf(address(this), billing);
         if (balance > 0) {
-            uint income = IDeMineNFT(s.nft).alchemize(address(this), billing);
+            uint[] memory toBurn = new uint[](1);
+            toBurn[0] = billing;
+            uint income = IDeMineNFT(s.nft).alchemize(address(this), toBurn);
             uint debt = s.tokenCost * balance;
             (bool success, uint sold) = trySwap(l.swapRouter, income, debt);
             if (success) {

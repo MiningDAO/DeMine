@@ -8,10 +8,8 @@ import '@solidstate/contracts/token/ERC1155/metadata/ERC1155MetadataStorage.sol'
 
 import '../shared/lib/DeMineBase.sol';
 import '../shared/interfaces/IDiamondFacet.sol';
-import './interfaces/IERC2981.sol';
 import './interfaces/IDeMineNFT.sol';
-import './facets/ERC2981Facet.sol';
-import './facets/ERC1155MetadataFacet.sol';
+import './facets/ERC1155Facet.sol';
 import './facets/DeMineNFTFacet.sol';
 
 contract DeMineNFT is DeMineBase {
@@ -20,60 +18,24 @@ contract DeMineNFT is DeMineBase {
     function initialize(
         address baseFacet,
         address diamondFacet,
-        address erc2981Facet,
-        address erc1155MetadataFacet,
-        address nftFacet,
-        // for ERC2981
-        address royaltyRecipient,
-        uint16 royaltyBps,
-        // for ERC1155
-        string memory uri
+        address erc1155Facet,
+        address nftFacet
     ) external initializer {
         __DeMineBase_init();
-        IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](5);
+        IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](4);
         facetCuts[0] = IDiamondFacet(baseFacet).genFacetCutAdd();
         facetCuts[1] = IDiamondFacet(diamondFacet).genFacetCutAdd();
-        facetCuts[2] = genCutERC2981(erc2981Facet);
-        facetCuts[3] = genCutERC1155Metadata(erc1155MetadataFacet);
-        facetCuts[4] = genCutDeMineNFT(nftFacet);
+        facetCuts[2] = genCutERC1155(erc1155Facet);
+        facetCuts[3] = genCutDeMineNFT(nftFacet);
         cutFacets(facetCuts, diamondFacet);
-
-        LibERC2981.layout().recipient = royaltyRecipient;
-        LibERC2981.layout().bps = royaltyBps;
-        ERC1155MetadataStorage.layout().baseURI = uri;
     }
 
-    function genCutERC2981(
+    function genCutERC1155(
         address target
     ) internal returns(IDiamondCuttable.FacetCut memory) {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
-        erc165.setSupportedInterface(type(IERC2981).interfaceId, true);
+        bytes4[] memory selectors = new bytes4[](11);
 
-        bytes4[] memory selectors = new bytes4[](2);
-        selectors[0] = IERC2981.royaltyInfo.selector;
-        selectors[1] = ERC2981Facet.setRoyaltyInfo.selector;
-        return genFacetCut(target, selectors);
-    }
-
-    function genCutERC1155Metadata(
-        address target
-    ) internal returns(IDiamondCuttable.FacetCut memory) {
-        ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
-        erc165.setSupportedInterface(type(IERC1155Metadata).interfaceId, true);
-
-        bytes4[] memory selectors = new bytes4[](3);
-        selectors[0] = IERC1155Metadata.uri.selector;
-        selectors[1] = ERC1155MetadataFacet.setBaseURI.selector;
-        selectors[2] = ERC1155MetadataFacet.setTokenURI.selector;
-        return genFacetCut(target, selectors);
-    }
-
-    function genCutDeMineNFT(
-        address target
-    ) internal returns(IDiamondCuttable.FacetCut memory) {
-        ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
-
-        bytes4[] memory selectors = new bytes4[](13);
         // register ERC1155
         selectors[0] = IERC1155.balanceOf.selector;
         selectors[1] = IERC1155.balanceOfBatch.selector;
@@ -83,25 +45,36 @@ contract DeMineNFT is DeMineBase {
         selectors[5] = IERC1155.safeBatchTransferFrom.selector;
         erc165.setSupportedInterface(type(IERC1155).interfaceId, true);
 
-        // register IDeMineNFT
-        selectors[6] = IDeMineNFT.alchemize.selector;
-        selectors[7] = IDeMineNFT.alchemizeBatch.selector;
-        selectors[8] = IDeMineNFT.shrink.selector;
-        selectors[9] = IDeMineNFT.getMining.selector;
+        // register ERC1155Metadata
+        selectors[6] = IERC1155Metadata.uri.selector;
+        selectors[7] = ERC1155Facet.setBaseURI.selector;
+        selectors[8] = ERC1155Facet.setTokenURI.selector;
+        erc165.setSupportedInterface(type(IERC1155Metadata).interfaceId, true);
 
-        // register DeMineNFTFacet
-        selectors[10] = DeMineNFTFacet.finalize.selector;
-        selectors[11] = DeMineNFTFacet.expand.selector;
-        selectors[12] = DeMineNFTFacet.getTokenInfo.selector;
-
-        erc165.setSupportedInterface(type(IDeMineNFT).interfaceId, true);
+        // register ERC2981
+        selectors[9] = IERC2981.royaltyInfo.selector;
+        selectors[10] = ERC1155Facet.setRoyaltyInfo.selector;
+        erc165.setSupportedInterface(type(IERC2981).interfaceId, true);
         return genFacetCut(target, selectors);
     }
 
-    function genCutPoolAgent(
+    function genCutDeMineNFT(
         address target
-    ) internal pure returns(IDiamondCuttable.FacetCut memory) {
-        bytes4[] memory selectors = new bytes4[](5);
+    ) internal returns(IDiamondCuttable.FacetCut memory) {
+        ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
+        bytes4[] memory selectors = new bytes4[](6);
+
+        // register IDeMineNFT
+        selectors[0] = IDeMineNFT.alchemize.selector;
+        selectors[1] = IDeMineNFT.shrink.selector;
+        selectors[2] = IDeMineNFT.getMining.selector;
+        erc165.setSupportedInterface(type(IDeMineNFT).interfaceId, true);
+
+        // register DeMineNFTFacet
+        selectors[3] = DeMineNFTFacet.finalize.selector;
+        selectors[4] = DeMineNFTFacet.expand.selector;
+        selectors[5] = DeMineNFTFacet.getTokenInfo.selector;
+
         return genFacetCut(target, selectors);
     }
 }

@@ -9,8 +9,14 @@ struct Token {
     uint income;
 }
 
+struct RoyaltyInfo {
+    address recipient;
+    uint16 bps;
+}
+
 struct AppStorage {
     IERC20 income;
     uint mining;
     mapping(uint => Token) tokens;
+    RoyaltyInfo royalty;
 }
