@@ -17,7 +17,7 @@ module.exports = async ({ ethers, deployments, localConfig }) => {
         log: true
     });
 
-    const { address: agent } = await deploy('DeMineAgent', {
+    await deploy('DeMineAgent', {
         from: deployer.address,
         log: true
     });

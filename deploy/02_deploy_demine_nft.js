@@ -17,7 +17,7 @@ module.exports = async ({ ethers, deployments }) => {
         log: true
     });
 
-    const { address: nft } = await deploy('DeMineNFT', {
+    await deploy('DeMineNFT', {
         from: deployer.address,
         log: true
     });

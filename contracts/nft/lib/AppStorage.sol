@@ -13,5 +13,4 @@ struct AppStorage {
     IERC20 income;
     uint mining;
     mapping(uint => Token) tokens;
-    mapping(address => bool) agents;
 }

@@ -42,22 +42,15 @@ contract DeMineNFTFacet is
         s.mining = mining + 1;
     }
 
-    function registerAgent(address agent) external onlyOwner {
-        require(agent.isContract(), 'DeMineNFT: agent is not contract');
-        require(!s.agents[agent], 'DeMineNFT: agent already registered');
-        s.agents[agent] = true;
-        emit RegisterAgent(agent);
-    }
-
-    function mint(
-        address agent,
+    function expand(
+        address recipient,
         uint[] calldata ids,
         uint[] calldata amounts,
         bytes memory data
     ) external onlyOwner {
-        require(s.agents[agent], 'DeMineNFT: agent not registered');
-        _safeMintBatch(agent, ids, amounts, data);
+        _safeMintBatch(recipient, ids, amounts, data);
         for (uint i; i < ids.length; i++) {
+            require(ids[i] > s.mining, 'DeMineNFT: mined or mining token');
             s.tokens[ids[i]].supply += amounts[i];
         }
     }
@@ -133,10 +126,6 @@ contract DeMineNFTFacet is
 
     function getTokenInfo(uint256 id) external view returns(Token memory) {
         return s.tokens[id];
-    }
-
-    function isAgentRegistered(address agent) external view returns(bool) {
-        return s.agents[agent];
     }
 
     function _beforeTokenTransfer(

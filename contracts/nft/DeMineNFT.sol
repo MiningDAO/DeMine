@@ -83,7 +83,7 @@ contract DeMineNFT is DeMineBase {
     ) internal returns(IDiamondCuttable.FacetCut memory) {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
 
-        bytes4[] memory selectors = new bytes4[](15);
+        bytes4[] memory selectors = new bytes4[](13);
         // register ERC1155
         selectors[0] = IERC1155.balanceOf.selector;
         selectors[1] = IERC1155.balanceOfBatch.selector;
@@ -101,10 +101,8 @@ contract DeMineNFT is DeMineBase {
 
         // register DeMineNFTFacet
         selectors[10] = DeMineNFTFacet.finalize.selector;
-        selectors[11] = DeMineNFTFacet.registerAgent.selector;
-        selectors[12] = DeMineNFTFacet.mint.selector;
-        selectors[13] = DeMineNFTFacet.getTokenInfo.selector;
-        selectors[14] = DeMineNFTFacet.isAgentRegistered.selector;
+        selectors[11] = DeMineNFTFacet.expand.selector;
+        selectors[12] = DeMineNFTFacet.getTokenInfo.selector;
 
         erc165.setSupportedInterface(type(IDeMineNFT).interfaceId, true);
         return LibDiamond.genFacetCut(target, selectors);
