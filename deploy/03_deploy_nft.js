@@ -7,12 +7,17 @@ module.exports = async ({ ethers, deployments }) => {
         log: true
     });
 
-    await deploy('DeMineNFTFacet', {
+    await deploy('MiningPoolFacet', {
         from: deployer.address,
         log: true
     });
 
     await deploy('DeMineNFT', {
+        from: deployer.address,
+        log: true
+    });
+
+    await deploy('DeMineNFTV2', {
         from: deployer.address,
         log: true
     });

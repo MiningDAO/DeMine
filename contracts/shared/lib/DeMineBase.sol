@@ -49,7 +49,7 @@ abstract contract DeMineBase is DiamondBase, Initializable {
         require(success, string(returndata));
     }
 
-    function genCutDeMineBase(address target)
+    function genCutDeMineAdmin(address target)
         internal
         returns(IDiamondCuttable.FacetCut memory)
     {

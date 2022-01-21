@@ -18,7 +18,7 @@ contract DeMineAgent is DeMineBase {
     using ERC165Storage for ERC165Storage.Layout;
 
     function initialize(
-        address baseFacet,
+        address adminFacet,
         address diamondFacet,
         address mortgageFacet,
         address primaryMarketFacet,
@@ -31,7 +31,7 @@ contract DeMineAgent is DeMineBase {
     ) external initializer {
         __DeMineBase_init();
         IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](5);
-        facetCuts[0] = genCutDeMineBase(baseFacet);
+        facetCuts[0] = genCutDeMineAdmin(adminFacet);
         facetCuts[1] = genCutDiamond(diamondFacet);
         facetCuts[2] = genCutMortagage(mortgageFacet);
         facetCuts[3] = genCutPrimaryMarket(primaryMarketFacet);

@@ -3,17 +3,10 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@solidstate/contracts/access/SafeOwnable.sol';
 import '@solidstate/contracts/factory/CloneFactory.sol';
 import '../interfaces/ICloneable.sol';
-import '../lib/LibPausable.sol';
 
-contract DeMineBaseFacet is
-    ICloneable,
-    Pausable,
-    SafeOwnable,
-    CloneFactory
-{
+abstract contract Cloneable is ICloneable, CloneFactory {
     function clone() external override returns(address) {
         return _deployClone();
     }

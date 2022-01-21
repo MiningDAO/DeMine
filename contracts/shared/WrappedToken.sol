@@ -1,53 +1,34 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import '@solidstate/contracts/access/SafeOwnable.sol';
+import '@solidstate/contracts/token/ERC20/ERC20.sol';
+import '@solidstate/contracts/token/ERC20/metadata/ERC20MetadataStorage.sol';
 
-contract WrappedTokenCloneFactory {
-    event Clone(address indexed);
-
-    address immutable implementation;
-
-    constructor() {
-        implementation = address(new WrappedToken());
-    }
-
-    function create(
-        string memory name,
-        string memory symbol,
-        uint8 decimals,
-        address owner
-    ) external returns(address) {
-        address clone = ClonesUpgradeable.clone(implementation);
-        WrappedToken(clone).initialize(name, symbol, decimals);
-        WrappedToken(clone).transferOwnership(owner);
-        emit Clone(clone);
-        return clone;
-    }
-}
+import './lib/Cloneable.sol';
+import './lib/LibPausable.sol';
+import './lib/LibInitializable.sol';
 
 contract WrappedToken is
-    ERC20Upgradeable,
-    OwnableUpgradeable,
-    PausableUpgradeable
+    Cloneable,
+    Pausable,
+    Initializable,
+    SafeOwnable,
+    ERC20
 {
-    uint8 private _decimals;
+    using OwnableStorage for OwnableStorage.Layout;
 
     function initialize(
         string memory name,
         string memory symbol,
-        uint8 decimalsToSet
+        uint8 decimals
     ) public initializer {
-        __Ownable_init();
-        __Pausable_init();
-        __ERC20_init(name, symbol);
-        _decimals = decimalsToSet;
+        OwnableStorage.layout().setOwner(msg.sender);
+        ERC20MetadataStorage.Layout storage l = ERC20MetadataStorage.layout();
+        l.name = name;
+        l.symbol = symbol;
+        l.decimals = decimals;
     }
-
-    constructor() initializer {}
 
     function burn(address from, uint256 amount) external onlyOwner {
         _burn(from, amount);
@@ -55,22 +36,5 @@ contract WrappedToken is
 
     function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);
-    }
-
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-
-    function decimals()
-        public
-        view
-        override
-        returns (uint8)
-    {
-        return _decimals;
     }
 }
