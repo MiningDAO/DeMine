@@ -121,7 +121,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             s.statements[billing].debt = 0;
             close(billing);
         }
-        s.payment.safeTransferFrom(msg.sender, address(this), subtotal);
+        s.payment.safeTransferFrom(msg.sender, s.payee, subtotal);
         s.income.safeTransfer(msg.sender, incomeTokenSold);
         emit RewardTokenSold(msg.sender, incomeTokenSold, subtotal);
     }
@@ -145,6 +145,25 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         }
         l.stage = BillingStorage.Stage.NOT_STARTED;
         close(billing);
+    }
+
+    /**
+     * @notice Collect income leftover, no waste
+     */
+    function collectResidue(
+        address recipient,
+        uint start,
+        uint end
+    ) external onlyOwner {
+        require(end < s.billing, 'DeMineAgent: token not billed yet');
+        BillingStorage.Layout storage l = BillingStorage.layout();
+        uint total;
+        for (uint id = start; id <= end; id++) {
+            uint income = s.statements[s.billing].income;
+            uint balance = s.statements[s.billing].income;
+            total += income - (income / balance) * balance;
+        }
+        s.income.safeTransferFrom(address(this), recipient, total);
     }
 
     /**

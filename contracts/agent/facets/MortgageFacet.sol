@@ -3,7 +3,6 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@solidstate/contracts/access/OwnableInternal.sol';
 import '@solidstate/contracts/introspection/ERC165.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
@@ -24,7 +23,6 @@ import '../lib/BillingStorage.sol';
  */
 contract MortgageFacet is
     PausableModifier,
-    OwnableInternal,
     IERC1155Receiver,
     ERC165
 {
@@ -45,7 +43,7 @@ contract MortgageFacet is
     ) external whenNotPaused {
         require(
             ids.length == amounts.length,
-            "PoolOwnerFacet: array length mismatch"
+            "DeMineAgent: array length mismatch"
         );
         uint tokenCost = s.tokenCost;
         uint billing = s.billing;
@@ -57,13 +55,14 @@ contract MortgageFacet is
             require(balance > amounts[i], 'DeMineAgent: no sufficient balance');
             s.balances[ids[i]][msg.sender] = balance - amounts[i];
         }
-        s.payment.safeTransferFrom(msg.sender, address(this), totalCost);
+        s.payment.safeTransferFrom(msg.sender, s.payee, totalCost);
         emit Redeem(msg.sender, ids, amounts);
         IERC1155(s.nft).safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
     }
 
     /**
-     * @notice payoff debt from billing
+     * @notice payoff debt from billing. Ensure you have a valid start and
+     *         end set for msg.sender to prevent infinite loop
      */
     function payoff() external whenNotPaused {
         uint income;
@@ -78,13 +77,15 @@ contract MortgageFacet is
                 s.balances[id][msg.sender] = 0;
             }
         }
-        s.payment.safeTransferFrom(address(this), msg.sender, debt);
+        s.payment.safeTransferFrom(s.payee, msg.sender, debt);
         s.deposit += debt;
         s.income.safeTransfer(msg.sender, income);
     }
 
     /**
      * @notice adjust deposit for msg sender and update account info
+     *         Ensure you have a valid start and end set for msg.sender
+     *         to prevent infinite loop
      */
     function adjustDeposit() external whenNotPaused {
         Account memory account = readAccount(msg.sender);
@@ -209,7 +210,7 @@ contract MortgageFacet is
             s.accounts[account].maxBalance = update.maxBalance;
             current.maxBalance = update.maxBalance;
             uint delta = (update.maxBalance - current.maxBalance) * depositBase();
-            s.payment.safeTransferFrom(msg.sender, address(this), delta);
+            s.payment.safeTransferFrom(msg.sender, s.payee, delta);
             s.deposit += delta;
         }
     }

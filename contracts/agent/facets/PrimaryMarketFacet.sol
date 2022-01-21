@@ -138,7 +138,7 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             cs.totalCost += cs.tokenCost * amount;
             cs.totalPay += f(l, from, ids[i], cs.tokenCost) * amount;
         }
-        s.payment.safeTransferFrom(msg.sender, address(this), cs.totalCost);
+        s.payment.safeTransferFrom(msg.sender, s.payee, cs.totalCost);
         s.payment.safeTransferFrom(msg.sender, from, cs.totalPay - cs.totalCost);
         IERC1155(s.nft).safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
         emit Claim(msg.sender, from, ids, amounts);

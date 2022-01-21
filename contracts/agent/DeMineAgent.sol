@@ -24,10 +24,11 @@ contract DeMineAgent is DeMineBase {
         address primaryMarketFacet,
         address billingFacet,
         // initialization args
-        uint256 tokenCost,
+        address nft,
         address income,
         address payment,
-        address nft
+        address payee,
+        uint256 tokenCost
     ) external initializer {
         __DeMineBase_init();
         IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](5);
@@ -40,9 +41,10 @@ contract DeMineAgent is DeMineBase {
 
         // init storage
         s.nft = nft;
-        s.tokenCost = tokenCost;
         s.income = IERC20(income);
         s.payment = IERC20(payment);
+        s.payee = s.payee;
+        s.tokenCost = tokenCost;
     }
 
     function genCutMortagage(

@@ -7,35 +7,30 @@ function gas(txReceipt) {
 }
 
 async function getDeployment(deployer, deployments, name) {
-    var factory = await deployments.getOrNull(name);
-    if (factory === undefined) {
+    var deployment = await deployments.getOrNull(name);
+    if (deployment === undefined) {
         // for hardhat network
         await deployments.run([name]);
-        factory = await deployments.getOrNull(name);
+        deployment = await deployments.getOrNull(name);
     }
-    return await ethers.getContractAt(name, factory.address, deployer);
+    return await ethers.getContractAt(name, deployment.address, deployer);
 }
 
 async function cloneWrappedToken(ethers, deployments, meta) {
     const { deployer, admin } = await ethers.getNamedSigners();
-    const factory = await getDeployment(
-        deployer, deployments, 'WrappedTokenCloneFactory'
+    const Base = await getDeployment(
+        deployer, deployments, 'WrappedToken'
     );
-    const tx = await factory.create(
-        meta.name,
-        meta.symbol,
-        meta.decimals,
-        admin.address
-    );
+    const tx = await Base.clone();
     const { events } = txReceipt = await tx.wait();
-    const { args: [token] } = events.find(
+    const { args: [_from, cloned] } = events.find(
         function(e) { return e.event === 'Clone'; }
     );
     console.log(
         'Cloning WrappedToken ' + meta.symbol + ' at ' +
-        token + ' with ' + gas(txReceipt) + ' gas'
+        cloned + ' with ' + gas(txReceipt) + ' gas'
     );
-    return token;
+    return cloned;
 }
 
 task('clone-demine', 'Deploy clone of demine nft and agent')
@@ -77,7 +72,7 @@ task('clone-demine', 'Deploy clone of demine nft and agent')
         );
     });
 
-subtask("clone-wrapped-token", "clone wrapped token")
+task("clone-wrapped-token", "clone wrapped token")
     .addParam('name', 'Wrapped token name')
     .addParam('symbol', 'Wrapped token symbol')
     .addParam('decimals', 'Wrapped token decimals', undefined, types.int)

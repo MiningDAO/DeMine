@@ -18,17 +18,20 @@ struct Statement {
 }
 
 struct AppStorage {
+    uint tokenCost; // cost per nft in cost token
+
     IERC20 income;
     IERC20 payment;
-    address nft;
+    address nft; // DeMineNFT contract address
+    address payee; // payee account address, could be contract
 
     bool initialized;
     uint8 depositMultiplier; // deposit = maxBalance * tokenCost * depositMultiplier
-    uint tokenCost; // cost per nft in cost token
     uint deposit; // total deposit in cost token
-
-    uint billing; // billing token
+    uint billing; // current billing token
+    // billing statement
     mapping(uint => Statement) statements;
+    // account info
     mapping(address => Account) accounts;
     // tokenId => account => price
     mapping(uint => mapping(address => uint)) balances;

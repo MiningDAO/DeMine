@@ -10,12 +10,10 @@ async function clone(meta) {
 
 async function main() {
     const config = localConfig[network.name] || {};
-    const rewardMeta = localConfig.wrappedTokenMeta.reward;
-    const paymentMetas = localConfig.wrappedTokenMeta.payments;
-    config.wrappedToken?.reward || await clone(rewardMeta)
-    config.wrappedToken?.payments || await Promise.all(
-        paymentMetas.map(p => clone(p))
-    );
+    const income = localConfig.wrappedTokenMeta.income;
+    const payment = localConfig.wrappedTokenMeta.payment;
+    config.wrappedToken?.income || await clone(income)
+    config.wrappedToken?.payment || await clone(payment)
 }
 
 main()
