@@ -7,12 +7,16 @@ import '@solidstate/contracts/factory/CloneFactory.sol';
 import '../interfaces/ICloneable.sol';
 
 abstract contract Cloneable is ICloneable, CloneFactory {
-    function clone() external override returns(address) {
-        return _deployClone();
+    event Clone(address indexed from, address indexed cloned);
+
+    function clone() external override returns(address cloned) {
+        cloned = _deployClone();
+        emit Clone(address(this), cloned);
     }
 
-    function cloneDeterministic(bytes32 salt) external override returns(address) {
-        return _deployClone(salt);
+    function cloneDeterministic(bytes32 salt) external override returns(address cloned) {
+        cloned = _deployClone(salt);
+        emit Clone(address(this), cloned);
     }
 
     function predictDeterministicAddress(bytes32 salt) external override view returns(address) {
