@@ -9,7 +9,6 @@ import '@solidstate/contracts/token/ERC1155/metadata/ERC1155MetadataStorage.sol'
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import '../shared/lib/DeMineBase.sol';
-import '../shared/interfaces/IDiamondFacet.sol';
 import './interfaces/IDeMineNFT.sol';
 import './facets/ERC1155Facet.sol';
 import './facets/DeMineNFTFacet.sol';
@@ -32,8 +31,8 @@ contract DeMineNFT is DeMineBase {
     ) external initializer {
         __DeMineBase_init();
         IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](4);
-        facetCuts[0] = IDiamondFacet(baseFacet).genFacetCutAdd();
-        facetCuts[1] = IDiamondFacet(diamondFacet).genFacetCutAdd();
+        facetCuts[0] = genCutDeMineBase(baseFacet);
+        facetCuts[1] = genCutDiamond(diamondFacet);
         facetCuts[2] = genCutERC1155(erc1155Facet);
         facetCuts[3] = genCutDeMineNFT(nftFacet);
         cutFacets(facetCuts, diamondFacet);

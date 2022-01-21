@@ -7,7 +7,6 @@ import '@solidstate/contracts/access/OwnableInternal.sol';
 import '@solidstate/contracts/token/ERC1155/base/ERC1155BaseStorage.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Internal.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
-import '@solidstate/contracts/introspection/ERC165Storage.sol';
 import '@solidstate/contracts/utils/AddressUtils.sol';
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -26,7 +25,6 @@ contract DeMineNFTFacet is
     AppStorage internal s;
     using AddressUtils for address;
     using SafeERC20 for IERC20;
-    using ERC165Storage for ERC165Storage.Layout;
 
     event Alchemy(address indexed operator, address indexed account, uint income);
     event RegisterAgent(address indexed);
