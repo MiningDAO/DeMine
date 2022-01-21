@@ -13,12 +13,13 @@ contract DeMineAgentV2 is DeMineBaseV2 {
     function initialize(
         address diamond,
         IDiamondCuttable.FacetCut[] calldata facetCuts,
+        bytes4[] calldata interfaces,
         uint256 tokenCost,
         address income,
         address payment,
         address nft
     ) external initializer {
-        __DeMineBaseV2_init(diamond, facetCuts);
+        __DeMineBaseV2_init(diamond, facetCuts, interfaces);
         s.nft = nft;
         s.tokenCost = tokenCost;
         s.income = IERC20(income);
