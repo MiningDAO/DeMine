@@ -1,10 +1,10 @@
 module.exports = async ({ ethers, deployments }) => {
     const { deployer, admin } = await ethers.getNamedSigners();
     const { deploy } = deployments;
-    await deploy('DeMineBaseFacet', {
+    await deploy('DeMineAdminFacet', {
         from: deployer.address,
         log: true
     });
 };
 
-module.exports.tags = ['DeMineBase', 'DeMine'];
+module.exports.tags = ['DeMineAdmin', 'DeMine'];
