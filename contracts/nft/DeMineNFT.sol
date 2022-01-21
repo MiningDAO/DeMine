@@ -9,9 +9,9 @@ import '@solidstate/contracts/token/ERC1155/metadata/ERC1155MetadataStorage.sol'
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import '../shared/lib/DeMineBase.sol';
-import './interfaces/IDeMineNFT.sol';
+import './interfaces/IMiningPool.sol';
+import './facets/MiningPoolFacet.sol';
 import './facets/ERC1155Facet.sol';
-import './facets/DeMineNFTFacet.sol';
 import './lib/AppStorage.sol';
 
 contract DeMineNFT is DeMineBase {
@@ -77,15 +77,15 @@ contract DeMineNFT is DeMineBase {
         bytes4[] memory selectors = new bytes4[](6);
 
         // register IDeMineNFT
-        selectors[0] = IDeMineNFT.alchemize.selector;
-        selectors[1] = IDeMineNFT.shrink.selector;
-        selectors[2] = IDeMineNFT.getMining.selector;
-        erc165.setSupportedInterface(type(IDeMineNFT).interfaceId, true);
+        selectors[0] = IMiningPool.alchemize.selector;
+        selectors[1] = IMiningPool.shrink.selector;
+        selectors[2] = IMiningPool.getMining.selector;
+        erc165.setSupportedInterface(type(IMiningPool).interfaceId, true);
 
-        // register DeMineNFTFacet
-        selectors[3] = DeMineNFTFacet.finalize.selector;
-        selectors[4] = DeMineNFTFacet.expand.selector;
-        selectors[5] = DeMineNFTFacet.getTokenInfo.selector;
+        // register MiningPoolFacet
+        selectors[3] = MiningPoolFacet.finalize.selector;
+        selectors[4] = MiningPoolFacet.expand.selector;
+        selectors[5] = MiningPoolFacet.getTokenInfo.selector;
 
         return genFacetCut(target, selectors);
     }

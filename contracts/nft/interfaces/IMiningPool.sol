@@ -8,7 +8,7 @@ import '@solidstate/contracts/token/ERC1155/IERC1155Internal.sol';
 /**
  * @dev Interface for DeMineNFT for DeMineAgent
  */
-interface IDeMineNFT is IERC1155Internal {
+interface IMiningPool is IERC1155Internal {
     /**
      * @dev shrink mining pool by burning token not mined
      * @param account Address of token holder

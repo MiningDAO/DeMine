@@ -9,7 +9,6 @@ import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import '../shared/lib/DeMineBase.sol';
-import '../nft/interfaces/IDeMineNFT.sol';
 import './facets/MortgageFacet.sol';
 import './facets/PrimaryMarketFacet.sol';
 import './facets/BillingFacet.sol';

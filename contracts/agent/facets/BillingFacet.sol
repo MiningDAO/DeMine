@@ -15,7 +15,7 @@ import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/Util.sol';
-import '../../nft/interfaces/IDeMineNFT.sol';
+import '../../nft/interfaces/IMiningPool.sol';
 import '../lib/AppStorage.sol';
 import '../lib/BillingStorage.sol';
 
@@ -47,9 +47,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         uint billing = s.billing;
         uint balance = IERC1155(s.nft).balanceOf(address(this), billing);
         if (balance > 0) {
-            uint[] memory toBurn = new uint[](1);
-            toBurn[0] = billing;
-            uint income = IDeMineNFT(s.nft).alchemize(address(this), toBurn);
+            uint income = alchemize(billing);
             uint debt = s.tokenCost * balance;
             (bool success, uint sold) = trySwap(l.swapRouter, income, debt);
             if (success) {
@@ -162,7 +160,8 @@ contract BillingFacet is PausableModifier, OwnableInternal {
      * @dev shrink to current mining token + s.shrinkSize
      */
     function shrink(BillingStorage.Layout storage l) private {
-        uint mining = IDeMineNFT(s.nft).getMining();
+        address nft = s.nft;
+        uint mining = IMiningPool(nft).getMining();
         uint start = Util.max2(l.shrinked, mining) + 1;
         uint end = mining + l.shrinkSize;
         if (start < end) {
@@ -170,7 +169,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             for (uint id = start; id <= end; id++) {
                 ids[id - start] = id;
             }
-            IDeMineNFT(s.nft).shrink(address(this), ids);
+            IMiningPool(nft).shrink(address(this), ids);
             l.shrinked = end;
         }
     }
@@ -247,6 +246,12 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             uint unitSize = Util.ceil(income, cost);
             return (unitSize, Util.ceil(cost, income / unitSize));
         }
+    }
+
+    function alchemize(uint billing) private returns(uint) {
+        uint[] memory toBurn = new uint[](1);
+        toBurn[0] = billing;
+        return IMiningPool(s.nft).alchemize(address(this), toBurn);
     }
 
     function close(uint billing) private {
