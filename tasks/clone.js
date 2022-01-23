@@ -6,55 +6,56 @@ function gas(txReceipt) {
     return gas.toNumber();
 }
 
-async function getDeployment(deployer, deployments, name) {
-    var deployment = await deployments.getOrNull(name);
-    if (deployment === undefined) {
-        // for hardhat network
-        await deployments.run([name]);
-        deployment = await deployments.getOrNull(name);
+async function getDeployment(hre, name) {
+    const { deployer } = await hre.ethers.getNamedSigners();
+    if (hre.network.name == 'hardhat') {
+        deployment = await hre.deployments.getOrNull(name);
+        if (deployment === undefined) {
+            await hre.deployments.run(['DeMine']);
+        }
     }
-    return await ethers.getContractAt(name, deployment.address, deployer);
+    deployment = await hre.deployments.get(name);
+    return await hre.ethers.getContractAt(name, deployment.address, deployer);
 }
 
-async function genSelectors(ethers, nameFunctions) {
+async function genSelectors(hre, nameFunctions) {
     const selectors = await Promise.all(nameFunctions.map(
         async ([name, functions]) => {
-            const factory = await ethers.getContractFactory(name);
-            const iface = factory.interface;
+            const artifact = await hre.deployments.getArtifact(name);
+            const iface = new hre.ethers.utils.Interface(artifact.abi);
             return functions.map(f => iface.getSighash(f));
         }
     ));
     return selectors.flat();
 }
 
-async function genInterfaces(ethers, ifaceNames) {
-    return await Promise.all(names.map(
-        async name => {
-            const factory = await ethers.getContractFactory(ifaceName);
-            const iface = factory.interface;
-            const selectors = iface.functions.map(f => iface.getSighash(f));
-            const interfaceId = selectors.reduce(
+async function genInterfaces(hre, ifaceNames) {
+    return await Promise.all(ifaceNames.map(
+        async ifaceName => {
+            const artifact = await deployments.getArtifact(ifaceName);
+            const iface = new ethers.utils.Interface(artifact.abi);
+            const selectors = Object.keys(iface.functions).map(f => iface.getSighash(f));
+            return selectors.reduce(
                 (prev, cur) => ethers.BigNumber.from(prev).xor(ethers.BigNumber.from(cur))
             );
-            return interfaceId;
         }
     ));
 }
 
-async function genDeMineAdminFacetCut(ethers, deployments) {
-    const facet = await deployments.get('DeMineAdminFacet');
-    const selectors = await genSelectors(ethers, [
+async function genDeMineAdminFacetCut(hre) {
+    const facet = await getDeployment(hre, 'DeMineAdminFacet');
+    const selectors = await genSelectors(hre, [
         ['Ownable', ['owner']],
-        ['Safeownable', ['nomineeOwner', 'transferOwnership', 'acceptOwnership']],
+        ['SafeOwnable', ['nomineeOwner', 'transferOwnership', 'acceptOwnership']],
         ['IPausable', ['paused', 'pause', 'unpause']],
         ['ICloneable', ['clone', 'cloneDeterministic', 'predictDeterministicAddress']]
     ]);
     return [facet, 0, selectors];
 }
 
-async function genDiamondFacetCut(ethers, deployments) {
-    const facet = await deployments.get('DiamondFacet');
-    const selectors = await genSelectors(ethers, [
+async function genDiamondFacetCut(hre) {
+    const facet = await getDeployment(hre, 'DiamondFacet');
+    const selectors = await genSelectors(hre, [
         ['IDiamondCuttable', ['diamondCut']],
         ['IDiamondLoupe', ['facets', 'facetFunctionSelectors', 'facetAddresses', 'facetAddress']],
         ['DiamondFacet', ['getFallbackAddress', 'setFallbackAddress']]
@@ -62,9 +63,9 @@ async function genDiamondFacetCut(ethers, deployments) {
     return [facet, 0, selectors];
 }
 
-async function genERC1155FacetCut(ethers, deployments) {
-    const facet = await deployments.get('ERC1155Facet');
-    const selectors = await genSelectors(ethers, [
+async function genERC1155FacetCut(hre) {
+    const facet = await getDeployment(hre, 'ERC1155Facet');
+    const selectors = await genSelectors(hre, [
         ['IERC1155', [
             'balanceOf',
             'balanceOfBatch',
@@ -80,27 +81,27 @@ async function genERC1155FacetCut(ethers, deployments) {
     return [facet, 0, selectors];
 }
 
-async function genDeMineNFTFacetCut(ethers, deployments) {
-    const facet = await deployments.get('MiningPoolFacet');
-    const selectors = await genSelectors(ethers, [
+async function genDeMineNFTFacetCut(hre) {
+    const facet = await getDeployment(hre, 'MiningPoolFacet');
+    const selectors = await genSelectors(hre, [
         ['IMiningPool', ['alchemize', 'shrink', 'getMining']],
         ['MiningPoolFacet', ['finalize', 'expand', 'getTokenInfo']]
     ]);
     return [facet, 0, selectors];
 }
 
-async function genMortgageFacetCut(ethers, deployments) {
-    const facet = await deployments.get('MortgageFacet');
-    const selectors = await genSelectors(ethers, [
+async function genMortgageFacetCut(hre) {
+    const facet = await getDeployment(hre, 'MortgageFacet');
+    const selectors = await genSelectors(hre, [
         ['IERC1155Receiver', ['onERC1155Received', 'onERC1155BatchReceived']],
         ['MortgageFacet', ['redeem', 'payoff', 'adjustDeposit', 'getAccountInfo', 'balanceOfBatch']]
     ]);
     return [facet, 0, selectors];
 }
 
-async function genPrimaryMarketFacetCut(ethers, deployments) {
-    const facet = await deployments.get('PrimaryMarketFacet');
-    const selectors = await genSelectors(ethers, [
+async function genPrimaryMarketFacetCut(hre) {
+    const facet = await getDeployment(hre, 'PrimaryMarketFacet');
+    const selectors = await genSelectors(hre, [
         [
             'PrimaryMarketFacet',
             [
@@ -118,9 +119,9 @@ async function genPrimaryMarketFacetCut(ethers, deployments) {
     return [facet, 0, selectors];
 }
 
-async function genBillingFacetCut(ethers, deployments) {
-    const facet = await deployments.get('BillingFacet');
-    const selectors = await genSelectors(ethers, [
+async function genBillingFacetCut(hre) {
+    const facet = await getDeployment(hre, 'BillingFacet');
+    const selectors = await genSelectors(hre, [
         [
             'BillingFacet',
             [
@@ -141,13 +142,11 @@ subtask("clone-wrapped-token", "clone wrapped token")
     .addParam('name', 'Wrapped token name')
     .addParam('symbol', 'Wrapped token symbol')
     .addParam('decimals', 'Wrapped token decimals', undefined, types.int)
-    .setAction(async function(args, { ethers, deployments }) {
-        const { deployer, admin } = await ethers.getNamedSigners();
-        const Base = await getDeployment(
-            deployer, deployments, 'DeMineERC20'
-        );
-        const tx = await Base.clone(
-            args.name, args.symbol, args.decimals
+    .setAction(async function(args, { ethers } = hre) {
+        const { admin } = await ethers.getNamedSigners();
+        const Base = await getDeployment(hre, 'DeMineERC20');
+        const tx = await Base.create(
+            args.name, args.symbol, args.decimals, admin.address
         );
         const { events } = txReceipt = await tx.wait();
         const { args: [_from, cloned] } = events.find(
@@ -162,8 +161,8 @@ subtask("clone-wrapped-token", "clone wrapped token")
 
 task('clone-demine-nft', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
-    .setAction(async (args, { ehters, network, deployments, localConfig }) => {
-        const { deployer, admin, custodian } = await ethers.getNamedSigners();
+    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
+        const { admin, custodian } = await ethers.getNamedSigners();
         let localNetworkConfig = localConfig[network.name] || {};
 
         const coinConfig = localNetworkConfig[args.coin] || {};
@@ -174,39 +173,38 @@ task('clone-demine-nft', 'Deploy clone of demine nft')
             income = coinConfig.wrapped;
         }
 
-        const base = await getDeployment(deployer, deployments, 'DeMineNFTV2');
-        const interfaceIds = await genInterfaces(
-            ethers, [
-                'ICloneable',
-                'IERC173',
-                'IPausable',
-                'IDiamondCuttable',
-                'IDiamondLoupe',
-                'IERC165',
-                'IERC1155',
-                'IERC1155Metadata',
-                'IERC2981',
-                'IMiningPool'
-            ]
-        );
+        const base = await getDeployment(hre, 'DeMineNFTV2');
+        const interfaceIds = await genInterfaces(hre, [
+            'ICloneable',
+            'IERC173',
+            'IPausable',
+            'IDiamondCuttable',
+            'IDiamondLoupe',
+            'IERC165',
+            'IERC1155',
+            'IERC1155Metadata',
+            'IERC2981',
+            'IMiningPool'
+        ]);
         const facetCuts = ethers.utils.AbiCoder.prototype.encode(
             Array(4).fill('tuple(address,uint8,bytes4[])'),
             [
-                genDeMineAdminFacetCut(ethers, deployments),
-                genDiamondFacetCut(ethers, deployments),
-                genERC1155FacetCut(ethers, deployments),
-                genDiamondFacetCut(ethers, deployments)
+                genDeMineAdminFacetCut(hre),
+                genDiamondFacetCut(hre),
+                genERC1155FacetCut(hre),
+                genDiamondFacetCut(hre)
             ]
         );
 
-        const tx = await base.clone(
-            diamondFacet,
+        const tx = await base.create(
+            await getDeployment(hre, 'DiamondFacet'),
             facetCuts,
             interfaces,
             income,
             custodian.address,
             100,
-            localConfig.tokenUri
+            localConfig.tokenUri,
+            admin.address
         );
         const { events } = txReceipt = await tx.wait();
         const { args: [from, cloned] } = events.find(
@@ -243,38 +241,37 @@ task('clone-demine-agent', 'Deploy clone of demine agent')
             );
         }
 
-        const base = await getDeployment(deployer, deployments, 'DeMineAgentV2');
-        const interfaceIds = await genInterfaces(
-            ethers, [
-                'ICloneable',
-                'IERC173',
-                'IPausable',
-                'IDiamondCuttable',
-                'IDiamondLoupe',
-                'IERC165',
-                'IERC1155Receiver'
-            ]
-        );
+        const interfaceIds = await genInterfaces(hre, [
+            'ICloneable',
+            'IERC173',
+            'IPausable',
+            'IDiamondCuttable',
+            'IDiamondLoupe',
+            'IERC165',
+            'IERC1155Receiver'
+        ]);
         const facetCuts = ethers.utils.AbiCoder.prototype.encode(
             Array(4).fill('tuple(address,uint8,bytes4[])'),
             [
-                genDeMineAdminFacetCut(ethers, deployments),
-                genDiamondFacetCut(ethers, deployments),
-                genMortgageFacetCut(ethers, deployments),
-                genPrimaryMarketFacetCut(ethers, deployments),
-                genBillingFacetCut(ethers, deployments)
+                genDeMineAdminFacetCut(hre),
+                genDiamondFacetCut(hre),
+                genMortgageFacetCut(hre),
+                genPrimaryMarketFacetCut(hre),
+                genBillingFacetCut(hre)
             ]
         );
 
-        const tx = await base.clone(
-            diamondFacet,
+        const base = await getDeployment(hre, 'DeMineAgentV2');
+        const tx = await base.create(
+            await getDeployment(hre, 'DiamondFacet'),
             facetCuts,
             interfaces,
             coinConfig.nft,
             coinConfig.wrapped,
             paymentConfig.wrapped,
             custodian.address,
-            localConfig.tokenCost
+            localConfig.tokenCost,
+            admin.address
         );
         const { events } = txReceipt = await tx.wait();
         const { args: [from, cloned] } = events.find(

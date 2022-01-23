@@ -19,17 +19,18 @@ contract DeMineAgentV2 is DeMineBaseV2 {
         address income,
         address payment,
         address payee,
-        uint256 tokenCost
+        uint256 tokenCost,
+        address owner
     ) external initializer {
-        __DeMineBaseV2_init(diamondFacet, facetCuts, interfaces);
+        __DeMineBaseV2_init(diamondFacet, facetCuts, interfaces, owner);
         s.nft = nft;
         s.income = IERC20(income);
         s.payment = IERC20(payment);
-        s.payee = s.payee;
+        s.payee = payee;
         s.tokenCost = tokenCost;
     }
 
-    function clone(
+    function create(
         address diamondFacet,
         IDiamondCuttable.FacetCut[] calldata facetCuts,
         bytes4[] calldata interfaces,
@@ -37,11 +38,12 @@ contract DeMineAgentV2 is DeMineBaseV2 {
         address income,
         address payment,
         address payee,
-        uint256 tokenCost
+        uint256 tokenCost,
+        address owner
     ) external {
         address payable cloned = payable(ICloneable(address(this)).clone());
         DeMineAgentV2(cloned).initialize(
-            diamondFacet, facetCuts, interfaces, nft, income, payment, payee, tokenCost
+            diamondFacet, facetCuts, interfaces, nft, income, payment, payee, tokenCost, owner
         );
     }
 }

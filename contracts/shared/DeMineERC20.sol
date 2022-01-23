@@ -21,22 +21,24 @@ contract DeMineERC20 is
     function initialize(
         string memory name,
         string memory symbol,
-        uint8 decimals
+        uint8 decimals,
+        address owner
     ) external initializer {
-        OwnableStorage.layout().setOwner(msg.sender);
+        OwnableStorage.layout().setOwner(owner);
         ERC20MetadataStorage.Layout storage l = ERC20MetadataStorage.layout();
         l.name = name;
         l.symbol = symbol;
         l.decimals = decimals;
     }
 
-    function clone(
+    function create(
         string memory name,
         string memory symbol,
-        uint8 decimals
+        uint8 decimals,
+        address owner
     ) external {
         address payable cloned = payable(ICloneable(address(this)).clone());
-        DeMineERC20(cloned).initialize(name, symbol, decimals);
+        DeMineERC20(cloned).initialize(name, symbol, decimals, owner);
     }
 
     function burn(address from, uint256 amount) external onlyOwner {

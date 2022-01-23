@@ -15,9 +15,10 @@ abstract contract DeMineBaseV2 is DiamondBase, Initializable {
     function __DeMineBaseV2_init(
         address diamond,
         IDiamondCuttable.FacetCut[] calldata facetCuts,
-        bytes4[] calldata interfaces
+        bytes4[] calldata interfaces,
+        address owner
     ) internal onlyInitializing {
-        OwnableStorage.layout().setOwner(msg.sender);
+        OwnableStorage.layout().setOwner(owner);
         (bool success, bytes memory returndata) = diamond.delegatecall(
             abi.encodeWithSelector(
                 IDiamondCuttable.diamondCut.selector,

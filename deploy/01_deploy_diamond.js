@@ -7,4 +7,4 @@ module.exports = async ({ ethers, deployments }) => {
     });
 };
 
-module.exports.tags = ['Diamond', 'DeMine'];
+module.exports.tags = ['DiamondFacet', 'DeMine'];

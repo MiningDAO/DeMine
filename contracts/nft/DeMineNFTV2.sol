@@ -20,26 +20,28 @@ contract DeMineNFTV2 is DeMineBaseV2 {
         address income,
         address recipient,
         uint16 bps,
-        string memory uri
+        string memory uri,
+        address owner
     ) external initializer {
-        __DeMineBaseV2_init(diamondFacet, facetCuts, interfaces);
+        __DeMineBaseV2_init(diamondFacet, facetCuts, interfaces, owner);
         ERC1155MetadataStorage.layout().baseURI = uri;
         s.royalty = RoyaltyInfo(recipient, bps);
         s.income = IERC20(income);
     }
 
-    function clone(
+    function create(
         address diamondFacet,
         IDiamondCuttable.FacetCut[] calldata facetCuts,
         bytes4[] calldata interfaces,
         address income,
         address recipient,
         uint16 bps,
-        string memory uri
+        string memory uri,
+        address owner
     ) external {
         address payable cloned = payable(ICloneable(address(this)).clone());
         DeMineNFTV2(cloned).initialize(
-            diamondFacet, facetCuts, interfaces, income, recipient, bps, uri
+            diamondFacet, facetCuts, interfaces, income, recipient, bps, uri, owner
         );
     }
 }
