@@ -45,11 +45,15 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             'DeMineAgent: billing in progress'
         );
         uint billing = s.billing;
-        uint balance = IERC1155(s.nft).balanceOf(address(this), billing);
+        address nft = s.nft;
+        IMiningPool pool = IMiningPool(nft);
+        uint balance = IERC1155(nft).balanceOf(address(this), billing);
         if (balance > 0) {
-            uint income = alchemize(billing);
+            uint income = alchemize(pool, billing);
             uint debt = s.tokenCost * balance;
-            (bool success, uint sold) = trySwap(l.swapRouter, income, debt);
+            (bool success, uint sold) = trySwap(
+                l.swapRouter, address(s.income), address(s.payment), income, debt
+            );
             if (success) {
                 s.statements[billing] = Statement(balance, income - sold, 0);
                 close(l, billing);
@@ -64,7 +68,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             close(l, billing);
         }
         if (l.shrinked > 0) {
-            shrink(l);
+            shrink(l, pool);
         }
     }
 
@@ -113,8 +117,8 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             st.income / p.unitSize
         );
         uint subtotal = unitToBuy * p.unitPrice;
-        uint incomeTokenSold = unitToBuy * p.unitSize;
-        s.statements[billing].income = st.income - incomeTokenSold;
+        uint rewardTokenSold = unitToBuy * p.unitSize;
+        s.statements[billing].income = st.income - rewardTokenSold;
         if (subtotal < st.debt) {
             s.statements[billing].debt = st.debt - subtotal;
         } else {
@@ -122,8 +126,8 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             close(l, s.billing);
         }
         s.payment.safeTransferFrom(msg.sender, s.payee, subtotal);
-        s.income.safeTransfer(msg.sender, incomeTokenSold);
-        emit RewardTokenSold(msg.sender, incomeTokenSold, subtotal);
+        s.income.safeTransfer(msg.sender, rewardTokenSold);
+        emit RewardTokenSold(msg.sender, rewardTokenSold, subtotal);
     }
 
     /**
@@ -141,7 +145,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         Statement memory st = s.statements[s.billing];
         s.deposit -= st.debt;
         if (l.shrinked == 0) {
-            shrink(l);
+            shrink(l, IMiningPool(s.nft));
         }
         close(l, billing);
     }
@@ -176,9 +180,8 @@ contract BillingFacet is PausableModifier, OwnableInternal {
     /**
      * @dev shrink to current mining token + s.shrinkSize
      */
-    function shrink(BillingStorage.Layout storage l) private {
-        address nft = s.nft;
-        uint mining = IMiningPool(nft).getMining();
+    function shrink(BillingStorage.Layout storage l, IMiningPool pool) private {
+        uint mining = pool.getMining();
         uint start = Util.max2(l.shrinked, mining) + 1;
         uint end = mining + l.shrinkSize;
         if (start < end) {
@@ -186,7 +189,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             for (uint id = start; id <= end; id++) {
                 ids[id - start] = id;
             }
-            IMiningPool(nft).shrink(address(this), ids);
+            pool.shrink(address(this), ids);
             l.shrinked = end;
         }
     }
@@ -197,15 +200,16 @@ contract BillingFacet is PausableModifier, OwnableInternal {
 
     function trySwap(
         address swapRouter,
+        address tokenIn,
+        address tokenOut,
         uint amountInMaximum,
         uint amountOut
     ) internal returns(bool, uint) {
-        address income = address(s.income);
-        TransferHelper.safeApprove(income, swapRouter, amountInMaximum);
+        TransferHelper.safeApprove(tokenIn, swapRouter, amountInMaximum);
         ISwapRouter.ExactOutputSingleParams memory param =
             ISwapRouter.ExactOutputSingleParams({
-                tokenIn: income,
-                tokenOut: address(s.payment),
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
                 fee: 3000, // 0.3%
                 recipient: address(this),
                 deadline: block.timestamp,
@@ -219,7 +223,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
                 param
             )
         );
-        TransferHelper.safeApprove(income, swapRouter, 0);
+        TransferHelper.safeApprove(tokenIn, swapRouter, 0);
         if (success) {
             (uint amountIn) = abi.decode(encoded, (uint));
             return (true, amountIn);
@@ -265,10 +269,10 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         }
     }
 
-    function alchemize(uint billing) private returns(uint) {
+    function alchemize(IMiningPool pool, uint billing) private returns(uint) {
         uint[] memory toBurn = new uint[](1);
         toBurn[0] = billing;
-        return IMiningPool(s.nft).alchemize(address(this), toBurn);
+        return pool.alchemize(address(this), toBurn);
     }
 
     function close(BillingStorage.Layout storage l, uint billing) private {

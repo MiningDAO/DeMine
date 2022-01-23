@@ -5,6 +5,5 @@ pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/access/SafeOwnable.sol';
 import '../lib/LibPausable.sol';
-import '../lib/Cloneable.sol';
 
-contract DeMineAdminFacet is Cloneable, Pausable, SafeOwnable { }
+contract DeMineAdminFacet is Pausable, SafeOwnable { }

@@ -110,6 +110,10 @@ contract MiningPoolFacet is
         return s.mining;
     }
 
+    function treasureSource() external override view returns(address) {
+        return address(s.income);
+    }
+
     function getTokenInfo(uint256 id) external view returns(Token memory) {
         return s.tokens[id];
     }

@@ -4,8 +4,9 @@ pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
-import '../shared/interfaces/ICloneable.sol';
+
 import '../shared/lib/DeMineBaseV2.sol';
+import '../nft/interfaces/IMiningPool.sol';
 import './lib/AppStorage.sol';
 
 contract DeMineAgentV2 is DeMineBaseV2 {
@@ -16,7 +17,6 @@ contract DeMineAgentV2 is DeMineBaseV2 {
         IDiamondCuttable.FacetCut[] calldata facetCuts,
         bytes4[] calldata interfaces,
         address nft,
-        address income,
         address payment,
         address payee,
         uint256 tokenCost,
@@ -24,7 +24,7 @@ contract DeMineAgentV2 is DeMineBaseV2 {
     ) external initializer {
         __DeMineBaseV2_init(diamondFacet, facetCuts, interfaces, owner);
         s.nft = nft;
-        s.income = IERC20(income);
+        s.income = IERC20(IMiningPool(nft).treasureSource());
         s.payment = IERC20(payment);
         s.payee = payee;
         s.tokenCost = tokenCost;
@@ -35,15 +35,13 @@ contract DeMineAgentV2 is DeMineBaseV2 {
         IDiamondCuttable.FacetCut[] calldata facetCuts,
         bytes4[] calldata interfaces,
         address nft,
-        address income,
         address payment,
         address payee,
         uint256 tokenCost,
         address owner
     ) external {
-        address payable cloned = payable(ICloneable(address(this)).clone());
-        DeMineAgentV2(cloned).initialize(
-            diamondFacet, facetCuts, interfaces, nft, income, payment, payee, tokenCost, owner
+        DeMineAgentV2(clone()).initialize(
+            diamondFacet, facetCuts, interfaces, nft, payment, payee, tokenCost, owner
         );
     }
 }

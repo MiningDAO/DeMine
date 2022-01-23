@@ -54,7 +54,7 @@ abstract contract DeMineBase is DiamondBase, Initializable {
         returns(IDiamondCuttable.FacetCut memory)
     {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](7);
 
         // register SafeOwnable
         selectors[0] = Ownable.owner.selector;
@@ -69,11 +69,6 @@ abstract contract DeMineBase is DiamondBase, Initializable {
         selectors[6] = IPausable.unpause.selector;
         erc165.setSupportedInterface(type(IPausable).interfaceId, true);
 
-        // register ICloneable
-        selectors[4] = ICloneable.clone.selector;
-        selectors[5] = ICloneable.cloneDeterministic.selector;
-        selectors[6] = ICloneable.predictDeterministicAddress.selector;
-        erc165.setSupportedInterface(type(ICloneable).interfaceId, true);
         return IDiamondCuttable.FacetCut({
             target: target,
             action: IDiamondCuttable.FacetCutAction.ADD,

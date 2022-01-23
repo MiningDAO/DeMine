@@ -25,4 +25,6 @@ interface IMiningPool is IERC1155Internal {
     function alchemize(address account, uint[] memory ids) external returns(uint);
 
     function getMining() external view returns(uint);
+
+    function treasureSource() external view returns(address);
 }

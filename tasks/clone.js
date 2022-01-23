@@ -1,4 +1,6 @@
 const { types } = require("hardhat/config");
+const assert = require("assert");
+const SUPPORTED_COINS = ['btc', 'eth', 'fil'];
 
 function gas(txReceipt) {
     const { cumulativeGasUsed, effectiveGasPrice } = txReceipt;
@@ -18,11 +20,15 @@ async function getDeployment(hre, name) {
     return await hre.ethers.getContractAt(name, deployment.address, deployer);
 }
 
+async function getInterface(hre, name) {
+    const artifact = await hre.deployments.getArtifact(name);
+    return new hre.ethers.utils.Interface(artifact.abi);
+}
+
 async function genSelectors(hre, nameFunctions) {
     const selectors = await Promise.all(nameFunctions.map(
         async ([name, functions]) => {
-            const artifact = await hre.deployments.getArtifact(name);
-            const iface = new hre.ethers.utils.Interface(artifact.abi);
+            const iface = await getInterface(hre, name);
             return functions.map(f => iface.getSighash(f));
         }
     ));
@@ -32,8 +38,7 @@ async function genSelectors(hre, nameFunctions) {
 async function genInterfaces(hre, ifaceNames) {
     return await Promise.all(ifaceNames.map(
         async ifaceName => {
-            const artifact = await deployments.getArtifact(ifaceName);
-            const iface = new ethers.utils.Interface(artifact.abi);
+            const iface = await getInterface(hre, ifaceName);
             const selectors = Object.keys(iface.functions).map(f => iface.getSighash(f));
             return selectors.reduce(
                 (prev, cur) => ethers.BigNumber.from(prev).xor(ethers.BigNumber.from(cur))
@@ -42,30 +47,30 @@ async function genInterfaces(hre, ifaceNames) {
     ));
 }
 
+async function genFacetCut(hre, name, functions) {
+    const facet = await getDeployment(hre, name);
+    const selectors = await genSelectors(hre, functions);
+    return [facet.address, 0, selectors];
+}
+
 async function genDeMineAdminFacetCut(hre) {
-    const facet = await getDeployment(hre, 'DeMineAdminFacet');
-    const selectors = await genSelectors(hre, [
+    return await genFacetCut(hre, 'DeMineAdminFacet', [
         ['Ownable', ['owner']],
         ['SafeOwnable', ['nomineeOwner', 'transferOwnership', 'acceptOwnership']],
-        ['IPausable', ['paused', 'pause', 'unpause']],
-        ['ICloneable', ['clone', 'cloneDeterministic', 'predictDeterministicAddress']]
+        ['IPausable', ['paused', 'pause', 'unpause']]
     ]);
-    return [facet, 0, selectors];
 }
 
 async function genDiamondFacetCut(hre) {
-    const facet = await getDeployment(hre, 'DiamondFacet');
-    const selectors = await genSelectors(hre, [
+    return await genFacetCut(hre, 'DiamondFacet', [
         ['IDiamondCuttable', ['diamondCut']],
         ['IDiamondLoupe', ['facets', 'facetFunctionSelectors', 'facetAddresses', 'facetAddress']],
         ['DiamondFacet', ['getFallbackAddress', 'setFallbackAddress']]
     ]);
-    return [facet, 0, selectors];
 }
 
 async function genERC1155FacetCut(hre) {
-    const facet = await getDeployment(hre, 'ERC1155Facet');
-    const selectors = await genSelectors(hre, [
+    return await genFacetCut(hre, 'ERC1155Facet', [
         ['IERC1155', [
             'balanceOf',
             'balanceOfBatch',
@@ -78,30 +83,24 @@ async function genERC1155FacetCut(hre) {
         ['IERC2981', ['royaltyInfo']],
         ['ERC1155Facet', ['setBaseURI', 'setTokenURI', 'setRoyaltyInfo']]
     ]);
-    return [facet, 0, selectors];
 }
 
-async function genDeMineNFTFacetCut(hre) {
-    const facet = await getDeployment(hre, 'MiningPoolFacet');
-    const selectors = await genSelectors(hre, [
-        ['IMiningPool', ['alchemize', 'shrink', 'getMining']],
+async function genMiningPoolFacetCut(hre) {
+    return await genFacetCut(hre, 'MiningPoolFacet', [
+        ['IMiningPool', ['alchemize', 'shrink', 'getMining', 'treasureSource']],
         ['MiningPoolFacet', ['finalize', 'expand', 'getTokenInfo']]
     ]);
-    return [facet, 0, selectors];
 }
 
 async function genMortgageFacetCut(hre) {
-    const facet = await getDeployment(hre, 'MortgageFacet');
-    const selectors = await genSelectors(hre, [
+    return await genFacetCut(hre, 'MortgageFacet', [
         ['IERC1155Receiver', ['onERC1155Received', 'onERC1155BatchReceived']],
         ['MortgageFacet', ['redeem', 'payoff', 'adjustDeposit', 'getAccountInfo', 'balanceOfBatch']]
     ]);
-    return [facet, 0, selectors];
 }
 
 async function genPrimaryMarketFacetCut(hre) {
-    const facet = await getDeployment(hre, 'PrimaryMarketFacet');
-    const selectors = await genSelectors(hre, [
+    return await genFacetCut(hre, 'PrimaryMarketFacet', [
         [
             'PrimaryMarketFacet',
             [
@@ -116,12 +115,10 @@ async function genPrimaryMarketFacetCut(hre) {
         ['PricingStatic', ['setStaticBase', 'setStaticOverride']],
         ['PricingLinearDecay', ['setLinearDecay']]
     ]);
-    return [facet, 0, selectors];
 }
 
 async function genBillingFacetCut(hre) {
-    const facet = await getDeployment(hre, 'BillingFacet');
-    const selectors = await genSelectors(hre, [
+    return await genFacetCut(hre, 'BillingFacet', [
         [
             'BillingFacet',
             [
@@ -135,7 +132,6 @@ async function genBillingFacetCut(hre) {
             ]
         ]
     ]);
-    return [facet, 0, selectors];
 }
 
 subtask("clone-wrapped-token", "clone wrapped token")
@@ -162,6 +158,8 @@ subtask("clone-wrapped-token", "clone wrapped token")
 task('clone-demine-nft', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
+        assert(SUPPORTED_COINS.includes(args.coin), 'unsupported coin');
+
         const { admin, custodian } = await ethers.getNamedSigners();
         let localNetworkConfig = localConfig[network.name] || {};
 
@@ -173,33 +171,27 @@ task('clone-demine-nft', 'Deploy clone of demine nft')
             income = coinConfig.wrapped;
         }
 
+        const diamondFacet = await getDeployment(hre, 'DiamondFacet');
         const base = await getDeployment(hre, 'DeMineNFTV2');
-        const interfaceIds = await genInterfaces(hre, [
-            'ICloneable',
-            'IERC173',
-            'IPausable',
-            'IDiamondCuttable',
-            'IDiamondLoupe',
-            'IERC165',
-            'IERC1155',
-            'IERC1155Metadata',
-            'IERC2981',
-            'IMiningPool'
-        ]);
-        const facetCuts = ethers.utils.AbiCoder.prototype.encode(
-            Array(4).fill('tuple(address,uint8,bytes4[])'),
-            [
-                genDeMineAdminFacetCut(hre),
-                genDiamondFacetCut(hre),
-                genERC1155FacetCut(hre),
-                genDiamondFacetCut(hre)
-            ]
-        );
-
         const tx = await base.create(
-            await getDeployment(hre, 'DiamondFacet'),
-            facetCuts,
-            interfaces,
+            diamondFacet.address,
+            [
+                await genDeMineAdminFacetCut(hre),
+                await genDiamondFacetCut(hre),
+                await genERC1155FacetCut(hre),
+                await genMiningPoolFacetCut(hre)
+            ],
+            await genInterfaces(hre, [
+                'IERC173',
+                'IPausable',
+                'IDiamondCuttable',
+                'IDiamondLoupe',
+                'IERC165',
+                'IERC1155',
+                'IERC1155Metadata',
+                'IERC2981',
+                'IMiningPool'
+            ]),
             income,
             custodian.address,
             100,
@@ -211,64 +203,55 @@ task('clone-demine-nft', 'Deploy clone of demine nft')
             function(e) { return e.event === 'Clone'; }
         );
         console.log(
-            'Cloning contract DeMineNFT at ' + nft +
-            ' and DeMineAgent at ' + agent +
+            'Cloning contract DeMineNFT at ' + cloned +
             ' with ' + gas(txReceipt) + ' gas'
         );
     });
 
 task('clone-demine-agent', 'Deploy clone of demine agent')
+    .addOptionalParam('nft', 'contract address of DeMineNFT', undefined)
     .addParam('coin', 'Coin type')
     .addParam('cost', 'Cost per token')
     .setAction(async (args, { ehters, network, deployments, localConfig } = hre) => {
+        assert(SUPPORTED_COINS.includes(args.coin), 'unsupported coin');
+
         const { deployer, admin, custodian } = await ethers.getNamedSigners();
         let localNetworkConfig = localConfig[network.name] || {};
 
         const coinConfig = localNetworkConfig[args.coin] || {};
         const paymentConfig = localNetworkConfig.payment || {};
-        var income, nft, payment;
+        var nft, income, payment;
         if (network.name == 'hardhat') {
-            nft = await hre.run('clone-demine-nft', {coin: args.coin});
-            income = await hre.run('clone-wrapped-token', coinConfig.metadata);
+            nft = await hre.run('clone-demine-nft', {coin: args.coin, income: income});
             payment = await hre.run('clone-wrapped-token', paymentConfig.metadata);
         } else {
-            income = coinConfig.wrapped;
             nft = coinConfig.nft;
             payment = coinConfig.wrapped;
-            assert(
-                income && nft && payment,
-                'invalid income/payment/nft contract address'
-            );
         }
+        assert(nft && payment, 'invalid nft or payment contract address');
 
-        const interfaceIds = await genInterfaces(hre, [
-            'ICloneable',
-            'IERC173',
-            'IPausable',
-            'IDiamondCuttable',
-            'IDiamondLoupe',
-            'IERC165',
-            'IERC1155Receiver'
-        ]);
-        const facetCuts = ethers.utils.AbiCoder.prototype.encode(
-            Array(4).fill('tuple(address,uint8,bytes4[])'),
-            [
-                genDeMineAdminFacetCut(hre),
-                genDiamondFacetCut(hre),
-                genMortgageFacetCut(hre),
-                genPrimaryMarketFacetCut(hre),
-                genBillingFacetCut(hre)
-            ]
-        );
-
+        const diamondFacet = await getDeployment(hre, 'DiamondFacet');
         const base = await getDeployment(hre, 'DeMineAgentV2');
         const tx = await base.create(
-            await getDeployment(hre, 'DiamondFacet'),
-            facetCuts,
-            interfaces,
-            coinConfig.nft,
-            coinConfig.wrapped,
-            paymentConfig.wrapped,
+            diamondFacet.address,
+            [
+                await genDeMineAdminFacetCut(hre),
+                await genDiamondFacetCut(hre),
+                await genMortgageFacetCut(hre),
+                await genPrimaryMarketFacetCut(hre),
+                await genBillingFacetCut(hre)
+            ],
+            await genInterfaces(hre, [
+                'ICloneable',
+                'IERC173',
+                'IPausable',
+                'IDiamondCuttable',
+                'IDiamondLoupe',
+                'IERC165',
+                'IERC1155Receiver'
+            ]),
+            nft,
+            payment,
             custodian.address,
             localConfig.tokenCost,
             admin.address
@@ -279,7 +262,6 @@ task('clone-demine-agent', 'Deploy clone of demine agent')
         );
         console.log(
             'Cloning contract DeMineAgent at ' + cloned +
-            ' and DeMineAgent at ' + agent +
             ' with ' + gas(txReceipt) + ' gas'
         );
     });

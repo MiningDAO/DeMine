@@ -61,28 +61,6 @@ contract MortgageFacet is
     }
 
     /**
-     * @notice payoff debt from billing. Ensure you have a valid start and
-     *         end set for msg.sender to prevent infinite loop
-     */
-    function payoff() external whenNotPaused {
-        uint income;
-        uint debt;
-        Account memory account = readAccount(msg.sender);
-        for (uint id = account.start; id < s.billing; id++) {
-            uint balance = s.balances[id][msg.sender];
-            if (balance > 0) {
-                Statement memory st = s.statements[id];
-                income += st.income * balance / st.balance;
-                debt += Util.ceil(st.debt * balance, st.balance);
-                s.balances[id][msg.sender] = 0;
-            }
-        }
-        s.payment.safeTransferFrom(s.payee, msg.sender, debt);
-        s.deposit += debt;
-        s.income.safeTransfer(msg.sender, income);
-    }
-
-    /**
      * @notice adjust deposit for msg sender and update account info
      *         Ensure you have a valid start and end set for msg.sender
      *         to prevent infinite loop
@@ -164,6 +142,28 @@ contract MortgageFacet is
         }
         mergeAccount(mortgager, account, update);
         return IERC1155Receiver.onERC1155BatchReceived.selector;
+    }
+
+    /**
+     * @notice payoff debt from billing. Ensure you have a valid start and
+     *         end set for msg.sender to prevent infinite loop
+     */
+    function payoff() external whenNotPaused {
+        uint income;
+        uint debt;
+        Account memory account = readAccount(msg.sender);
+        for (uint id = account.start; id < s.billing; id++) {
+            uint balance = s.balances[id][msg.sender];
+            if (balance > 0) {
+                Statement memory st = s.statements[id];
+                income += st.income * balance / st.balance;
+                debt += Util.ceil(st.debt * balance, st.balance);
+                s.balances[id][msg.sender] = 0;
+            }
+        }
+        s.payment.safeTransferFrom(s.payee, msg.sender, debt);
+        s.deposit += debt;
+        s.income.safeTransfer(msg.sender, income);
     }
 
     function readAccount(
