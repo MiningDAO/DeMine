@@ -22,11 +22,6 @@ contract ERC1155Facet is
     AppStorage internal s;
     event TokenRoyaltyBpsSet(uint16);
 
-    function setRoyaltyInfo(address recipient, uint16 bps) external onlyOwner {
-        s.royalty = RoyaltyInfo(recipient, bps);
-        emit TokenRoyaltyBpsSet(bps);
-    }
-
     function setBaseURI(string memory baseURI) external onlyOwner {
         _setBaseURI(baseURI);
     }
@@ -36,6 +31,11 @@ contract ERC1155Facet is
         string memory baseURI
     ) external onlyOwner {
         _setTokenURI(tokenId, baseURI);
+    }
+
+    function setRoyaltyInfo(address recipient, uint16 bps) external onlyOwner {
+        s.royalty = RoyaltyInfo(recipient, bps);
+        emit TokenRoyaltyBpsSet(bps);
     }
 
     function royaltyInfo(uint256, uint256 value)

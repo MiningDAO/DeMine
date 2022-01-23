@@ -9,7 +9,7 @@ import './lib/Cloneable.sol';
 import './lib/LibPausable.sol';
 import './lib/LibInitializable.sol';
 
-contract WrappedToken is
+contract DeMineERC20 is
     Cloneable,
     Pausable,
     Initializable,
@@ -22,12 +22,21 @@ contract WrappedToken is
         string memory name,
         string memory symbol,
         uint8 decimals
-    ) public initializer {
+    ) external initializer {
         OwnableStorage.layout().setOwner(msg.sender);
         ERC20MetadataStorage.Layout storage l = ERC20MetadataStorage.layout();
         l.name = name;
         l.symbol = symbol;
         l.decimals = decimals;
+    }
+
+    function clone(
+        string memory name,
+        string memory symbol,
+        uint8 decimals
+    ) external {
+        address payable cloned = payable(ICloneable(address(this)).clone());
+        DeMineERC20(cloned).initialize(name, symbol, decimals);
     }
 
     function burn(address from, uint256 amount) external onlyOwner {

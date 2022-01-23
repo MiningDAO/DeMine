@@ -43,7 +43,7 @@ contract DeMineAgent is DeMineBase {
         s.nft = nft;
         s.income = IERC20(income);
         s.payment = IERC20(payment);
-        s.payee = s.payee;
+        s.payee = payee;
         s.tokenCost = tokenCost;
     }
 

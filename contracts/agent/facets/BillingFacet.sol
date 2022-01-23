@@ -52,7 +52,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             (bool success, uint sold) = trySwap(l.swapRouter, income, debt);
             if (success) {
                 s.statements[billing] = Statement(balance, income - sold, 0);
-                close(billing);
+                close(l, billing);
             } else {
                 s.statements[billing] = Statement(balance, income, debt);
                 uint saleExpireAt = block.timestamp + l.saleDuration;
@@ -61,7 +61,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
                 emit BillingSale(billing, block.timestamp, saleExpireAt);
             }
         } else {
-            close(billing);
+            close(l, billing);
         }
         if (l.shrinked > 0) {
             shrink(l);
@@ -119,7 +119,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             s.statements[billing].debt = st.debt - subtotal;
         } else {
             s.statements[billing].debt = 0;
-            close(billing);
+            close(l, s.billing);
         }
         s.payment.safeTransferFrom(msg.sender, s.payee, subtotal);
         s.income.safeTransfer(msg.sender, incomeTokenSold);
@@ -143,8 +143,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         if (l.shrinked == 0) {
             shrink(l);
         }
-        l.stage = BillingStorage.Stage.NOT_STARTED;
-        close(billing);
+        close(l, billing);
     }
 
     /**
@@ -156,7 +155,6 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         uint end
     ) external onlyOwner {
         require(end < s.billing, 'DeMineAgent: token not billed yet');
-        BillingStorage.Layout storage l = BillingStorage.layout();
         uint total;
         for (uint id = start; id <= end; id++) {
             uint income = s.statements[s.billing].income;
@@ -273,8 +271,9 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         return IMiningPool(s.nft).alchemize(address(this), toBurn);
     }
 
-    function close(uint billing) private {
+    function close(BillingStorage.Layout storage l, uint billing) private {
         s.billing = billing + 1;
+        l.stage = BillingStorage.Stage.NOT_STARTED;
         emit CloseBilling(billing);
     }
 }

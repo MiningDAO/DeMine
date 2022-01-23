@@ -6,6 +6,7 @@ pragma experimental ABIEncoderV2;
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/token/ERC1155/metadata/ERC1155MetadataStorage.sol';
 
+import '../shared/interfaces/ICloneable.sol';
 import '../shared/lib/DeMineBaseV2.sol';
 import './lib/AppStorage.sol';
 
@@ -13,7 +14,7 @@ contract DeMineNFTV2 is DeMineBaseV2 {
     AppStorage internal s;
 
     function initialize(
-        address diamond,
+        address diamondFacet,
         IDiamondCuttable.FacetCut[] calldata facetCuts,
         bytes4[] calldata interfaces,
         address income,
@@ -21,9 +22,24 @@ contract DeMineNFTV2 is DeMineBaseV2 {
         uint16 bps,
         string memory uri
     ) external initializer {
-        __DeMineBaseV2_init(diamond, facetCuts, interfaces);
+        __DeMineBaseV2_init(diamondFacet, facetCuts, interfaces);
         ERC1155MetadataStorage.layout().baseURI = uri;
         s.royalty = RoyaltyInfo(recipient, bps);
         s.income = IERC20(income);
+    }
+
+    function clone(
+        address diamondFacet,
+        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        bytes4[] calldata interfaces,
+        address income,
+        address recipient,
+        uint16 bps,
+        string memory uri
+    ) external {
+        address payable cloned = payable(ICloneable(address(this)).clone());
+        DeMineNFTV2(cloned).initialize(
+            diamondFacet, facetCuts, interfaces, income, recipient, bps, uri
+        );
     }
 }
