@@ -35,8 +35,8 @@ contract MiningPoolFacet is
         if (total > 0) {
             s.income.safeTransferFrom(source, address(this), total);
         }
-        emit Finalize(mining, source, income, supply);
         s.mining = mining + 1;
+        emit Finalize(mining, source, income, supply);
     }
 
     function shrink(uint[] calldata ids) external override whenNotPaused {
@@ -70,7 +70,6 @@ contract MiningPoolFacet is
         s.income.safeTransfer(msg.sender, income);
         emit TransferBatch(msg.sender, msg.sender, address(0), ids, amounts);
         emit Alchemy(msg.sender, income);
-        return income;
     }
 
     function getMining() external view override returns(uint) {
