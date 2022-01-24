@@ -3,90 +3,43 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@solidstate/contracts/introspection/ERC165Storage.sol';
+import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/token/ERC1155/metadata/ERC1155MetadataStorage.sol';
-// use IERC20 from openzeppelin so we can use SafeERC20 lib
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import '../shared/lib/DeMineBase.sol';
-import './interfaces/IMiningPool.sol';
-import './facets/MiningPoolFacet.sol';
-import './facets/ERC1155Facet.sol';
 import './lib/AppStorage.sol';
 
 contract DeMineNFT is DeMineBase {
     AppStorage internal s;
-    using ERC165Storage for ERC165Storage.Layout;
 
     function initialize(
-        address adminFacet,
         address diamondFacet,
-        address erc1155Facet,
-        address nftFacet,
-        // initialization args
+        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        bytes4[] calldata interfaces,
         address income,
         address recipient,
         uint16 bps,
-        string memory uri
+        string memory uri,
+        address owner
     ) external initializer {
-        __DeMineBase_init();
-        IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](4);
-        facetCuts[0] = genCutDeMineAdmin(adminFacet);
-        facetCuts[1] = genCutDiamond(diamondFacet);
-        facetCuts[2] = genCutERC1155(erc1155Facet);
-        facetCuts[3] = genCutDeMineNFT(nftFacet);
-        cutFacets(facetCuts, diamondFacet);
-
+        __DeMineBase_init(diamondFacet, facetCuts, interfaces, owner);
         ERC1155MetadataStorage.layout().baseURI = uri;
         s.royalty = RoyaltyInfo(recipient, bps);
         s.income = IERC20(income);
     }
 
-    function genCutERC1155(
-        address target
-    ) internal returns(IDiamondCuttable.FacetCut memory) {
-        ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
-        bytes4[] memory selectors = new bytes4[](11);
-
-        // register ERC1155
-        selectors[0] = IERC1155.balanceOf.selector;
-        selectors[1] = IERC1155.balanceOfBatch.selector;
-        selectors[2] = IERC1155.isApprovedForAll.selector;
-        selectors[3] = IERC1155.setApprovalForAll.selector;
-        selectors[4] = IERC1155.safeTransferFrom.selector;
-        selectors[5] = IERC1155.safeBatchTransferFrom.selector;
-        erc165.setSupportedInterface(type(IERC1155).interfaceId, true);
-
-        // register ERC1155Metadata
-        selectors[6] = IERC1155Metadata.uri.selector;
-        selectors[7] = ERC1155Facet.setBaseURI.selector;
-        selectors[8] = ERC1155Facet.setTokenURI.selector;
-        erc165.setSupportedInterface(type(IERC1155Metadata).interfaceId, true);
-
-        // register ERC2981
-        selectors[9] = IERC2981.royaltyInfo.selector;
-        selectors[10] = ERC1155Facet.setRoyaltyInfo.selector;
-        erc165.setSupportedInterface(type(IERC2981).interfaceId, true);
-        return genFacetCut(target, selectors);
-    }
-
-    function genCutDeMineNFT(
-        address target
-    ) internal returns(IDiamondCuttable.FacetCut memory) {
-        ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
-        bytes4[] memory selectors = new bytes4[](6);
-
-        // register IDeMineNFT
-        selectors[0] = IMiningPool.alchemize.selector;
-        selectors[1] = IMiningPool.shrink.selector;
-        selectors[2] = IMiningPool.getMining.selector;
-        erc165.setSupportedInterface(type(IMiningPool).interfaceId, true);
-
-        // register MiningPoolFacet
-        selectors[3] = MiningPoolFacet.finalize.selector;
-        selectors[4] = MiningPoolFacet.expand.selector;
-        selectors[5] = MiningPoolFacet.getTokenInfo.selector;
-
-        return genFacetCut(target, selectors);
+    function create(
+        address diamondFacet,
+        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        bytes4[] calldata interfaces,
+        address income,
+        address recipient,
+        uint16 bps,
+        string memory uri,
+        address owner
+    ) external {
+        DeMineNFT(clone()).initialize(
+            diamondFacet, facetCuts, interfaces, income, recipient, bps, uri, owner
+        );
     }
 }

@@ -170,9 +170,10 @@ task('clone-demine-nft', 'Deploy clone of demine nft')
         } else {
             income = coinConfig.wrapped;
         }
+        assert(income, 'invalid income contract address');
 
         const diamondFacet = await getDeployment(hre, 'DiamondFacet');
-        const base = await getDeployment(hre, 'DeMineNFTV2');
+        const base = await getDeployment(hre, 'DeMineNFT');
         const tx = await base.create(
             diamondFacet.address,
             [
@@ -206,6 +207,7 @@ task('clone-demine-nft', 'Deploy clone of demine nft')
             'Cloning contract DeMineNFT at ' + cloned +
             ' with ' + gas(txReceipt) + ' gas'
         );
+        return cloned;
     });
 
 task('clone-demine-agent', 'Deploy clone of demine agent')
@@ -231,7 +233,7 @@ task('clone-demine-agent', 'Deploy clone of demine agent')
         assert(nft && payment, 'invalid nft or payment contract address');
 
         const diamondFacet = await getDeployment(hre, 'DiamondFacet');
-        const base = await getDeployment(hre, 'DeMineAgentV2');
+        const base = await getDeployment(hre, 'DeMineAgent');
         const tx = await base.create(
             diamondFacet.address,
             [
@@ -253,7 +255,7 @@ task('clone-demine-agent', 'Deploy clone of demine agent')
             nft,
             payment,
             custodian.address,
-            localConfig.tokenCost,
+            args.cost,
             admin.address
         );
         const { events } = txReceipt = await tx.wait();

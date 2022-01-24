@@ -21,11 +21,6 @@ module.exports = async ({ ethers, deployments, localConfig }) => {
         from: deployer.address,
         log: true
     });
-
-    await deploy('DeMineAgentV2', {
-        from: deployer.address,
-        log: true
-    });
 };
 
 module.exports.tags = ['DeMineAgent', 'DeMine'];

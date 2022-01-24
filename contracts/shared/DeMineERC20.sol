@@ -4,18 +4,20 @@ pragma solidity ^0.8.4;
 import '@solidstate/contracts/access/SafeOwnable.sol';
 import '@solidstate/contracts/token/ERC20/ERC20.sol';
 import '@solidstate/contracts/token/ERC20/metadata/ERC20MetadataStorage.sol';
+import '@solidstate/contracts/factory/CloneFactory.sol';
 
-import './lib/Cloneable.sol';
 import './lib/LibPausable.sol';
 import './lib/LibInitializable.sol';
 
 contract DeMineERC20 is
-    Cloneable,
+    CloneFactory,
     Pausable,
     Initializable,
     SafeOwnable,
     ERC20
 {
+    event Clone(address indexed from, address indexed cloned);
+
     using OwnableStorage for OwnableStorage.Layout;
 
     function initialize(
@@ -37,7 +39,8 @@ contract DeMineERC20 is
         uint8 decimals,
         address owner
     ) external {
-        address payable cloned = payable(ICloneable(address(this)).clone());
+        address payable cloned = payable(_deployClone());
+        emit Clone(address(this), cloned);
         DeMineERC20(cloned).initialize(name, symbol, decimals, owner);
     }
 

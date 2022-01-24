@@ -3,94 +3,45 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@solidstate/contracts/introspection/ERC165Storage.sol';
-import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
-// use IERC20 from openzeppelin so we can use SafeERC20 lib
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 
 import '../shared/lib/DeMineBase.sol';
-import './facets/MortgageFacet.sol';
-import './facets/PrimaryMarketFacet.sol';
-import './facets/BillingFacet.sol';
+import '../nft/interfaces/IMiningPool.sol';
+import './lib/AppStorage.sol';
 
 contract DeMineAgent is DeMineBase {
     AppStorage internal s;
-    using ERC165Storage for ERC165Storage.Layout;
 
     function initialize(
-        address adminFacet,
         address diamondFacet,
-        address mortgageFacet,
-        address primaryMarketFacet,
-        address billingFacet,
-        // initialization args
+        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        bytes4[] calldata interfaces,
         address nft,
-        address income,
         address payment,
         address payee,
-        uint256 tokenCost
+        uint256 tokenCost,
+        address owner
     ) external initializer {
-        __DeMineBase_init();
-        IDiamondCuttable.FacetCut[] memory facetCuts = new IDiamondCuttable.FacetCut[](5);
-        facetCuts[0] = genCutDeMineAdmin(adminFacet);
-        facetCuts[1] = genCutDiamond(diamondFacet);
-        facetCuts[2] = genCutMortagage(mortgageFacet);
-        facetCuts[3] = genCutPrimaryMarket(primaryMarketFacet);
-        facetCuts[4] = genCutBilling(billingFacet);
-        cutFacets(facetCuts, diamondFacet);
-
-        // init storage
+        __DeMineBase_init(diamondFacet, facetCuts, interfaces, owner);
         s.nft = nft;
-        s.income = IERC20(income);
+        s.income = IERC20(IMiningPool(nft).treasureSource());
         s.payment = IERC20(payment);
         s.payee = payee;
         s.tokenCost = tokenCost;
     }
 
-    function genCutMortagage(
-        address target
-    ) internal returns(IDiamondCuttable.FacetCut memory) {
-        ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
-
-        bytes4[] memory selectors = new bytes4[](7);
-        selectors[0] = IERC1155Receiver.onERC1155Received.selector;
-        selectors[1] = IERC1155Receiver.onERC1155BatchReceived.selector;
-        erc165.setSupportedInterface(type(IERC1155Receiver).interfaceId, true);
-
-        selectors[2] = MortgageFacet.redeem.selector;
-        selectors[3] = MortgageFacet.payoff.selector;
-        selectors[4] = MortgageFacet.adjustDeposit.selector;
-        selectors[5] = MortgageFacet.getAccountInfo.selector;
-        selectors[6] = MortgageFacet.balanceOfBatch.selector;
-        return genFacetCut(target, selectors);
-    }
-
-    function genCutPrimaryMarket(
-        address target
-    ) internal pure returns(IDiamondCuttable.FacetCut memory) {
-        bytes4[] memory selectors = new bytes4[](9);
-        selectors[0] = PrimaryMarketFacet.setPricingStrategy.selector;
-        selectors[1] = PrimaryMarketFacet.increaseAllowance.selector;
-        selectors[2] = PrimaryMarketFacet.decreaseAllowance.selector;
-        selectors[3] = PrimaryMarketFacet.claim.selector;
-        selectors[4] = PrimaryMarketFacet.getListedPrices.selector;
-        selectors[5] = PrimaryMarketFacet.getAllowances.selector;
-        selectors[6] = PricingStatic.setStaticBase.selector;
-        selectors[7] = PricingStatic.setStaticOverride.selector;
-        selectors[8] = PricingLinearDecay.setLinearDecay.selector;
-        return genFacetCut(target, selectors);
-    }
-
-    function genCutBilling(
-        address target
-    ) internal pure returns(IDiamondCuttable.FacetCut memory) {
-        bytes4[] memory selectors = new bytes4[](6);
-        selectors[0] = BillingFacet.tryBilling.selector;
-        selectors[1] = BillingFacet.lockPrice.selector;
-        selectors[2] = BillingFacet.buyWithLockedPrice.selector;
-        selectors[3] = BillingFacet.closeBilling.selector;
-        selectors[4] = BillingFacet.resetShrink.selector;
-        selectors[5] = BillingFacet.getStatement.selector;
-        return genFacetCut(target, selectors);
+    function create(
+        address diamondFacet,
+        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        bytes4[] calldata interfaces,
+        address nft,
+        address payment,
+        address payee,
+        uint256 tokenCost,
+        address owner
+    ) external {
+        DeMineAgent(clone()).initialize(
+            diamondFacet, facetCuts, interfaces, nft, payment, payee, tokenCost, owner
+        );
     }
 }
