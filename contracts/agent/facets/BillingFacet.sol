@@ -189,7 +189,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             for (uint id = start; id <= end; id++) {
                 ids[id - start] = id;
             }
-            pool.shrink(address(this), ids);
+            pool.shrink(ids);
             l.shrinked = end;
         }
     }
@@ -272,7 +272,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
     function alchemize(IMiningPool pool, uint billing) private returns(uint) {
         uint[] memory toBurn = new uint[](1);
         toBurn[0] = billing;
-        return pool.alchemize(address(this), toBurn);
+        return pool.alchemize(toBurn);
     }
 
     function close(BillingStorage.Layout storage l, uint billing) private {

@@ -32,16 +32,8 @@ contract ERC1155Facet is
         _safeMintBatch(account, ids, amounts, data);
     }
 
-    function burnBatch(
-        address from,
-        uint[] memory ids,
-        uint[] memory amounts
-    )  external {
-        require(
-            from == msg.sender || isApprovedForAll(from, msg.sender),
-            'ERC1155: caller is not owner nor approved'
-        );
-        _burnBatch(from, ids, amounts);
+    function burnBatch(uint[] memory ids, uint[] memory amounts) external {
+        _burnBatch(msg.sender, ids, amounts);
     }
 
     function setURI(string memory baseURI) external onlyOwner {
