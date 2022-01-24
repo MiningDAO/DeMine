@@ -42,24 +42,6 @@ contract MiningPoolFacet is
         s.mining = mining + 1;
     }
 
-    function expand(
-        address recipient,
-        uint[] calldata ids,
-        uint[] calldata amounts,
-        bytes memory data
-    ) external onlyOwner {
-        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
-        for (uint i; i < ids.length; i++) {
-            require(ids[i] > s.mining, 'DeMineNFT: mined or mining token');
-            s.tokens[ids[i]].supply += amounts[i];
-            l.balances[ids[i]][recipient] += amounts[i];
-        }
-        _doSafeBatchTransferAcceptanceCheck(
-            msg.sender, address(0), recipient, ids, amounts, data
-        );
-        emit TransferBatch(msg.sender, address(0), recipient, ids, amounts);
-    }
-
     function shrink(address account, uint[] calldata ids)
         external
         override
@@ -81,6 +63,7 @@ contract MiningPoolFacet is
         }
         emit TransferBatch(msg.sender, account, address(0), ids, amounts);
     }
+
 
     function alchemize(
         address account,
@@ -116,28 +99,5 @@ contract MiningPoolFacet is
 
     function getTokenInfo(uint256 id) external view returns(Token memory) {
         return s.tokens[id];
-    }
-
-    function _doSafeBatchTransferAcceptanceCheck(
-        address operator,
-        address from,
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
-        bytes memory data
-    ) private {
-        if (to.isContract()) {
-            try IERC1155Receiver(to).onERC1155BatchReceived(operator, from, ids, amounts, data) returns (
-                bytes4 response
-            ) {
-                if (response != IERC1155Receiver.onERC1155BatchReceived.selector) {
-                    revert("ERC1155: ERC1155Receiver rejected tokens");
-                }
-            } catch Error(string memory reason) {
-                revert(reason);
-            } catch {
-                revert("ERC1155: transfer to non ERC1155Receiver implementer");
-            }
-        }
     }
 }

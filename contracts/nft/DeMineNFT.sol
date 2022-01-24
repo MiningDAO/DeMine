@@ -5,6 +5,7 @@ pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/token/ERC1155/metadata/ERC1155MetadataStorage.sol';
+import "@openzeppelin/contracts/proxy/Clones.sol";
 
 import '../shared/lib/DeMineBase.sol';
 import './lib/AppStorage.sol';
@@ -38,8 +39,10 @@ contract DeMineNFT is DeMineBase {
         string memory uri,
         address owner
     ) external {
-        DeMineNFT(clone()).initialize(
+        address cloned = Clones.clone(address(this));
+        DeMineNFT(payable(cloned)).initialize(
             diamondFacet, facetCuts, interfaces, income, recipient, bps, uri, owner
         );
+        emit Clone(address(this), cloned);
     }
 }

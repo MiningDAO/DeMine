@@ -6,10 +6,9 @@ pragma experimental ABIEncoderV2;
 import '@solidstate/contracts/introspection/ERC165Storage.sol';
 import '@solidstate/contracts/access/OwnableStorage.sol';
 import '@solidstate/contracts/proxy/diamond/DiamondBase.sol';
-import '@solidstate/contracts/factory/CloneFactory.sol';
 import './LibInitializable.sol';
 
-abstract contract DeMineBase is DiamondBase, Initializable, CloneFactory {
+abstract contract DeMineBase is DiamondBase, Initializable {
     event Clone(address indexed from, address indexed cloned);
 
     using ERC165Storage for ERC165Storage.Layout;
@@ -39,11 +38,6 @@ abstract contract DeMineBase is DiamondBase, Initializable, CloneFactory {
         }
         // set the new owner after initialization
         OwnableStorage.layout().setOwner(owner);
-    }
-
-    function clone() internal returns(address payable cloned) {
-        cloned = payable(_deployClone());
-        emit Clone(address(this), cloned);
     }
 
     receive() external payable { }

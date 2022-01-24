@@ -81,14 +81,14 @@ async function genERC1155FacetCut(hre) {
         ]],
         ['IERC1155Metadata', ['uri']],
         ['IERC2981', ['royaltyInfo']],
-        ['ERC1155Facet', ['setBaseURI', 'setTokenURI', 'setRoyaltyInfo']]
+        ['ERC1155Facet', ['mintBatch', 'burnBatch', 'setURI', 'setRoyaltyInfo']]
     ]);
 }
 
 async function genMiningPoolFacetCut(hre) {
     return await genFacetCut(hre, 'MiningPoolFacet', [
         ['IMiningPool', ['alchemize', 'shrink', 'getMining', 'treasureSource']],
-        ['MiningPoolFacet', ['finalize', 'expand', 'getTokenInfo']]
+        ['MiningPoolFacet', ['finalize', 'getTokenInfo']]
     ]);
 }
 

@@ -6,11 +6,12 @@ import '@solidstate/contracts/token/ERC20/ERC20.sol';
 import '@solidstate/contracts/token/ERC20/metadata/ERC20MetadataStorage.sol';
 import '@solidstate/contracts/factory/CloneFactory.sol';
 
+import "@openzeppelin/contracts/proxy/Clones.sol";
+
 import './lib/LibPausable.sol';
 import './lib/LibInitializable.sol';
 
 contract DeMineERC20 is
-    CloneFactory,
     Pausable,
     Initializable,
     SafeOwnable,
@@ -39,9 +40,9 @@ contract DeMineERC20 is
         uint8 decimals,
         address owner
     ) external {
-        address payable cloned = payable(_deployClone());
+        address cloned = Clones.clone(address(this));
+        DeMineERC20(payable(cloned)).initialize(name, symbol, decimals, owner);
         emit Clone(address(this), cloned);
-        DeMineERC20(cloned).initialize(name, symbol, decimals, owner);
     }
 
     function burn(address from, uint256 amount) external onlyOwner {

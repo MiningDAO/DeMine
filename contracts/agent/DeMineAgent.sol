@@ -4,6 +4,7 @@ pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
+import "@openzeppelin/contracts/proxy/Clones.sol";
 
 import '../shared/lib/DeMineBase.sol';
 import '../nft/interfaces/IMiningPool.sol';
@@ -40,8 +41,10 @@ contract DeMineAgent is DeMineBase {
         uint256 tokenCost,
         address owner
     ) external {
-        DeMineAgent(clone()).initialize(
+        address cloned = Clones.clone(address(this));
+        DeMineAgent(payable(cloned)).initialize(
             diamondFacet, facetCuts, interfaces, nft, payment, payee, tokenCost, owner
         );
+        emit Clone(address(this), cloned);
     }
 }

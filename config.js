@@ -24,7 +24,7 @@ const wrappedTokenMeta = {
 };
 
 const config = {
-    tokenUri: 'DeMineNFT',
+    tokenUri: 'https://www.demine.com/token/',
     royaltyBps: 100,
     accounts: [
         process.env.DEPLOYER_DEV,
