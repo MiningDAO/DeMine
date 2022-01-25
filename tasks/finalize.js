@@ -1,6 +1,6 @@
 const assert = require("assert");
 const { types } = require("hardhat/config");
-const constants = require("./constants.js");
+const common = require("./common.js");
 
 task('finalize', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'Coin to deploy')
@@ -9,7 +9,7 @@ task('finalize', 'finalize cycle for DeMineNFT contract')
     .addFlag('dryrun', 'only do the check')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-        assert(constants.SUPPORTED_COINS.includes(args.coin), 'unsupported coin');
+        common.validateCoin(args.coin);
         assert(args.income >= 0, 'Income has to be non-negative number');
 
         let nft = localConfig[network.name][args.coin].nft;
@@ -40,7 +40,7 @@ task('finalize', 'finalize cycle for DeMineNFT contract')
             'Insufficient balance, current=' + balance + ', required=' + total
         );
 
-        console.log(JSON.stringify({
+        var info = {
             tokenId: mining.toNumber(),
             supply: supply.toNumber(),
             income: args.income,
@@ -48,12 +48,21 @@ task('finalize', 'finalize cycle for DeMineNFT contract')
             source: custodian.address,
             allowance: allowance.toNumber(),
             balance: balance.toNumber()
-        }, null, 2));
-
+        };
 
         if (!args.dryrun) {
-            await miningPoolFacet.connect(admin).finalize(
+            const tx = await miningPoolFacet.connect(admin).finalize(
                 custodian.address, args.income
             );
+            const txReceipt = await tx.wait();
+            console.log(JSON.stringify({
+                ...info,
+                tx: {
+                    gas: common.gas(txReceipt),
+                    hash: txReceipt.transactionHash
+                }
+            }, null, 2));
+        } else {
+            console.log(JSON.stringify(info, null, 2));
         }
     });

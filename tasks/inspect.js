@@ -1,12 +1,12 @@
 const assert = require("assert");
-const constants = require("./constants.js");
+const common = require("./common.js");
 
 task('inspect-nft', 'Inspect state of DeMineNFT contract')
     .addParam('coin', 'Coin to deploy')
     .setAction(async (args, { ethers, network, localConfig }) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
+        common.validateCoin(args.coin);
 
-        assert(constants.SUPPORTED_COINS.includes(args.coin), 'unsupported coin');
         let nft = localConfig[network.name][args.coin].nft;
         const adminFacet = await ethers.getContractAt('DeMineAdminFacet', nft);
         const diamondFacet = await ethers.getContractAt('DiamondFacet', nft);

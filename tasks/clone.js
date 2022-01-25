@@ -1,12 +1,6 @@
 const { types } = require("hardhat/config");
 const assert = require("assert");
-const SUPPORTED_COINS = ['btc', 'eth', 'fil'];
-
-function gas(txReceipt) {
-    const { cumulativeGasUsed, effectiveGasPrice } = txReceipt;
-    const gas = cumulativeGasUsed.mul(effectiveGasPrice).div(1000000000);
-    return gas.toNumber();
-}
+const common = require("./common.js");
 
 async function getDeployment(hre, name) {
     const { deployer } = await hre.ethers.getNamedSigners();
@@ -150,7 +144,7 @@ task("clone-wrapped-token", "clone wrapped token")
         );
         console.log(
             'Cloning DeMineERC20 ' + args.symbol + ' at ' +
-            cloned + ' with ' + gas(txReceipt) + ' gas'
+            cloned + ' with ' + common.gas(txReceipt) + ' gas'
         );
         return cloned;
     });
@@ -205,7 +199,7 @@ task('clone-demine-nft', 'Deploy clone of demine nft')
         );
         console.log(
             'Cloning contract DeMineNFT at ' + cloned +
-            ' with ' + gas(txReceipt) + ' gas'
+            ' with ' + common.gas(txReceipt) + ' gas'
         );
         return cloned;
     });
@@ -264,6 +258,6 @@ task('clone-demine-agent', 'Deploy clone of demine agent')
         );
         console.log(
             'Cloning contract DeMineAgent at ' + cloned +
-            ' with ' + gas(txReceipt) + ' gas'
+            ' with ' + common.gas(txReceipt) + ' gas'
         );
     });
