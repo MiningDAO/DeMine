@@ -20,9 +20,14 @@ task('inspect-nft', 'Inspect state of DeMineNFT contract')
         const miningToken = await miningPoolFacet.getTokenInfo(mining);
         const balance = await income.balanceOf(nft);
         var history = [];
-        for (let i = Math.max(mining - 1, 0); i <= mining - 10; i++) {
+        var start = Math.max(mining.toNumber() - 5, 0);
+        for (let i = start; i < mining.toNumber(); i++) {
             let info = await miningPoolFacet.getTokenInfo(i);
-            history.push([info[0].toNumber(), info[1].toNumber()]);
+            history.push({
+                tokenId: i,
+                supply: info[0].toNumber(),
+                income: info[1].toNumber()
+            });
         }
         console.log(JSON.stringify({
             address: nft,

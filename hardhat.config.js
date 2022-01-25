@@ -5,7 +5,7 @@ require('hardhat-deploy');
 require('hardhat-deploy-ethers');
 require('./tasks/clone.js');
 require('./tasks/inspect.js');
-require('./tasks/finalize.js');
+require('./tasks/mining.js');
 
 const config = require('./config');
 extendEnvironment((hre) => {
