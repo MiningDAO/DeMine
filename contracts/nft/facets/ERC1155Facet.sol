@@ -89,7 +89,13 @@ contract ERC1155Facet is
         return s.mining;
     }
 
-    function getTokenInfo(uint256 id) external view returns(Token memory) {
-        return s.tokens[id];
+    function getTokenInfo(
+        uint[] calldata ids
+    ) external view returns(Token[] memory) {
+        Token[] memory res = new Token[](ids.length);
+        for (uint i; i < ids.length; i++) {
+            res[i] = s.tokens[ids[i]];
+        }
+        return res;
     }
 }

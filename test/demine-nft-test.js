@@ -80,8 +80,7 @@ describe("DeMineNFT", function () {
                 await common.genSelectors(hre, [
                     ['IDiamondLoupe', [
                         'facets', 'facetFunctionSelectors', 'facetAddresses', 'facetAddress'
-                    ]],
-                    ['DiamondFacet', ['getFallbackAddress', 'setFallbackAddress']]
+                    ]]
                 ])
             ]
         ], address0, []);
@@ -216,7 +215,8 @@ describe("DeMineNFT", function () {
             [0, custodian.address, 0, 0]
         );
         expect(await erc1155.getMining()).to.equal(1);
-        common.compareArray(await erc1155.getTokenInfo(0), [0, 0]);
+        var [tokenInfo] = await erc1155.getTokenInfo([0]);
+        common.compareArray(tokenInfo, [0, 0]);
         expect(await income.balanceOf(custodian.address)).to.equal(1000);
 
         checkEvent(
@@ -227,7 +227,8 @@ describe("DeMineNFT", function () {
         );
 
         expect(await erc1155.getMining()).to.equal(2);
-        common.compareArray(await erc1155.getTokenInfo(1), [200, 1]);
+        [tokenInfo] = await erc1155.getTokenInfo([1]);
+        common.compareArray(tokenInfo, [200, 1]);
         expect(await income.balanceOf(custodian.address)).to.equal(800);
         expect(await income.balanceOf(nft)).to.equal(200);
 
@@ -238,7 +239,8 @@ describe("DeMineNFT", function () {
             [2, custodian.address, 2, 400]
         );
         expect(await erc1155.getMining()).to.equal(3);
-        common.compareArray(await erc1155.getTokenInfo(2), [400, 2]);
+        [tokenInfo] = await erc1155.getTokenInfo([2]);
+        common.compareArray(tokenInfo, [400, 2]);
         expect(await income.balanceOf(custodian.address)).to.equal(0);
         expect(await income.balanceOf(nft)).to.equal(1000);
 

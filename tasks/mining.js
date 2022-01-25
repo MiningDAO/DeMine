@@ -16,7 +16,9 @@ task('finalize', 'finalize cycle for DeMineNFT contract')
         const mining = await erc1155Facet.getMining();
         assert(ethers.BigNumber.from(args.mining).eq(mining), 'wrong mining cycle');
 
-        const [supply, incomePerToken] = await erc1155Facet.getTokenInfo(mining);
+        const [
+            [supply, incomePerToken]
+        ] = await erc1155Facet.getTokenInfo([mining]);
         assert(
             incomePerToken.eq(ethers.BigNumber.from(0)),
             'unexpected income per token ' + incomePerToken + ' for token id ' + mining

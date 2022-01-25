@@ -30,7 +30,8 @@ async function genDeMineAdminFacetCut(hre) {
 
 async function genDiamondFacetCut(hre) {
     return await genFacetCut(hre, 'DiamondFacet', [
-        ['IDiamondCuttable', ['diamondCut']]
+        ['IDiamondCuttable', ['diamondCut']],
+        ['DiamondFacet', ['getFallbackAddress', 'setFallbackAddress']]
     ]);
 }
 
