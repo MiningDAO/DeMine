@@ -32,8 +32,52 @@ async function prompt(func) {
     })();
 }
 
+async function getInterface(hre, name) {
+    const artifact = await hre.deployments.getArtifact(name);
+    return new hre.ethers.utils.Interface(artifact.abi);
+}
+
+async function genSelectors(hre, nameFunctions) {
+    const selectors = await Promise.all(nameFunctions.map(
+        async ([name, functions]) => {
+            const iface = await getInterface(hre, name);
+            return functions.map(f => iface.getSighash(f));
+        }
+    ));
+    return selectors.flat();
+}
+
+async function genInterfaces(hre, ifaceNames) {
+    return await Promise.all(ifaceNames.map(
+        async ifaceName => {
+            const iface = await getInterface(hre, ifaceName);
+            const selectors = Object.keys(iface.functions).map(f => iface.getSighash(f));
+            return selectors.reduce(
+                (prev, cur) => ethers.BigNumber.from(prev).xor(ethers.BigNumber.from(cur))
+            );
+        }
+    ));
+}
+
+function address0(ethers) {
+    return hre.ethers.utils.getAddress(
+        "0x0000000000000000000000000000000000000000"
+    );
+}
+
+async function compareArray(a, b) {
+    expect(a.length).to.equal(b.length);
+    for (let i = 0; i < a.length; i++) {
+        expect(a[i]).to.equal(b[i]);
+    }
+}
+
 module.exports = {
     gas: gas,
     validateCoin: validateCoin,
-    prompt: prompt
+    prompt: prompt,
+    genInterfaces: genInterfaces,
+    genSelectors: genSelectors,
+    address0: address0,
+    compareArray: compareArray
 }

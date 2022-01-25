@@ -3,26 +3,35 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '@solidstate/contracts/introspection/ERC165Storage.sol';
-import '@solidstate/contracts/access/OwnableStorage.sol';
+import '@solidstate/contracts/access/SafeOwnable.sol';
+import '@solidstate/contracts/access/SafeOwnable.sol';
+import '@solidstate/contracts/access/IERC173.sol';
+import '@solidstate/contracts/introspection/IERC165.sol';
 import '@solidstate/contracts/proxy/diamond/DiamondBase.sol';
-import './LibInitializable.sol';
 
-abstract contract DeMineBase is DiamondBase, Initializable {
+import '../facets/DiamondFacet.sol';
+import './LibInitializable.sol';
+import './LibPausable.sol';
+
+abstract contract DeMineBase is
+    IERC165,
+    DiamondBase,
+    Initializable,
+    Pausable,
+    SafeOwnable
+{
     event Clone(address indexed from, address indexed cloned);
 
-    using ERC165Storage for ERC165Storage.Layout;
     using OwnableStorage for OwnableStorage.Layout;
 
     function __DeMineBase_init(
-        address diamond,
+        address diamondFacet,
+        address fallbackAddress,
         IDiamondCuttable.FacetCut[] calldata facetCuts,
-        bytes4[] calldata interfaces,
         address owner
     ) internal onlyInitializing {
-        // set owner to ensure delegate call works
         OwnableStorage.layout().setOwner(msg.sender);
-        (bool success, bytes memory returndata) = diamond.delegatecall(
+        (bool success, bytes memory returndata) = diamondFacet.delegatecall(
             abi.encodeWithSelector(
                 IDiamondCuttable.diamondCut.selector,
                 facetCuts,
@@ -31,13 +40,25 @@ abstract contract DeMineBase is DiamondBase, Initializable {
             )
         );
         require(success, string(returndata));
-
-        ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
-        for (uint i; i < interfaces.length; i++) {
-            erc165.setSupportedInterface(interfaces[i], true);
-        }
-        // set the new owner after initialization
+        // set fallback address
+        (success, returndata) = diamondFacet.delegatecall(
+            abi.encodeWithSelector(
+                DiamondFacet.setFallbackAddress.selector,
+                fallbackAddress
+            )
+        );
+        require(success, string(returndata));
         OwnableStorage.layout().setOwner(owner);
+    }
+
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public virtual override view returns (bool) {
+        return interfaceId == type(IPausable).interfaceId ||
+            interfaceId == type(IERC173).interfaceId ||
+            interfaceId == type(IERC165).interfaceId ||
+            interfaceId == type(IDiamondCuttable).interfaceId ||
+            interfaceId == type(IDiamondLoupe).interfaceId;
     }
 
     receive() external payable { }

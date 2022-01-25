@@ -14,36 +14,9 @@ async function getDeployment(hre, name) {
     return await hre.ethers.getContractAt(name, deployment.address, deployer);
 }
 
-async function getInterface(hre, name) {
-    const artifact = await hre.deployments.getArtifact(name);
-    return new hre.ethers.utils.Interface(artifact.abi);
-}
-
-async function genSelectors(hre, nameFunctions) {
-    const selectors = await Promise.all(nameFunctions.map(
-        async ([name, functions]) => {
-            const iface = await getInterface(hre, name);
-            return functions.map(f => iface.getSighash(f));
-        }
-    ));
-    return selectors.flat();
-}
-
-async function genInterfaces(hre, ifaceNames) {
-    return await Promise.all(ifaceNames.map(
-        async ifaceName => {
-            const iface = await getInterface(hre, ifaceName);
-            const selectors = Object.keys(iface.functions).map(f => iface.getSighash(f));
-            return selectors.reduce(
-                (prev, cur) => ethers.BigNumber.from(prev).xor(ethers.BigNumber.from(cur))
-            );
-        }
-    ));
-}
-
 async function genFacetCut(hre, name, functions) {
     const facet = await getDeployment(hre, name);
-    const selectors = await genSelectors(hre, functions);
+    const selectors = await common.genSelectors(hre, functions);
     return [facet.address, 0, selectors];
 }
 
@@ -57,9 +30,7 @@ async function genDeMineAdminFacetCut(hre) {
 
 async function genDiamondFacetCut(hre) {
     return await genFacetCut(hre, 'DiamondFacet', [
-        ['IDiamondCuttable', ['diamondCut']],
-        ['IDiamondLoupe', ['facets', 'facetFunctionSelectors', 'facetAddresses', 'facetAddress']],
-        ['DiamondFacet', ['getFallbackAddress', 'setFallbackAddress']]
+        ['IDiamondCuttable', ['diamondCut']]
     ]);
 }
 
@@ -152,7 +123,7 @@ task("clone-wrapped-token", "clone wrapped token")
 task('clone-demine-nft', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        assert(SUPPORTED_COINS.includes(args.coin), 'unsupported coin');
+        common.validateCoin(args.coin);
 
         const { admin, custodian } = await ethers.getNamedSigners();
         let localNetworkConfig = localConfig[network.name] || {};
@@ -167,31 +138,20 @@ task('clone-demine-nft', 'Deploy clone of demine nft')
         assert(income, 'invalid income contract address');
 
         const diamondFacet = await getDeployment(hre, 'DiamondFacet');
+        const erc1155Facet = await getDeployment(hre, 'ERC1155Facet');
         const base = await getDeployment(hre, 'DeMineNFT');
         const tx = await base.create(
+            admin.address,
             diamondFacet.address,
+            erc1155Facet.address,
             [
-                await genDeMineAdminFacetCut(hre),
                 await genDiamondFacetCut(hre),
-                await genERC1155FacetCut(hre),
                 await genMiningPoolFacetCut(hre)
             ],
-            await genInterfaces(hre, [
-                'IERC173',
-                'IPausable',
-                'IDiamondCuttable',
-                'IDiamondLoupe',
-                'IERC165',
-                'IERC1155',
-                'IERC1155Metadata',
-                'IERC2981',
-                'IMiningPool'
-            ]),
             income,
             custodian.address,
             100,
-            localConfig.tokenUri,
-            admin.address
+            localConfig.tokenUri
         );
         const { events } = txReceipt = await tx.wait();
         const { args: [from, cloned] } = events.find(
@@ -227,25 +187,17 @@ task('clone-demine-agent', 'Deploy clone of demine agent')
         assert(nft && payment, 'invalid nft or payment contract address');
 
         const diamondFacet = await getDeployment(hre, 'DiamondFacet');
+        const mortgageFacet = await getDeployment(hre, 'MortgageFacet');
         const base = await getDeployment(hre, 'DeMineAgent');
         const tx = await base.create(
+            admin.address,
             diamondFacet.address,
+            mortgageFacet,
             [
-                await genDeMineAdminFacetCut(hre),
                 await genDiamondFacetCut(hre),
-                await genMortgageFacetCut(hre),
                 await genPrimaryMarketFacetCut(hre),
                 await genBillingFacetCut(hre)
             ],
-            await genInterfaces(hre, [
-                'ICloneable',
-                'IERC173',
-                'IPausable',
-                'IDiamondCuttable',
-                'IDiamondLoupe',
-                'IERC165',
-                'IERC1155Receiver'
-            ]),
             nft,
             payment,
             custodian.address,

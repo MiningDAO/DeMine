@@ -1,10 +1,7 @@
 const { expect } = require("chai");
+const common = require("../tasks/common.js");
 const hre = require("hardhat");
-const utils = require("./demine-test-utils.js");
-
-const address0 = hre.ethers.utils.getAddress(
-    "0x0000000000000000000000000000000000000000"
-);
+const address0 = common.address0(hre.ethers);
 
 async function facetAddress(name) {
     const facet = await hre.deployments.get(name);
@@ -18,7 +15,7 @@ const checkEvent = async function(tx, address, name, expectedArgs) {
             return e.event === name && e.address === address;
         }
     );
-    utils.compareArray(args, expectedArgs);
+    common.compareArray(args, expectedArgs);
 }
 
 describe("DeMineNFT", function () {
@@ -31,17 +28,17 @@ describe("DeMineNFT", function () {
 
     it("DeMineAdmin", async function () {
         const { deployer, admin, custodian } = await hre.ethers.getNamedSigners();
-        const facet = await hre.ethers.getContractAt('DeMineAdminFacet', nft);
+        const main = await hre.ethers.getContractAt('DeMineNFT', nft);
         // SafeOwnable
-        expect(await facet.owner()).to.equal(admin.address);
-        await facet.connect(admin).transferOwnership(deployer.address);
-        expect(await facet.nomineeOwner()).to.equal(deployer.address);
-        await facet.connect(deployer).acceptOwnership();
-        expect(await facet.owner()).to.equal(deployer.address);
+        expect(await main.owner()).to.equal(admin.address);
+        await main.connect(admin).transferOwnership(deployer.address);
+        expect(await main.nomineeOwner()).to.equal(deployer.address);
+        await main.connect(deployer).acceptOwnership();
+        expect(await main.owner()).to.equal(deployer.address);
         // Pausable
-        expect(await facet.paused()).to.be.false;
-        await facet.connect(deployer).pause();
-        expect(await facet.paused()).to.be.true;
+        expect(await main.paused()).to.be.false;
+        await main.connect(deployer).pause();
+        expect(await main.paused()).to.be.true;
 
         const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
         await expect(
@@ -67,19 +64,29 @@ describe("DeMineNFT", function () {
             pool.connect(custodian).alchemize([0, 1])
         ).to.be.revertedWith("Pausable: paused");
 
-        await facet.connect(deployer).unpause();
-        expect(await facet.paused()).to.be.false;
+        await main.connect(deployer).unpause();
+        expect(await main.paused()).to.be.false;
     });
 
-    it("Diamond", async function () {
+    it.only("Diamond", async function () {
         const { admin } = await hre.ethers.getNamedSigners();
         const facet = await hre.ethers.getContractAt('DiamondFacet', nft);
 
-        const adminFacet = await facetAddress('DeMineAdminFacet');
+        const diamondFacet = (await hre.deployments.get('DiamondFacet')).address;
+        await facet.connect(admin).diamondCut([
+            [
+                diamondFacet,
+                0,
+                await common.genSelectors(hre, [
+                    ['IDiamondLoupe', [
+                        'facets', 'facetFunctionSelectors', 'facetAddresses', 'facetAddress'
+                    ]],
+                    ['DiamondFacet', ['getFallbackAddress', 'setFallbackAddress']]
+                ])
+            ]
+        ], address0, []);
         const expected = {
-            [adminFacet]: 7,
             [await facetAddress('DiamondFacet')]: 7,
-            [await facetAddress('ERC1155Facet')]: 12,
             [await facetAddress('MiningPoolFacet')]: 6
         };
 
@@ -89,22 +96,17 @@ describe("DeMineNFT", function () {
             expect(selectors.length).to.equal(expected[facet]);
         }
 
-        var selectors = await facet.facetFunctionSelectors(adminFacet);
-        expect(selectors.length).to.equal(expected[adminFacet]);
+        const selectors = await facet.facetFunctionSelectors(diamondFacet);
+        expect(selectors.length).to.equal(expected[diamondFacet]);
 
         const addresses = await facet.facetAddresses();
         const expectedAddresses = Object.keys(expected);
         expect(addresses).to.include.members(expectedAddresses);
 
-        const artifact = await hre.deployments.getArtifact('Ownable');
+        const artifact = await hre.deployments.getArtifact('DiamondFacet');
         const iface = new hre.ethers.utils.Interface(artifact.abi);
-        const selector = iface.getSighash('owner');
-        expect(await facet.facetAddress(selector)).to.equal(adminFacet);
-
-        await facet.connect(admin).diamondCut([[address0, 2, [selector]]], address0, []);
-        selectors = await facet.facetFunctionSelectors(adminFacet);
-        expect(selectors.length).to.equal(expected[adminFacet] - 1);
-        expect(await facet.facetAddress(selector)).to.equal(address0);
+        const selector = iface.getSighash('facets');
+        expect(await facet.facetAddress(selector)).to.equal(diamondFacet);
     });
 
     it("IERC1155", async function () {
@@ -116,9 +118,9 @@ describe("DeMineNFT", function () {
         // mint and burn
         await facet.connect(admin).mintBatch(custodian.address, ids, amounts, []);
         const accounts = Array(3).fill(custodian.address);
-        utils.compareArray(await facet.balanceOfBatch(accounts, ids), amounts);
+        common.compareArray(await facet.balanceOfBatch(accounts, ids), amounts);
         await facet.connect(custodian).burnBatch(ids, [50, 50, 50]);
-        utils.compareArray(await facet.balanceOfBatch(accounts, ids), [100, 100, 100]);
+        common.compareArray(await facet.balanceOfBatch(accounts, ids), [100, 100, 100]);
 
         // transfer and batch transfer
         await facet.connect(custodian).safeTransferFrom(
@@ -183,9 +185,9 @@ describe("DeMineNFT", function () {
         const { admin, custodian } = await hre.ethers.getNamedSigners();
         const facet = await hre.ethers.getContractAt('ERC1155Facet', nft);
 
-        utils.compareArray(await facet.royaltyInfo(1, 1000), [custodian.address, 10]);
+        common.compareArray(await facet.royaltyInfo(1, 1000), [custodian.address, 10]);
         await facet.connect(admin).setRoyaltyInfo(admin.address, 1000);
-        utils.compareArray(await facet.royaltyInfo(1, 1000), [admin.address, 100]);
+        common.compareArray(await facet.royaltyInfo(1, 1000), [admin.address, 100]);
     });
 
     it('MiningPoolFacet', async function() {
@@ -214,7 +216,7 @@ describe("DeMineNFT", function () {
             [0, custodian.address, 0, 0]
         );
         expect(await pool.getMining()).to.equal(1);
-        utils.compareArray(await pool.getTokenInfo(0), [0, 0]);
+        common.compareArray(await pool.getTokenInfo(0), [0, 0]);
         expect(await income.balanceOf(custodian.address)).to.equal(1000);
 
         checkEvent(
@@ -225,7 +227,7 @@ describe("DeMineNFT", function () {
         );
 
         expect(await pool.getMining()).to.equal(2);
-        utils.compareArray(await pool.getTokenInfo(1), [200, 1]);
+        common.compareArray(await pool.getTokenInfo(1), [200, 1]);
         expect(await income.balanceOf(custodian.address)).to.equal(800);
         expect(await income.balanceOf(nft)).to.equal(200);
 
@@ -236,13 +238,13 @@ describe("DeMineNFT", function () {
             [2, custodian.address, 2, 400]
         );
         expect(await pool.getMining()).to.equal(3);
-        utils.compareArray(await pool.getTokenInfo(2), [400, 2]);
+        common.compareArray(await pool.getTokenInfo(2), [400, 2]);
         expect(await income.balanceOf(custodian.address)).to.equal(0);
         expect(await income.balanceOf(nft)).to.equal(1000);
 
         // shrink
-        utils.compareArray(await pool.getTokenInfo(4), [800, 0]);
-        utils.compareArray(await pool.getTokenInfo(5), [1000, 0]);
+        common.compareArray(await pool.getTokenInfo(4), [800, 0]);
+        common.compareArray(await pool.getTokenInfo(5), [1000, 0]);
         expect(await erc1155.balanceOf(custodian.address, 4)).to.equal(400);
         expect(await erc1155.balanceOf(custodian.address, 5)).to.equal(500);
 
@@ -254,8 +256,8 @@ describe("DeMineNFT", function () {
         ).to.be.revertedWith('DeMineNFT: mined or mining token')
         await pool.connect(custodian).shrink([4, 5])
 
-        utils.compareArray(await pool.getTokenInfo(4), [400, 0]);
-        utils.compareArray(await pool.getTokenInfo(5), [500, 0]);
+        common.compareArray(await pool.getTokenInfo(4), [400, 0]);
+        common.compareArray(await pool.getTokenInfo(5), [500, 0]);
         expect(await erc1155.balanceOf(custodian.address, 4)).to.equal(0);
         expect(await erc1155.balanceOf(custodian.address, 5)).to.equal(0);
 
