@@ -39,20 +39,6 @@ contract MiningPoolFacet is
         emit Finalize(mining, source, income, supply);
     }
 
-    function shrink(uint[] calldata ids) external override whenNotPaused {
-        ERC1155BaseStorage.Layout storage l = ERC1155BaseStorage.layout();
-        uint[] memory amounts = new uint[](ids.length);
-        uint mining = s.mining;
-        for (uint i; i < ids.length; i++) {
-            require(ids[i] > mining, 'DeMineNFT: mined or mining token');
-            uint balance = l.balances[ids[i]][msg.sender];
-            s.tokens[ids[i]].supply -= balance;
-            amounts[i] = balance;
-            l.balances[ids[i]][msg.sender] = 0;
-        }
-        emit TransferBatch(msg.sender, msg.sender, address(0), ids, amounts);
-    }
-
     function alchemize(
         uint[] calldata ids
     ) external override whenNotPaused returns(uint income) {
@@ -78,9 +64,5 @@ contract MiningPoolFacet is
 
     function treasureSource() external override view returns(address) {
         return address(s.income);
-    }
-
-    function getTokenInfo(uint256 id) external view returns(Token memory) {
-        return s.tokens[id];
     }
 }

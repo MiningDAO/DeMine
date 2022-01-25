@@ -1,3 +1,4 @@
+const { expect } = require("chai");
 const assert = require("assert");
 const prompts = require('prompts');
 const constants = require("./constants.js");

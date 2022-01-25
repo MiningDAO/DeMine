@@ -10,10 +10,12 @@ import '@solidstate/contracts/token/ERC1155/metadata/ERC1155Metadata.sol';
 
 import '../../shared/lib/LibPausable.sol';
 import '../interfaces/IERC2981.sol';
+import '../interfaces/IERC1155Burnable.sol';
 import '../lib/AppStorage.sol';
 
 contract ERC1155Facet is
     IERC2981,
+    IERC1155Burnable,
     OwnableInternal,
     PausableModifier,
     ERC1155Base,
@@ -25,14 +27,17 @@ contract ERC1155Facet is
 
     function mintBatch(
         address account,
-        uint[] memory ids,
-        uint[] memory amounts,
+        uint[] calldata ids,
+        uint[] calldata amounts,
         bytes memory data
     ) external onlyOwner {
         _safeMintBatch(account, ids, amounts, data);
     }
 
-    function burnBatch(uint[] memory ids, uint[] memory amounts) external {
+    function burnBatch(
+        uint[] calldata ids,
+        uint[] calldata amounts
+    ) external override {
         _burnBatch(msg.sender, ids, amounts);
     }
 
@@ -78,5 +83,9 @@ contract ERC1155Facet is
                 s.tokens[ids[i]].supply += amounts[i];
             }
         }
+    }
+
+    function getTokenInfo(uint256 id) external view returns(Token memory) {
+        return s.tokens[id];
     }
 }

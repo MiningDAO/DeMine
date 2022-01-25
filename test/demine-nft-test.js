@@ -68,7 +68,7 @@ describe("DeMineNFT", function () {
         expect(await main.paused()).to.be.false;
     });
 
-    it.only("Diamond", async function () {
+    it("Diamond", async function () {
         const { admin } = await hre.ethers.getNamedSigners();
         const facet = await hre.ethers.getContractAt('DiamondFacet', nft);
 

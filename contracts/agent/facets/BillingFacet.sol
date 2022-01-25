@@ -4,7 +4,6 @@ pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/access/OwnableInternal.sol';
-import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
@@ -16,6 +15,7 @@ import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/Util.sol';
 import '../../nft/interfaces/IMiningPool.sol';
+import '../../nft/interfaces/IERC1155Burnable.sol';
 import '../lib/AppStorage.sol';
 import '../lib/BillingStorage.sol';
 
@@ -47,7 +47,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         uint billing = s.billing;
         address nft = s.nft;
         IMiningPool pool = IMiningPool(nft);
-        uint balance = IERC1155(nft).balanceOf(address(this), billing);
+        uint balance = IERC1155Burnable(nft).balanceOf(address(this), billing);
         if (balance > 0) {
             uint income = alchemize(pool, billing);
             uint debt = s.tokenCost * balance;
@@ -68,7 +68,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             close(l, billing);
         }
         if (l.shrinked > 0) {
-            shrink(l, pool);
+            shrink(l, nft);
         }
     }
 
@@ -145,7 +145,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         Statement memory st = s.statements[s.billing];
         s.deposit -= st.debt;
         if (l.shrinked == 0) {
-            shrink(l, IMiningPool(s.nft));
+            shrink(l, s.nft);
         }
         close(l, billing);
     }
@@ -180,16 +180,18 @@ contract BillingFacet is PausableModifier, OwnableInternal {
     /**
      * @dev shrink to current mining token + s.shrinkSize
      */
-    function shrink(BillingStorage.Layout storage l, IMiningPool pool) private {
-        uint mining = pool.getMining();
+    function shrink(BillingStorage.Layout storage l, address nft) private {
+        uint mining = IMiningPool(nft).getMining();
         uint start = Util.max2(l.shrinked, mining) + 1;
         uint end = mining + l.shrinkSize;
         if (start < end) {
             uint[] memory ids = new uint[](end - start + 1);
+            uint[] memory amounts = new uint[](end - start + 1);
             for (uint id = start; id <= end; id++) {
                 ids[id - start] = id;
+                amounts[id - start] = IERC1155Burnable(nft).balanceOf(address(this), id);
             }
-            pool.shrink(ids);
+            IERC1155Burnable(nft).burnBatch(ids, amounts);
             l.shrinked = end;
         }
     }

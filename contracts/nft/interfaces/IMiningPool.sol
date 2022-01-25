@@ -10,12 +10,6 @@ import '@solidstate/contracts/token/ERC1155/IERC1155Internal.sol';
  */
 interface IMiningPool is IERC1155Internal {
     /**
-     * @dev shrink mining pool by burning token not mined
-     * @param ids List of token ids to burn
-     */
-    function shrink(uint[] memory ids) external;
-
-    /**
      * @dev burn tokens in batch and cashout income
      * @param ids List of token ids to alchemize
      * @return total income
