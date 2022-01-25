@@ -1,0 +1,206 @@
+{
+  "address": "0xA3CbEDda9975530110f5283369B0F58e8124B9CE",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "Paused",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "Unpaused",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "acceptOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "nomineeOwner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "pause",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "paused",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "unpause",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x778c2da81884cfd7dc36afdbaab36df1e1bd10329d9268d45b15174111110239",
+  "receipt": {
+    "to": null,
+    "from": "0x633Da015e60F63b7de56817e9680D532aAa20016",
+    "contractAddress": "0xA3CbEDda9975530110f5283369B0F58e8124B9CE",
+    "transactionIndex": 14,
+    "gasUsed": "539050",
+    "logsBloom": "0x00000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000800000000000000000000100000000004000000080000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000080000000000000000000200000000000000000000000000000100000000000000000000000000000004000000000000000000001000000000000000000000000000000100040000000000000000000000000000000000000000000000000000000000000000000100000",
+    "blockHash": "0x75d5e04e74bf3c1805e1781af3ee17019bd84e7f81d30b9f45fca4a990f06789",
+    "transactionHash": "0x778c2da81884cfd7dc36afdbaab36df1e1bd10329d9268d45b15174111110239",
+    "logs": [
+      {
+        "transactionIndex": 14,
+        "blockNumber": 24223847,
+        "transactionHash": "0x778c2da81884cfd7dc36afdbaab36df1e1bd10329d9268d45b15174111110239",
+        "address": "0x0000000000000000000000000000000000001010",
+        "topics": [
+          "0x4dfe1bbbcf077ddc3e01291eea2d5c70c2b422b415d95645b9adcfd678cb1d63",
+          "0x0000000000000000000000000000000000000000000000000000000000001010",
+          "0x000000000000000000000000633da015e60f63b7de56817e9680d532aaa20016",
+          "0x000000000000000000000000be188d6641e8b680743a4815dfa0f6208038960f"
+        ],
+        "data": "0x0000000000000000000000000000000000000000000000000003d486b73e41060000000000000000000000000000000000000000000000002d11a39a5030e97300000000000000000000000000000000000000000000054f9f720a4a067ccb510000000000000000000000000000000000000000000000002d0dcf1398f2a86d00000000000000000000000000000000000000000000054f9f75ded0bdbb0c57",
+        "logIndex": 29,
+        "blockHash": "0x75d5e04e74bf3c1805e1781af3ee17019bd84e7f81d30b9f45fca4a990f06789"
+      }
+    ],
+    "blockNumber": 24223847,
+    "cumulativeGasUsed": "2209729",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [],
+  "numDeployments": 1,
+  "solcInputHash": "91f67aea1dc348227e3f6da62b6e39f7",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.4+commit.c7e474f2\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Paused\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Unpaused\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nomineeOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"owner()\":{\"returns\":{\"_0\":\"conract owner\"}},\"pause()\":{\"details\":\"pause the contract\"},\"paused()\":{\"details\":\"Should return if the contract is paused\"},\"transferOwnership(address)\":{\"details\":\"ownership transfer must be accepted by beneficiary before transfer is complete\",\"params\":{\"account\":\"address of new owner\"}},\"unpause()\":{\"details\":\"unpause the contract\"}},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"acceptOwnership()\":{\"notice\":\"accept transfer of contract ownership\"},\"owner()\":{\"notice\":\"get the ERC173 contract owner\"},\"transferOwnership(address)\":{\"notice\":\"transfer contract ownership to new account\"}},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/shared/facets/DeMineAdminFacet.sol\":\"DeMineAdminFacet\"},\"evmVersion\":\"istanbul\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":false,\"runs\":200},\"remappings\":[]},\"sources\":{\"@solidstate/contracts/access/IERC173.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity ^0.8.0;\\n\\n/**\\n * @title Contract ownership standard interface\\n * @dev see https://eips.ethereum.org/EIPS/eip-173\\n */\\ninterface IERC173 {\\n    event OwnershipTransferred(\\n        address indexed previousOwner,\\n        address indexed newOwner\\n    );\\n\\n    /**\\n     * @notice get the ERC173 contract owner\\n     * @return conract owner\\n     */\\n    function owner() external view returns (address);\\n\\n    /**\\n     * @notice transfer contract ownership to new account\\n     * @param account address of new owner\\n     */\\n    function transferOwnership(address account) external;\\n}\\n\",\"keccak256\":\"0x0fd040e17aa91c491c878ce12d104254b5f3ddd9ac8ccc01e355e3f56a686ef6\",\"license\":\"MIT\"},\"@solidstate/contracts/access/Ownable.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity ^0.8.0;\\n\\nimport { IERC173 } from './IERC173.sol';\\nimport { OwnableInternal } from './OwnableInternal.sol';\\nimport { OwnableStorage } from './OwnableStorage.sol';\\n\\n/**\\n * @title Ownership access control based on ERC173\\n */\\nabstract contract Ownable is IERC173, OwnableInternal {\\n    using OwnableStorage for OwnableStorage.Layout;\\n\\n    /**\\n     * @inheritdoc IERC173\\n     */\\n    function owner() public view virtual override returns (address) {\\n        return OwnableStorage.layout().owner;\\n    }\\n\\n    /**\\n     * @inheritdoc IERC173\\n     */\\n    function transferOwnership(address account)\\n        public\\n        virtual\\n        override\\n        onlyOwner\\n    {\\n        OwnableStorage.layout().setOwner(account);\\n        emit OwnershipTransferred(msg.sender, account);\\n    }\\n}\\n\",\"keccak256\":\"0x266ec400ca10bb3f6caaa967a41a515be5344a51ef29eb4f89365f1bd84fe7a0\",\"license\":\"MIT\"},\"@solidstate/contracts/access/OwnableInternal.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity ^0.8.0;\\n\\nimport { OwnableStorage } from './OwnableStorage.sol';\\n\\nabstract contract OwnableInternal {\\n    using OwnableStorage for OwnableStorage.Layout;\\n\\n    modifier onlyOwner() {\\n        require(\\n            msg.sender == OwnableStorage.layout().owner,\\n            'Ownable: sender must be owner'\\n        );\\n        _;\\n    }\\n}\\n\",\"keccak256\":\"0x424c81402a2f7e851f916cf037c59f41c867927b4fdb93434200a9873cfc0f52\",\"license\":\"MIT\"},\"@solidstate/contracts/access/OwnableStorage.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity ^0.8.0;\\n\\nlibrary OwnableStorage {\\n    struct Layout {\\n        address owner;\\n    }\\n\\n    bytes32 internal constant STORAGE_SLOT =\\n        keccak256('solidstate.contracts.storage.Ownable');\\n\\n    function layout() internal pure returns (Layout storage l) {\\n        bytes32 slot = STORAGE_SLOT;\\n        assembly {\\n            l.slot := slot\\n        }\\n    }\\n\\n    function setOwner(Layout storage l, address owner) internal {\\n        l.owner = owner;\\n    }\\n}\\n\",\"keccak256\":\"0x67a1fe72acad2d6960c8ac2a0ec981a5461e3cb52723709b32120de88eb76abf\",\"license\":\"MIT\"},\"@solidstate/contracts/access/SafeOwnable.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity ^0.8.0;\\n\\nimport { Ownable, OwnableStorage } from './Ownable.sol';\\nimport { SafeOwnableInternal } from './SafeOwnableInternal.sol';\\nimport { SafeOwnableStorage } from './SafeOwnableStorage.sol';\\n\\n/**\\n * @title Ownership access control based on ERC173 with ownership transfer safety check\\n */\\nabstract contract SafeOwnable is Ownable, SafeOwnableInternal {\\n    using OwnableStorage for OwnableStorage.Layout;\\n    using SafeOwnableStorage for SafeOwnableStorage.Layout;\\n\\n    function nomineeOwner() public view virtual returns (address) {\\n        return SafeOwnableStorage.layout().nomineeOwner;\\n    }\\n\\n    /**\\n     * @inheritdoc Ownable\\n     * @dev ownership transfer must be accepted by beneficiary before transfer is complete\\n     */\\n    function transferOwnership(address account)\\n        public\\n        virtual\\n        override\\n        onlyOwner\\n    {\\n        SafeOwnableStorage.layout().setNomineeOwner(account);\\n    }\\n\\n    /**\\n     * @notice accept transfer of contract ownership\\n     */\\n    function acceptOwnership() public virtual onlyNomineeOwner {\\n        OwnableStorage.Layout storage l = OwnableStorage.layout();\\n        emit OwnershipTransferred(l.owner, msg.sender);\\n        l.setOwner(msg.sender);\\n        SafeOwnableStorage.layout().setNomineeOwner(address(0));\\n    }\\n}\\n\",\"keccak256\":\"0xcde42dfacad074a3ab5d07ac085d0c2165b5fbaa384940b2937b6397f1e31389\",\"license\":\"MIT\"},\"@solidstate/contracts/access/SafeOwnableInternal.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity ^0.8.0;\\n\\nimport { SafeOwnableStorage } from './SafeOwnableStorage.sol';\\n\\nabstract contract SafeOwnableInternal {\\n    using SafeOwnableStorage for SafeOwnableStorage.Layout;\\n\\n    modifier onlyNomineeOwner() {\\n        require(\\n            msg.sender == SafeOwnableStorage.layout().nomineeOwner,\\n            'SafeOwnable: sender must be nominee owner'\\n        );\\n        _;\\n    }\\n}\\n\",\"keccak256\":\"0x4275d29f1735aa755ffe476081a6b87c8994f77629f6b613866db2d55042b16f\",\"license\":\"MIT\"},\"@solidstate/contracts/access/SafeOwnableStorage.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity ^0.8.0;\\n\\nlibrary SafeOwnableStorage {\\n    struct Layout {\\n        address nomineeOwner;\\n    }\\n\\n    bytes32 internal constant STORAGE_SLOT =\\n        keccak256('solidstate.contracts.storage.SafeOwnable');\\n\\n    function layout() internal pure returns (Layout storage l) {\\n        bytes32 slot = STORAGE_SLOT;\\n        assembly {\\n            l.slot := slot\\n        }\\n    }\\n\\n    function setNomineeOwner(Layout storage l, address nomineeOwner) internal {\\n        l.nomineeOwner = nomineeOwner;\\n    }\\n}\\n\",\"keccak256\":\"0xf6c40aa6fa00d6d1091a7ff9188a35d8851c89ae2747b39166858c4309794b87\",\"license\":\"MIT\"},\"contracts/shared/facets/DeMineAdminFacet.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity 0.8.4;\\npragma experimental ABIEncoderV2;\\n\\nimport '@solidstate/contracts/access/SafeOwnable.sol';\\nimport '../lib/LibPausable.sol';\\n\\ncontract DeMineAdminFacet is Pausable, SafeOwnable { }\\n\",\"keccak256\":\"0xf49b328ec0fb55ecb15cfa2fdc22321dcaec7c2d6e03c510db595e04c0e78114\",\"license\":\"MIT\"},\"contracts/shared/interfaces/IPausable.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity 0.8.4;\\n\\ninterface IPausable {\\n    /**\\n     * @dev Emitted when paused by `account`.\\n     */\\n    event Paused(address account);\\n\\n    /**\\n     * @dev Emitted when unpaused by `account`.\\n     */\\n    event Unpaused(address account);\\n\\n    /**\\n     * @dev Should return if the contract is paused\\n     */\\n    function paused() external view returns (bool);\\n\\n    /**\\n     * @dev pause the contract\\n     */\\n    function pause() external;\\n\\n    /**\\n     * @dev unpause the contract\\n     */\\n    function unpause() external;\\n}\\n\",\"keccak256\":\"0x18947b3b25f2912d86757e56560ee9d2d7c15bc4210e532d5de21006e90168f2\",\"license\":\"MIT\"},\"contracts/shared/lib/LibPausable.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n\\npragma solidity 0.8.4;\\n\\nimport '@solidstate/contracts/access/OwnableInternal.sol';\\nimport '../interfaces/IPausable.sol';\\n\\nlibrary LibPausable {\\n    struct Layout {\\n        bool paused;\\n    }\\n\\n    bytes32 internal constant STORAGE_SLOT =\\n        keccak256('solidstate.contracts.storage.Pausable');\\n\\n    function layout() internal pure returns (Layout storage l) {\\n        bytes32 slot = STORAGE_SLOT;\\n        assembly {\\n            l.slot := slot\\n        }\\n    }\\n}\\n\\nabstract contract PausableModifier {\\n    modifier whenPaused() {\\n        require(LibPausable.layout().paused, 'Pausable: not paused');\\n        _;\\n    }\\n\\n    modifier whenNotPaused() {\\n        require(!LibPausable.layout().paused, 'Pausable: paused');\\n        _;\\n    }\\n}\\n\\nabstract contract Pausable is IPausable, OwnableInternal {\\n    function paused() external override view returns (bool) {\\n        return LibPausable.layout().paused;\\n    }\\n\\n    function pause() external onlyOwner override {\\n        LibPausable.layout().paused = true;\\n        emit Paused(msg.sender);\\n    }\\n\\n    function unpause() external onlyOwner override {\\n        LibPausable.layout().paused = false;\\n        emit Unpaused(msg.sender);\\n    }\\n}\\n\",\"keccak256\":\"0xaf03bc9d579efb830f432cab5ba9dd61eb10015af38b7344f4ef46c42844ec59\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x608060405234801561001057600080fd5b506108d3806100206000396000f3fe608060405234801561001057600080fd5b506004361061007d5760003560e01c80638456cb591161005b5780638456cb59146100b45780638ab5150a146100be5780638da5cb5b146100dc578063f2fde38b146100fa5761007d565b80633f4ba83a146100825780635c975abb1461008c57806379ba5097146100aa575b600080fd5b61008a610116565b005b61009461020c565b6040516100a19190610764565b60405180910390f35b6100b261022c565b005b6100bc610380565b005b6100c6610476565b6040516100d39190610749565b60405180910390f35b6100e46104a9565b6040516100f19190610749565b60405180910390f35b610114600480360381019061010f91906106bc565b6104dc565b005b61011e610592565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146101af576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016101a69061079f565b60405180910390fd5b60006101b96105bf565b60000160006101000a81548160ff0219169083151502179055507f5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa336040516102029190610749565b60405180910390a1565b60006102166105bf565b60000160009054906101000a900460ff16905090565b6102346105ec565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146102c5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102bc9061077f565b60405180910390fd5b60006102cf610592565b90503373ffffffffffffffffffffffffffffffffffffffff168160000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a3610362338261061990919063ffffffff16565b61037d600061036f6105ec565b61066090919063ffffffff16565b50565b610388610592565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610419576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016104109061079f565b60405180910390fd5b60016104236105bf565b60000160006101000a81548160ff0219169083151502179055507f62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a2583360405161046c9190610749565b60405180910390a1565b60006104806105ec565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b60006104b3610592565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b6104e4610592565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610575576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161056c9061079f565b60405180910390fd5b61058f816105816105ec565b61066090919063ffffffff16565b50565b6000807f8a22373512790c48b83a1fe2efdd2888d4a917bcdc24d0adf63e60f67168046090508091505090565b6000807f68721c0bbf2c02a4d65000340d1370666be06a630022208d4baa9bd7a4b6fea890508091505090565b6000807f24aa1f7b31fd188a8d3ecfb06bc55c806040e59b03bd4396283442fce661789090508091505090565b808260000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055505050565b808260000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055505050565b6000813590506106b681610886565b92915050565b6000602082840312156106ce57600080fd5b60006106dc848285016106a7565b91505092915050565b6106ee816107d0565b82525050565b6106fd816107e2565b82525050565b60006107106029836107bf565b915061071b8261080e565b604082019050919050565b6000610733601d836107bf565b915061073e8261085d565b602082019050919050565b600060208201905061075e60008301846106e5565b92915050565b600060208201905061077960008301846106f4565b92915050565b6000602082019050818103600083015261079881610703565b9050919050565b600060208201905081810360008301526107b881610726565b9050919050565b600082825260208201905092915050565b60006107db826107ee565b9050919050565b60008115159050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b7f536166654f776e61626c653a2073656e646572206d757374206265206e6f6d6960008201527f6e6565206f776e65720000000000000000000000000000000000000000000000602082015250565b7f4f776e61626c653a2073656e646572206d757374206265206f776e6572000000600082015250565b61088f816107d0565b811461089a57600080fd5b5056fea2646970667358221220f97f15015ef753cc64043f3c8a022a7981a84014c2c183e865583b2116e77bdd64736f6c63430008040033",
+  "deployedBytecode": "0x608060405234801561001057600080fd5b506004361061007d5760003560e01c80638456cb591161005b5780638456cb59146100b45780638ab5150a146100be5780638da5cb5b146100dc578063f2fde38b146100fa5761007d565b80633f4ba83a146100825780635c975abb1461008c57806379ba5097146100aa575b600080fd5b61008a610116565b005b61009461020c565b6040516100a19190610764565b60405180910390f35b6100b261022c565b005b6100bc610380565b005b6100c6610476565b6040516100d39190610749565b60405180910390f35b6100e46104a9565b6040516100f19190610749565b60405180910390f35b610114600480360381019061010f91906106bc565b6104dc565b005b61011e610592565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146101af576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016101a69061079f565b60405180910390fd5b60006101b96105bf565b60000160006101000a81548160ff0219169083151502179055507f5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa336040516102029190610749565b60405180910390a1565b60006102166105bf565b60000160009054906101000a900460ff16905090565b6102346105ec565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146102c5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102bc9061077f565b60405180910390fd5b60006102cf610592565b90503373ffffffffffffffffffffffffffffffffffffffff168160000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a3610362338261061990919063ffffffff16565b61037d600061036f6105ec565b61066090919063ffffffff16565b50565b610388610592565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610419576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016104109061079f565b60405180910390fd5b60016104236105bf565b60000160006101000a81548160ff0219169083151502179055507f62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a2583360405161046c9190610749565b60405180910390a1565b60006104806105ec565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b60006104b3610592565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b6104e4610592565b60000160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610575576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161056c9061079f565b60405180910390fd5b61058f816105816105ec565b61066090919063ffffffff16565b50565b6000807f8a22373512790c48b83a1fe2efdd2888d4a917bcdc24d0adf63e60f67168046090508091505090565b6000807f68721c0bbf2c02a4d65000340d1370666be06a630022208d4baa9bd7a4b6fea890508091505090565b6000807f24aa1f7b31fd188a8d3ecfb06bc55c806040e59b03bd4396283442fce661789090508091505090565b808260000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055505050565b808260000160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055505050565b6000813590506106b681610886565b92915050565b6000602082840312156106ce57600080fd5b60006106dc848285016106a7565b91505092915050565b6106ee816107d0565b82525050565b6106fd816107e2565b82525050565b60006107106029836107bf565b915061071b8261080e565b604082019050919050565b6000610733601d836107bf565b915061073e8261085d565b602082019050919050565b600060208201905061075e60008301846106e5565b92915050565b600060208201905061077960008301846106f4565b92915050565b6000602082019050818103600083015261079881610703565b9050919050565b600060208201905081810360008301526107b881610726565b9050919050565b600082825260208201905092915050565b60006107db826107ee565b9050919050565b60008115159050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b7f536166654f776e61626c653a2073656e646572206d757374206265206e6f6d6960008201527f6e6565206f776e65720000000000000000000000000000000000000000000000602082015250565b7f4f776e61626c653a2073656e646572206d757374206265206f776e6572000000600082015250565b61088f816107d0565b811461089a57600080fd5b5056fea2646970667358221220f97f15015ef753cc64043f3c8a022a7981a84014c2c183e865583b2116e77bdd64736f6c63430008040033",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {
+      "owner()": {
+        "returns": {
+          "_0": "conract owner"
+        }
+      },
+      "pause()": {
+        "details": "pause the contract"
+      },
+      "paused()": {
+        "details": "Should return if the contract is paused"
+      },
+      "transferOwnership(address)": {
+        "details": "ownership transfer must be accepted by beneficiary before transfer is complete",
+        "params": {
+          "account": "address of new owner"
+        }
+      },
+      "unpause()": {
+        "details": "unpause the contract"
+      }
+    },
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "acceptOwnership()": {
+        "notice": "accept transfer of contract ownership"
+      },
+      "owner()": {
+        "notice": "get the ERC173 contract owner"
+      },
+      "transferOwnership(address)": {
+        "notice": "transfer contract ownership to new account"
+      }
+    },
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}

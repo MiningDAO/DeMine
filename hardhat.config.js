@@ -4,6 +4,8 @@ require('hardhat-gas-reporter');
 require('hardhat-deploy');
 require('hardhat-deploy-ethers');
 require('./tasks/clone.js');
+require('./tasks/inspect.js');
+require('./tasks/finalize.js');
 
 const config = require('./config');
 extendEnvironment((hre) => {
@@ -23,7 +25,7 @@ task('abi', 'Prints abi of contract')
     .addParam('contract', 'contract name')
     .setAction(async (taskArgs, { artifacts }) => {
         let artifact = await artifacts.readArtifact(taskArgs.contract);
-        console.log(artifact.abi);
+        console.log(JSON.stringify(artifact.abi));
     });
 
 module.exports = {

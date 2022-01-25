@@ -7,4 +7,4 @@ module.exports = async ({ ethers, deployments }) => {
     });
 };
 
-module.exports.tags = ['DeMineERC20', 'DeMine'];
+module.exports.tags = ['DeMineERC20', 'DeMine', 'DeMineNFT', 'DeMineAgent'];

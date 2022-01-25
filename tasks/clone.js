@@ -134,7 +134,7 @@ async function genBillingFacetCut(hre) {
     ]);
 }
 
-subtask("clone-wrapped-token", "clone wrapped token")
+task("clone-wrapped-token", "clone wrapped token")
     .addParam('name', 'Wrapped token name')
     .addParam('symbol', 'Wrapped token symbol')
     .addParam('decimals', 'Wrapped token decimals', undefined, types.int)
@@ -214,7 +214,7 @@ task('clone-demine-agent', 'Deploy clone of demine agent')
     .addOptionalParam('nft', 'contract address of DeMineNFT', undefined)
     .addParam('coin', 'Coin type')
     .addParam('cost', 'Cost per token')
-    .setAction(async (args, { ehters, network, deployments, localConfig } = hre) => {
+    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
         assert(SUPPORTED_COINS.includes(args.coin), 'unsupported coin');
 
         const { deployer, admin, custodian } = await ethers.getNamedSigners();
