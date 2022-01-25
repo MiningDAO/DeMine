@@ -15,7 +15,7 @@ import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/Util.sol';
 import '../../nft/interfaces/IMiningPool.sol';
-import '../../nft/interfaces/IERC1155Burnable.sol';
+import '../../nft/interfaces/IERC1155Mineable.sol';
 import '../lib/AppStorage.sol';
 import '../lib/BillingStorage.sol';
 
@@ -47,7 +47,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         uint billing = s.billing;
         address nft = s.nft;
         IMiningPool pool = IMiningPool(nft);
-        uint balance = IERC1155Burnable(nft).balanceOf(address(this), billing);
+        uint balance = IERC1155Mineable(nft).balanceOf(address(this), billing);
         if (balance > 0) {
             uint income = alchemize(pool, billing);
             uint debt = s.tokenCost * balance;
@@ -181,7 +181,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
      * @dev shrink to current mining token + s.shrinkSize
      */
     function shrink(BillingStorage.Layout storage l, address nft) private {
-        uint mining = IMiningPool(nft).getMining();
+        uint mining = IERC1155Mineable(nft).getMining();
         uint start = Util.max2(l.shrinked, mining) + 1;
         uint end = mining + l.shrinkSize;
         if (start < end) {
@@ -189,9 +189,9 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             uint[] memory amounts = new uint[](end - start + 1);
             for (uint id = start; id <= end; id++) {
                 ids[id - start] = id;
-                amounts[id - start] = IERC1155Burnable(nft).balanceOf(address(this), id);
+                amounts[id - start] = IERC1155Mineable(nft).balanceOf(address(this), id);
             }
-            IERC1155Burnable(nft).burnBatch(ids, amounts);
+            IERC1155Mineable(nft).burnBatch(ids, amounts);
             l.shrinked = end;
         }
     }

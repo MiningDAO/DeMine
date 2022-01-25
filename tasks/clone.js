@@ -52,8 +52,8 @@ async function genERC1155FacetCut(hre) {
 
 async function genMiningPoolFacetCut(hre) {
     return await genFacetCut(hre, 'MiningPoolFacet', [
-        ['IMiningPool', ['alchemize', 'shrink', 'getMining', 'treasureSource']],
-        ['MiningPoolFacet', ['finalize', 'getTokenInfo']]
+        ['IMiningPool', ['alchemize', 'treasureSource']],
+        ['MiningPoolFacet', ['finalize']]
     ]);
 }
 

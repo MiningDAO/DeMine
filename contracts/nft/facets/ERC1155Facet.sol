@@ -10,12 +10,12 @@ import '@solidstate/contracts/token/ERC1155/metadata/ERC1155Metadata.sol';
 
 import '../../shared/lib/LibPausable.sol';
 import '../interfaces/IERC2981.sol';
-import '../interfaces/IERC1155Burnable.sol';
+import '../interfaces/IERC1155Mineable.sol';
 import '../lib/AppStorage.sol';
 
 contract ERC1155Facet is
     IERC2981,
-    IERC1155Burnable,
+    IERC1155Mineable,
     OwnableInternal,
     PausableModifier,
     ERC1155Base,
@@ -83,6 +83,10 @@ contract ERC1155Facet is
                 s.tokens[ids[i]].supply += amounts[i];
             }
         }
+    }
+
+    function getMining() external view override returns(uint) {
+        return s.mining;
     }
 
     function getTokenInfo(uint256 id) external view returns(Token memory) {

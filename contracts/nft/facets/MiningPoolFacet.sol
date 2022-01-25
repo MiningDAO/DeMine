@@ -58,10 +58,6 @@ contract MiningPoolFacet is
         emit Alchemy(msg.sender, income);
     }
 
-    function getMining() external view override returns(uint) {
-        return s.mining;
-    }
-
     function treasureSource() external override view returns(address) {
         return address(s.income);
     }

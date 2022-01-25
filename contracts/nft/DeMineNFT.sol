@@ -13,7 +13,7 @@ import '@solidstate/contracts/introspection/IERC165.sol';
 import '../shared/lib/DeMineBase.sol';
 import './lib/AppStorage.sol';
 import './interfaces/IMiningPool.sol';
-import './interfaces/IERC1155Burnable.sol';
+import './interfaces/IERC1155Mineable.sol';
 import './interfaces/IERC2981.sol';
 
 contract DeMineNFT is DeMineBase {
@@ -57,7 +57,7 @@ contract DeMineNFT is DeMineBase {
     ) public override(DeMineBase) view returns (bool) {
         return super.supportsInterface(interfaceId) ||
             interfaceId == type(IERC1155).interfaceId ||
-            interfaceId == type(IERC1155Burnable).interfaceId ||
+            interfaceId == type(IERC1155Mineable).interfaceId ||
             interfaceId == type(IERC1155Metadata).interfaceId ||
             interfaceId == type(IERC2981).interfaceId ||
             interfaceId == type(IMiningPool).interfaceId;

@@ -12,9 +12,11 @@ import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
  *
  * _Available since v4.5._
  */
-interface IERC1155Burnable is IERC1155 {
+interface IERC1155Mineable is IERC1155 {
     function burnBatch(
         uint[] calldata ids,
         uint[] calldata amounts
     ) external;
+
+    function getMining() external view returns(uint);
 }
