@@ -1,5 +1,5 @@
 const { expect } = require("chai");
-const common = require("../tasks/common.js");
+const common = require("../lib/common.js");
 const hre = require("hardhat");
 const address0 = common.address0(hre.ethers);
 
@@ -87,7 +87,7 @@ describe("DeMineNFT", function () {
         ], address0, []);
         const expected = {
             [await facetAddress('DiamondFacet')]: 7,
-            [await facetAddress('MiningPoolFacet')]: 4
+            [await facetAddress('MiningPoolFacet')]: 3
         };
 
         // IDiamondLoupe

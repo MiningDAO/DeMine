@@ -1,5 +1,11 @@
 const assert = require("assert");
-const common = require("./common.js");
+const common = require("../lib/common.js");
+
+task('inspect-user', 'Inspect state of DeMineNFT contract')
+    .addParam('account', 'account address')
+    .setAction(async (args, { ethers, network, localConfig }) => {
+
+    });
 
 task('inspect-nft', 'Inspect state of DeMineNFT contract')
     .addParam('coin', 'Coin to deploy')
@@ -8,7 +14,7 @@ task('inspect-nft', 'Inspect state of DeMineNFT contract')
         common.validateCoin(args.coin);
 
         let nft = localConfig[network.name][args.coin].nft;
-        const adminFacet = await ethers.getContractAt('DeMineAdminFacet', nft);
+        const adminFacet = await ethers.getContractAt('DeMineNFT', nft);
         const diamondFacet = await ethers.getContractAt('DiamondFacet', nft);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
         const royaltyInfo = await erc1155Facet.royaltyInfo(1, 10000);
@@ -16,13 +22,13 @@ task('inspect-nft', 'Inspect state of DeMineNFT contract')
         const income = await ethers.getContractAt(
             'DeMineERC20', await miningPoolFacet.treasureSource()
         );
-        const mining = await miningPoolFacet.getMining();
-        const miningToken = await miningPoolFacet.getTokenInfo(mining);
+        const mining = await erc1155Facet.getMining();
+        const miningToken = await erc1155Facet.getTokenInfo(mining);
         const balance = await income.balanceOf(nft);
         var history = [];
         var start = Math.max(mining.toNumber() - 5, 0);
         for (let i = start; i < mining.toNumber(); i++) {
-            let info = await miningPoolFacet.getTokenInfo(i);
+            let info = await erc1155Facet.getTokenInfo(i);
             history.push({
                 tokenId: i,
                 supply: info[0].toNumber(),

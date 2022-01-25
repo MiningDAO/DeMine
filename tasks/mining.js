@@ -1,6 +1,6 @@
 const assert = require("assert");
 const { types } = require("hardhat/config");
-const common = require("./common.js");
+const common = require("../lib/common.js");
 
 task('finalize', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'Coin of DeMineNFT')
@@ -12,11 +12,11 @@ task('finalize', 'finalize cycle for DeMineNFT contract')
         assert(args.income >= 0, 'Income has to be non-negative number');
 
         let nft = localConfig[network.name][args.coin].nft;
-        const miningPoolFacet = await ethers.getContractAt('MiningPoolFacet', nft);
-        const mining = await miningPoolFacet.getMining();
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
+        const mining = await erc1155Facet.getMining();
         assert(ethers.BigNumber.from(args.mining).eq(mining), 'wrong mining cycle');
 
-        const [supply, incomePerToken] = await miningPoolFacet.getTokenInfo(mining);
+        const [supply, incomePerToken] = await erc1155Facet.getTokenInfo(mining);
         assert(
             incomePerToken.eq(ethers.BigNumber.from(0)),
             'unexpected income per token ' + incomePerToken + ' for token id ' + mining
@@ -24,6 +24,7 @@ task('finalize', 'finalize cycle for DeMineNFT contract')
         const total = ethers.BigNumber.from(args.income).mul(supply);
 
         const { admin, custodian } = await ethers.getNamedSigners();
+        const miningPoolFacet = await ethers.getContractAt('MiningPoolFacet', nft);
         const income = await ethers.getContractAt(
             'DeMineERC20', await miningPoolFacet.treasureSource()
         );
@@ -69,8 +70,8 @@ task('mint', 'mint new nft tokens')
         common.validateCoin(args.coin);
 
         let nft = localConfig[network.name][args.coin].nft;
-        const miningPoolFacet = await ethers.getContractAt('MiningPoolFacet', nft);
-        const mining = await miningPoolFacet.getMining();
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
+        const mining = await erc1155Facet.getMining();
         assert(ethers.BigNumber.from(args.start).gt(mining), 'You cannot start from mined token')
         assert(args.end > args.start && args.end - args.start < 1000, 'Too long duration')
 
@@ -87,7 +88,6 @@ task('mint', 'mint new nft tokens')
         console.log('Will mint tokens with following info:');
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
-            const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
             return await erc1155Facet.connect(admin).mintBatch(
                 ethers.utils.getAddress(args.recipient), ids, amounts, []
             );

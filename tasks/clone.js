@@ -1,6 +1,6 @@
 const { types } = require("hardhat/config");
 const assert = require("assert");
-const common = require("./common.js");
+const common = require("../lib/common.js");
 
 async function getDeployment(hre, name) {
     const { deployer } = await hre.ethers.getNamedSigners();
