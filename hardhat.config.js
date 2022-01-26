@@ -4,9 +4,8 @@ require('hardhat-gas-reporter');
 require('hardhat-deploy');
 require('hardhat-deploy-ethers');
 require('./tasks/wrapped-token.js');
-require('./tasks/clone.js');
-require('./tasks/inspect.js');
-require('./tasks/mining.js');
+require('./tasks/nft.js');
+require('./tasks/agent.js');
 
 const config = require('./config');
 extendEnvironment((hre) => {
