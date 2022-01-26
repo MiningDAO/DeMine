@@ -8,6 +8,61 @@ async function facetAddress(name) {
     return facet.address;
 }
 
+async function genMiningPoolFacetCut(hre) {
+    return await common.genFacetCut(hre, 'MiningPoolFacet', [
+        ['IMiningPool', ['alchemize', 'treasureSource']],
+        ['MiningPoolFacet', ['finalize']]
+    ]);
+}
+
+async function cloneWrapped(coin) {
+    const { admin } = await hre.ethers.getNamedSigners();
+    const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
+
+    const wrappedConfig = hre.localConfig.wrapped[coin];
+    const erc20Facet = await common.getDeployment(hre, 'ERC20Facet');
+    const wrapped = await common.getDeployment(hre, 'DeMineERC20');
+    const tx = await wrapped.create(
+        admin.address,
+        diamondFacet.address,
+        erc20Facet.address,
+        [await common.genDiamondFacetCut(hre)],
+        wrappedConfig.name,
+        wrappedConfig.symbol,
+        wrappedConfig.decimals
+    );
+    const { events: events } = await tx.wait();
+    const { args: [from, cloned] } = events.find(
+        function(e) { return e.event === 'Clone'; }
+    );
+    return cloned;
+}
+
+async function cloneNFT(coin) {
+    const { admin, custodian } = await hre.ethers.getNamedSigners();
+    const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
+    const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
+    const Base = await common.getDeployment(hre, 'DeMineNFT');
+    const tx = await Base.create(
+        admin.address,
+        diamondFacet.address,
+        erc1155Facet.address,
+        [
+            await common.genDiamondFacetCut(hre),
+            await genMiningPoolFacetCut(hre)
+        ],
+        await cloneWrapped(coin),
+        custodian.address,
+        100,
+        localConfig.tokenUri[coin]
+    );
+    const { events: events } = await tx.wait();
+    const { args: [from, cloned] } = events.find(
+        function(e) { return e.event === 'Clone'; }
+    );
+    return cloned;
+}
+
 const checkEvent = async function(tx, address, name, expectedArgs) {
     const { events } = await tx.wait();
     const { args: args } = events.find(
@@ -19,11 +74,12 @@ const checkEvent = async function(tx, address, name, expectedArgs) {
 }
 
 describe("DeMineNFT", function () {
+    const coin = 'btc';
     var nft;
 
     beforeEach(async function() {
         await hre.deployments.fixture(['DeMine']);
-        nft = await hre.run('clone-demine-nft', { coin: 'btc' });
+        nft = await cloneNFT(coin);
     });
 
     it("DeMineAdmin", async function () {
@@ -172,7 +228,7 @@ describe("DeMineNFT", function () {
     it("IERC1155Metadata", async function () {
         const { admin, custodian } = await hre.ethers.getNamedSigners();
         const facet = await hre.ethers.getContractAt('ERC1155Facet', nft);
-        const baseUri = hre.localConfig.tokenUri;
+        const baseUri = hre.localConfig.tokenUri[coin];
         expect(await facet.uri(1)).to.equal(baseUri + '1');
 
         const newBaseUri = 'https://www.tokeninfo.com/token/';
@@ -202,8 +258,9 @@ describe("DeMineNFT", function () {
         const pool = await hre.ethers.getContractAt('MiningPoolFacet', nft);
         const incomeAddr = await pool.treasureSource();
         expect(incomeAddr).to.be.not.equal(address0);
-        const income = await hre.ethers.getContractAt('DeMineERC20', incomeAddr);
-        await income.connect(admin).mint(custodian.address, 1000);
+        const income = await hre.ethers.getContractAt('ERC20Facet', incomeAddr);
+        await income.connect(admin).mint(1000);
+        await income.connect(admin).transfer(custodian.address, 1000);
         await income.connect(custodian).approve(nft, 1000);
 
         // finalize

@@ -8,6 +8,7 @@ import '@solidstate/contracts/access/SafeOwnable.sol';
 import '@solidstate/contracts/access/IERC173.sol';
 import '@solidstate/contracts/introspection/IERC165.sol';
 import '@solidstate/contracts/proxy/diamond/DiamondBase.sol';
+import "@openzeppelin/contracts/proxy/Clones.sol";
 
 import '../facets/DiamondFacet.sol';
 import './LibInitializable.sol';
@@ -49,6 +50,11 @@ abstract contract DeMineBase is
         );
         require(success, string(returndata));
         OwnableStorage.layout().setOwner(owner);
+    }
+
+    function _clone() internal returns(address cloned) {
+        cloned = Clones.clone(address(this));
+        emit Clone(address(this), cloned);
     }
 
     function supportsInterface(

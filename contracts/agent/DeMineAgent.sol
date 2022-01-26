@@ -4,7 +4,6 @@ pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
-import "@openzeppelin/contracts/proxy/Clones.sol";
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 
 import '../shared/lib/DeMineBase.sol';
@@ -42,11 +41,10 @@ contract DeMineAgent is DeMineBase {
         address payee,
         uint256 tokenCost
     ) external {
-        address cloned = Clones.clone(address(this));
+        address cloned = _clone();
         DeMineAgent(payable(cloned)).initialize(
             owner, diamondFacet, mortgageFacet, facetCuts, nft, payment, payee, tokenCost
         );
-        emit Clone(address(this), cloned);
     }
 
     function supportsInterface(
