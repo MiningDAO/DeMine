@@ -81,7 +81,7 @@ task('mint-wrapped-token', 'mint new nft tokens')
         console.log('Will mint wrapped coin ' + args.coin + ' with following info:');
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
-            return await erc20.connect(admin).mint(account, supply);
+            return await erc20.connect(admin).mint(account, args.amount);
         });
     });
 

@@ -1,13 +1,34 @@
 const assert = require("assert");
 const common = require("../lib/common.js");
 
+task('inspect-wrapped-token', 'Inspect state of DeMineERC20 contract')
+    .addParam('coin', 'Coin to check')
+    .setAction(async (args, { ethers, network, localConfig }) => {
+        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
+        common.validateCoin(args.coin);
+
+        const token = localConfig[network.name][args.coin].wrapped;
+        const erc20 = await ethers.getContractAt('DeMineERC20', token);
+        const result = {
+            address: erc20.address,
+            name: await erc20.name(),
+            symbol: await erc20.symbol(),
+            decimals: await erc20.decimals(),
+            owner: await erc20.owner(),
+            paused: await erc20.paused()
+        }
+        console.log(JSON.stringify(result, null, 2));
+        return result;
+    });
+
 task('inspect-user', 'Inspect state of DeMineNFT contract')
-    .addParam('coin', 'Coin to deploy')
+    .addParam('coin', 'Coin to check')
     .addParam('who', 'account address')
     .addParam('what', 'data to inspect')
     .addParam('range', 'the range of token id, start,stop')
     .setAction(async (args, { ethers, network, localConfig }) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
+        common.validateCoin(args.coin);
 
         let nft = localConfig[network.name][args.coin].nft;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
@@ -72,7 +93,7 @@ task('inspect-nft', 'Inspect state of DeMineNFT contract')
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
 
-        let nft = localConfig[network.name][args.coin].nft;
+        const nft = localConfig[network.name][args.coin].nft;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
         const mining = (await erc1155Facet.getMining()).toNumber();
         var history = [];

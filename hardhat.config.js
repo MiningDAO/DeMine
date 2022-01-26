@@ -31,6 +31,12 @@ task('abi', 'Prints abi of contract')
 module.exports = {
     solidity: '0.8.4',
     networks: {
+        matic: {
+            live: true,
+            url: config.matic.alchemy,
+            chainId: 137,
+            accounts: config.accounts
+        },
         maticdev: {
             live: true,
             url: config.maticdev.alchemy,
