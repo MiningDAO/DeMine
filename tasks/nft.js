@@ -2,7 +2,7 @@ const { types } = require("hardhat/config");
 const assert = require("assert");
 const common = require("../lib/common.js");
 
-task("init-demine-nft", "init wrapped token")
+task("nft-init", "init wrapped token")
     .addParam('contract', 'contract address')
     .addParam('coin', 'coin type')
     .setAction(async function(args, { ethers } = hre) {
@@ -55,7 +55,7 @@ task("init-demine-nft", "init wrapped token")
         });
     });
 
-task('clone-demine-nft', 'Deploy clone of demine nft')
+task('nft-clone', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
@@ -113,7 +113,7 @@ task('clone-demine-nft', 'Deploy clone of demine nft')
         return cloned;
     });
 
-task('check-income', 'check income of user')
+task('nft-income', 'check income of user')
     .addParam('coin', 'Coin to check')
     .addParam('who', 'account address')
     .addParam('from', 'from token id to mining', undefined, types.int)
@@ -143,7 +143,7 @@ task('check-income', 'check income of user')
         return result;
     });
 
-task('check-nft-balance', 'check DeMineNFT balance for user')
+task('nft-balance', 'check DeMineNFT balance for user')
     .addParam('coin', 'Coin to check')
     .addParam('who', 'account address')
     .addParam('start', 'start token id', undefined, types.int)
@@ -173,7 +173,7 @@ task('check-nft-balance', 'check DeMineNFT balance for user')
         return result;
     });
 
-task('inspect-nft', 'Inspect state of DeMineNFT contract')
+task('nft-inspect', 'Inspect state of DeMineNFT contract')
     .addParam('coin', 'Coin to deploy')
     .setAction(async (args, { ethers, network, localConfig }) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
@@ -231,7 +231,7 @@ task('inspect-nft', 'Inspect state of DeMineNFT contract')
         }, undefined, 2));
     });
 
-task('finalize', 'finalize cycle for DeMineNFT contract')
+task('nft-finalize', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'Coin of DeMineNFT')
     .addParam('income', 'income per token', undefined, types.int)
     .addParam('mining', 'for validation, incase we finalized wrong token', undefined, types.int)
@@ -289,7 +289,7 @@ task('finalize', 'finalize cycle for DeMineNFT contract')
         });
     });
 
-task('mint-demine-nft', 'mint new demine nft tokens')
+task('nft-mint', 'mint new demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
     .addParam('recipient', 'recipient of minted tokens')
     .addParam('start', 'start token id', undefined, types.int)

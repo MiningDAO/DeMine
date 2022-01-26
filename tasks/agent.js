@@ -2,49 +2,7 @@ const assert = require("assert");
 const { types } = require("hardhat/config");
 const common = require("../lib/common.js");
 
-async function genMortgageFacetCut(hre) {
-    return await genFacetCut(hre, 'MortgageFacet', [
-        ['IERC1155Receiver', ['onERC1155Received', 'onERC1155BatchReceived']],
-        ['MortgageFacet', ['redeem', 'payoff', 'adjustDeposit', 'getAccountInfo', 'balanceOfBatch']]
-    ]);
-}
-
-async function genPrimaryMarketFacetCut(hre) {
-    return await genFacetCut(hre, 'PrimaryMarketFacet', [
-        [
-            'PrimaryMarketFacet',
-            [
-                'setPricingStrategy',
-                'increaseAllowance',
-                'decreaseAllowance',
-                'claim',
-                'getListedPrices',
-                'getAllowances'
-            ]
-        ],
-        ['PricingStatic', ['setStaticBase', 'setStaticOverride']],
-        ['PricingLinearDecay', ['setLinearDecay']]
-    ]);
-}
-
-async function genBillingFacetCut(hre) {
-    return await genFacetCut(hre, 'BillingFacet', [
-        [
-            'BillingFacet',
-            [
-                'tryBilling',
-                'lockPrice',
-                'buyWithLockedPrice',
-                'closeBilling',
-                'collectResidue',
-                'resetShrink',
-                'getStatement'
-            ]
-        ]
-    ]);
-}
-
-task('clone-demine-agent', 'Deploy clone of demine agent')
+task('agent-clone', 'Deploy clone of demine agent')
     .addOptionalParam('nft', 'contract address of DeMineNFT', undefined)
     .addParam('coin', 'Coin type')
     .addParam('cost', 'Cost per token')
@@ -86,3 +44,45 @@ task('clone-demine-agent', 'Deploy clone of demine agent')
             ' with ' + common.gas(txReceipt) + ' gas'
         );
     });
+
+async function genMortgageFacetCut(hre) {
+    return await genFacetCut(hre, 'MortgageFacet', [
+        ['IERC1155Receiver', ['onERC1155Received', 'onERC1155BatchReceived']],
+        ['MortgageFacet', ['redeem', 'payoff', 'adjustDeposit', 'getAccountInfo', 'balanceOfBatch']]
+    ]);
+}
+
+async function genPrimaryMarketFacetCut(hre) {
+    return await genFacetCut(hre, 'PrimaryMarketFacet', [
+        [
+            'PrimaryMarketFacet',
+            [
+                'setPricingStrategy',
+                'increaseAllowance',
+                'decreaseAllowance',
+                'claim',
+                'getListedPrices',
+                'getAllowances'
+            ]
+        ],
+        ['PricingStatic', ['setStaticBase', 'setStaticOverride']],
+        ['PricingLinearDecay', ['setLinearDecay']]
+    ]);
+}
+
+async function genBillingFacetCut(hre) {
+    return await genFacetCut(hre, 'BillingFacet', [
+        [
+            'BillingFacet',
+            [
+                'tryBilling',
+                'lockPrice',
+                'buyWithLockedPrice',
+                'closeBilling',
+                'collectResidue',
+                'resetShrink',
+                'getStatement'
+            ]
+        ]
+    ]);
+}

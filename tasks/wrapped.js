@@ -1,7 +1,7 @@
 const assert = require("assert");
 const common = require("../lib/common.js");
 
-task("init-wrapped-token", "init wrapped token")
+task("wrapped-init", "init wrapped token")
     .addParam('contract', 'contract address')
     .addParam('coin', 'coin type')
     .setAction(async function(args, { ethers, localConfig } = hre) {
@@ -26,7 +26,7 @@ task("init-wrapped-token", "init wrapped token")
         });
     });
 
-task("clone-wrapped-token", "clone wrapped token")
+task("wrapped-clone", "clone wrapped token")
     .addParam('coin', 'coin type')
     .setAction(async function(args, { ethers } = hre) {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
@@ -75,7 +75,7 @@ task('inspect-wrapped-token', 'Inspect state of DeMineERC20 contract')
         return result;
     });
 
-task('mint-wrapped-token', 'mint new nft tokens')
+task('wrapped-mint', 'mint new nft tokens')
     .addParam('coin', 'wrapped token type, btc/eth/fil')
     .addParam('amount', 'amount to mint', undefined, types.int)
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
@@ -99,7 +99,7 @@ task('mint-wrapped-token', 'mint new nft tokens')
         });
     });
 
-task('burn-wrapped-token', 'burn wrapped tokens')
+task('wrapped-burn', 'burn wrapped tokens')
     .addParam('coin', 'wrapped token type, usd/btc/eth/fil')
     .addParam('amount', 'amount to burn', undefined, types.int)
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
