@@ -60,31 +60,6 @@ task('finalize', 'finalize cycle for DeMineNFT contract')
         });
     });
 
-task('mint-wrapped-token', 'mint new nft tokens')
-    .addParam('coin', 'wrapped token type, btc/eth/fil')
-    .addParam('recipient', 'recipient of minted tokens')
-    .addParam('amount', 'amount to mint', undefined, types.int)
-    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        const { admin } = await ethers.getNamedSigners();
-        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-        common.validateCoin(args.coin);
-        const account = ethers.utils.getAddress(args.recipient);
-
-        const coin = localConfig[network.name][args.coin].wrapped;
-        const erc20 = await ethers.getContractAt('DeMineERC20', coin);
-        const balance = await erc20.balanceOf(account);
-        const info = {
-            contract: coin,
-            recipient: args.recipient,
-            currentBalance: balance.toNumber()
-        };
-        console.log('Will mint wrapped coin ' + args.coin + ' with following info:');
-        console.log(JSON.stringify(info, null, 2));
-        await common.prompt(async function() {
-            return await erc20.connect(admin).mint(account, args.amount);
-        });
-    });
-
 task('mint-demine-nft', 'mint new demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
     .addParam('recipient', 'recipient of minted tokens')

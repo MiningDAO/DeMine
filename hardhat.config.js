@@ -3,6 +3,7 @@ require('hardhat-contract-sizer');
 require('hardhat-gas-reporter');
 require('hardhat-deploy');
 require('hardhat-deploy-ethers');
+require('./tasks/wrapped-token.js');
 require('./tasks/clone.js');
 require('./tasks/inspect.js');
 require('./tasks/mining.js');

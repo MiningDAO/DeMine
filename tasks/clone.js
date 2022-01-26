@@ -2,20 +2,8 @@ const { types } = require("hardhat/config");
 const assert = require("assert");
 const common = require("../lib/common.js");
 
-async function getDeployment(hre, name) {
-    const { deployer } = await hre.ethers.getNamedSigners();
-    if (hre.network.name == 'hardhat') {
-        deployment = await hre.deployments.getOrNull(name);
-        if (deployment === undefined) {
-            await hre.deployments.run(['DeMine']);
-        }
-    }
-    deployment = await hre.deployments.get(name);
-    return await hre.ethers.getContractAt(name, deployment.address, deployer);
-}
-
 async function genFacetCut(hre, name, functions) {
-    const facet = await getDeployment(hre, name);
+    const facet = await common.getDeployment(hre, name);
     const selectors = await common.genSelectors(hre, functions);
     return [facet.address, 0, selectors];
 }
@@ -100,60 +88,6 @@ async function genBillingFacetCut(hre) {
     ]);
 }
 
-task("init-wrapped-token", "init wrapped token")
-    .addParam('contract', 'contract address')
-    .addParam('coin', 'coin type')
-    .setAction(async function(args, { ethers, localConfig } = hre) {
-        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-        args.coin == 'usd' || common.validateCoin(args.coin);
-
-        const { admin } = await ethers.getNamedSigners();
-        const erc20 = await ethers.getContractAt('DeMineERC20', args.contract);
-
-        const config = localConfig.wrapped[args.coin];
-        console.log('Will initialize DeMineERC20 ' + args.contract + ' with: ');
-        console.log(JSON.stringify({
-            name: config.name,
-            symbol: config.symbol,
-            decimals: config.decimals,
-            owner: admin.address
-        }, null, 2));
-        await common.prompt(async function() {
-            return await erc20.connect(admin).initialize(
-                config.name, config.symbol, config.decimals, admin.address
-            );
-        });
-    });
-
-task("clone-wrapped-token", "clone wrapped token")
-    .addParam('coin', 'coin type')
-    .setAction(async function(args, { ethers } = hre) {
-        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-        args.coin == 'usd' || common.validateCoin(args.coin);
-
-        const { admin } = await ethers.getNamedSigners();
-        const Base = await getDeployment(hre, 'DeMineERC20');
-        const config = localConfig.wrapped[args.coin];
-
-        console.log('Will clone DeMineERC20 from ' + Base.address + ' with: ');
-        console.log(JSON.stringify({
-            name: config.name,
-            symbol: config.symbol,
-            decimals: config.decimals,
-            owner: admin.address
-        }, null, 2));
-        const { events } = await common.prompt(async function() {
-            return await Base.create(
-                config.name, config.symbol, config.decimals, admin.address
-            );
-        });
-        const { args: [_from, cloned] } = events.find(
-            function(e) { return e.event === 'Clone'; }
-        );
-        console.log('Cloned DeMineERC20 at ' + cloned);
-        return cloned;
-    });
-
 task("init-demine-nft", "init wrapped token")
     .addParam('contract', 'contract address')
     .addParam('coin', 'coin type')
@@ -168,8 +102,8 @@ task("init-demine-nft", "init wrapped token")
             'DeMineERC20', localNetworkConfig[args.coin].wrapped
         );
 
-        const diamondFacet = await getDeployment(hre, 'DiamondFacet');
-        const erc1155Facet = await getDeployment(hre, 'ERC1155Facet');
+        const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
+        const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
         const facetCuts = [
             await genDiamondFacetCut(hre),
             await genMiningPoolFacetCut(hre)
@@ -218,15 +152,15 @@ task('clone-demine-nft', 'Deploy clone of demine nft')
         const coinConfig = localNetworkConfig[args.coin];
         const income = await ethers.getContractAt('DeMineERC20', coinConfig.wrapped);
 
-        const diamondFacet = await getDeployment(hre, 'DiamondFacet');
-        const erc1155Facet = await getDeployment(hre, 'ERC1155Facet');
+        const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
+        const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
         const facetCuts = [
             await genDiamondFacetCut(hre),
             await genMiningPoolFacetCut(hre)
         ];
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
-        const Base = await getDeployment(hre, 'DeMineNFT');
+        const Base = await common.getDeployment(hre, 'DeMineNFT');
 
         console.log('Will clone DeMineNFT from ' + Base.address + ' with: ');
         console.log(JSON.stringify({
@@ -280,9 +214,9 @@ task('clone-demine-agent', 'Deploy clone of demine agent')
         var usd = localNetworkConfig.usd.wrapped;
         assert(nft && payment, 'invalid nft or payment contract address');
 
-        const diamondFacet = await getDeployment(hre, 'DiamondFacet');
-        const mortgageFacet = await getDeployment(hre, 'MortgageFacet');
-        const base = await getDeployment(hre, 'DeMineAgent');
+        const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
+        const mortgageFacet = await common.getDeployment(hre, 'MortgageFacet');
+        const base = await common.getDeployment(hre, 'DeMineAgent');
         const tx = await base.create(
             admin.address,
             diamondFacet.address,

@@ -45,8 +45,8 @@ contract DeMineERC20 is
         emit Clone(address(this), cloned);
     }
 
-    function burn(address from, uint256 amount) external onlyOwner {
-        _burn(from, amount);
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
     }
 
     function mint(address to, uint256 amount) external onlyOwner {
