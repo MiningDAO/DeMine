@@ -45,27 +45,31 @@ const config = {
             metadata: wrappedTokenMeta['fil']
         }
     },
+    matic: {
+        alchemy: process.env.ALCHEMY_API_KEY_POLYGON_MAINNET,
+        scan: process.env.POLYGON_SCAN_API_KEY,
+        btc: {
+            nft: process.env.DEMINE_NFT_BTC_PLOGGON_MAINNET,
+            wrapped: process.env.DBTC_POLYGON_MAINNET
+        }
+    },
     maticdev: {
         alchemy: process.env.ALCHEMY_API_KEY_POLYGON_DEV,
         scan: process.env.POLYGON_SCAN_API_KEY,
         payment: {
-            wrapped: process.env.DPAY_POLYGON_DEV,
-            metadata: wrappedTokenMeta['payment']
+            wrapped: process.env.DPAY_POLYGON_DEV
         },
         btc: {
-            nft: process.env.DEMINE_NFT_BTC,
-            wrapped: process.env.DBTC_POLYGON_DEV,
-            metadata: wrappedTokenMeta['btc']
+            nft: process.env.DEMINE_NFT_BTC_PLOGGON_DEV,
+            wrapped: process.env.DBTC_POLYGON_DEV
         },
         eth: {
             nft: process.env.DEMINE_NFT_ETH,
-            wrapped: process.env.DETH_POLYGON_DEV,
-            metadata: wrappedTokenMeta['eth']
+            wrapped: process.env.DETH_POLYGON_DEV
         },
         fil: {
             nft: process.env.DEMINE_NFT_FIL,
-            wrapped: process.env.DFIL_NFT_FIL,
-            metadata: wrappedTokenMeta['fil']
+            wrapped: process.env.DFIL_NFT_FIL
         },
     },
     arbitrumdev: {

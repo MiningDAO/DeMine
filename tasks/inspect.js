@@ -5,22 +5,26 @@ task('inspect-user', 'Inspect state of DeMineNFT contract')
     .addParam('coin', 'Coin to deploy')
     .addParam('who', 'account address')
     .addParam('what', 'data to inspect')
-    .addParam('start', 'start token id')
-    .addOptionalParam('end', 'end token id')
+    .addParam('range', 'the range of token id, start,stop')
     .setAction(async (args, { ethers, network, localConfig }) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
 
         let nft = localConfig[network.name][args.coin].nft;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
         const account = ethers.utils.getAddress(args.who);
+        const range = args.range.split(',');
 
         if (args.what == 'balance') {
-            assert(args.end && args.end >= args.start, 'end must be larger than start');
-            assert(args.end - args.start <= 365, 'you can only check one-year data');
-            const balances = await erc1155Facet.balanceOfBatch(
-                Array(args.end - args.start + 1).fill(account), // accounts
-                [...Array(args.end - args.start + 1).keys()].map(i => i + args.start) // ids
-            );
+            assert(range.length == 2, 'malformed range')
+            const start = parseInt(range[0]), end = parseInt(range[1]);
+            assert(end >= start, 'end must be larger than start');
+            assert(end - start <= 365, 'you can only check one-year data');
+            const accounts = Array(end - start + 1).fill(account);
+            const ids = Array(end - start + 1).fill().map((_, i) => i + start);
+            console.log(ids);
+            const balances = await erc1155Facet.balanceOfBatch(accounts, ids);
+            console.log(balances.map(b => b.toNumber()));
+            return;
             const total = balances.reduce((prev, cur) => cur.add(prev));
             const result = {
                 total: total.toNumber(),
@@ -31,24 +35,21 @@ task('inspect-user', 'Inspect state of DeMineNFT contract')
                 balances: JSON.stringify(result.balances)
             }, null, 2));
             return result;
-        }
-
-        if (args.what == 'income') {
+        } else if (args.what == 'income') {
+            assert(range.length == 1, 'malformed range')
+            const start = parseInt(range[0]);
             const mining = (await erc1155Facet.getMining()).toNumber();
-            assert(
-                args.start < mining,
-                'start has to be lower than current mining ' + mining
-            );
-            var ids = [...Array(mining - args.start).keys()].map(i => i + args.start);
+            assert(start < mining, 'start exceeding mining token ' + mining);
+            const ids = Array(mining - start + 1).fill().map((_, i) => i + start);
             var tokenInfo = await erc1155Facet.getTokenInfo(ids);
             var balances = await erc1155Facet.balanceOfBatch(
-                Array(mining - args.start).fill(account), // accounts
+                Array(mining - start).fill(account), // accounts
                 ids
             );
             var result = {total: 0, perToken: []};
-            for (let i = args.start; i < mining; i++) {
-                let info = tokenInfo[i - args.start];
-                let balance = balances[i - args.start];
+            for (let i = start; i < mining; i++) {
+                let info = tokenInfo[i - start];
+                let balance = balances[i - start];
                 result.total += balance.mul(info[1]).toNumber();
                 result.perToken.push({
                     tokenId: i,
@@ -58,9 +59,11 @@ task('inspect-user', 'Inspect state of DeMineNFT contract')
             }
             console.log(JSON.stringify(result, null, 2));
             return result;
+        } else {
+            console.log(
+                'invalid `what` param, only `balance` and `income` are supported'
+            );
         }
-
-        console.log('invalid `what` param, only `balance` and `income` are supported');
     });
 
 task('inspect-nft', 'Inspect state of DeMineNFT contract')
@@ -76,7 +79,7 @@ task('inspect-nft', 'Inspect state of DeMineNFT contract')
         var start = Math.max(mining - 5, 0);
         if (mining > start) {
             var tokenInfo = await erc1155Facet.getTokenInfo(
-                [...Array(mining - start).keys()].map(i => i + start)
+                Array(mining - start).fill().map((_, i) => i + start)
             );
             for (let i = start; i < mining; i++) {
                 let info = tokenInfo[i - start];

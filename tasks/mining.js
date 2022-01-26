@@ -60,7 +60,32 @@ task('finalize', 'finalize cycle for DeMineNFT contract')
         });
     });
 
-task('mint', 'mint new nft tokens')
+task('mint-wrapped-token', 'mint new nft tokens')
+    .addParam('coin', 'wrapped token type, btc/eth/fil')
+    .addParam('recipient', 'recipient of minted tokens')
+    .addParam('amount', 'amount to mint', undefined, types.int)
+    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
+        const { admin } = await ethers.getNamedSigners();
+        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
+        common.validateCoin(args.coin);
+        const account = ethers.utils.getAddress(args.recipient);
+
+        const coin = localConfig[network.name][args.coin].wrapped;
+        const erc20 = await ethers.getContractAt('DeMineERC20', coin);
+        const balance = await erc20.balanceOf(account);
+        const info = {
+            contract: coin,
+            recipient: args.recipient,
+            currentBalance: balance.toNumber()
+        };
+        console.log('Will mint wrapped coin ' + args.coin + ' with following info:');
+        console.log(JSON.stringify(info, null, 2));
+        await common.prompt(async function() {
+            return await erc20.connect(admin).mint(account, supply);
+        });
+    });
+
+task('mint-demine-nft', 'mint new demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
     .addParam('recipient', 'recipient of minted tokens')
     .addParam('start', 'start token id', undefined, types.int)
@@ -70,6 +95,7 @@ task('mint', 'mint new nft tokens')
         const { admin } = await ethers.getNamedSigners();
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
+        const account = ethers.utils.getAddress(args.recipient);
 
         let nft = localConfig[network.name][args.coin].nft;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
@@ -83,15 +109,16 @@ task('mint', 'mint new nft tokens')
             amounts.push(args.supply);
         }
         const info = {
+            contract: nft,
             recipient: args.recipient,
             ids: JSON.stringify(ids),
             amounts: JSON.stringify(amounts)
         };
-        console.log('Will mint tokens with following info:');
+        console.log('Will mint nft with following info:');
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
             return await erc1155Facet.connect(admin).mintBatch(
-                ethers.utils.getAddress(args.recipient), ids, amounts, []
+                account, ids, amounts, []
             );
         });
     });
