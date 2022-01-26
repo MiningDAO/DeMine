@@ -26,7 +26,7 @@ async function cloneWrapped(coin) {
         admin.address,
         diamondFacet.address,
         erc20Facet.address,
-        [await common.genDiamondFacetCut(hre)],
+        [],
         wrappedConfig.name,
         wrappedConfig.symbol,
         wrappedConfig.decimals

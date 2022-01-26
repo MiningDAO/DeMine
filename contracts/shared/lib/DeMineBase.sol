@@ -32,6 +32,7 @@ abstract contract DeMineBase is
         address owner
     ) internal onlyInitializing {
         OwnableStorage.layout().setOwner(msg.sender);
+        // set facet cuts
         (bool success, bytes memory returndata) = diamondFacet.delegatecall(
             abi.encodeWithSelector(
                 IDiamondCuttable.diamondCut.selector,
