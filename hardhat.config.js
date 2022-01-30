@@ -58,6 +58,9 @@ module.exports = {
         },
         custodian: {
             default: 2
+        },
+        alchemist: {
+            default: 3
         }
     },
     gasReporter: {

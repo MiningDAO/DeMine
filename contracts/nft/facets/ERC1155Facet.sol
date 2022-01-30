@@ -21,7 +21,6 @@ contract ERC1155Facet is
     IERC1155Rewardable,
     IERC2981,
     OwnableInternal,
-    PausableModifier,
     ERC1155Base,
     ERC1155Metadata,
     ERC165
@@ -104,26 +103,27 @@ contract ERC1155Facet is
         uint[] memory ids,
         uint[] memory amounts,
         bytes memory data
-    ) internal whenNotPaused virtual override(ERC1155BaseInternal) {
+    ) internal virtual override(ERC1155BaseInternal) {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
         address alchemist = s.alchemist;
         require(from != alchemist, 'DeMineNFT: from alchemist');
         // alchemize
         if (to == alchemist) {
+            require(!LibPausable.layout().paused, 'Pausable: paused');
             uint mining = s.mining;
             uint reward;
             for (uint i; i < ids.length; i++) {
-                require(ids[i] < mining, 'DeMineNFT: not mined token');
+                require(ids[i] < mining, 'DeMineNFT: token not mined');
                 reward += amounts[i] * s.tokens[ids[i]].reward;
             }
-            s.reward.safeTransfer(msg.sender, reward);
-            emit Alchemy(msg.sender, reward);
+            s.reward.safeTransfer(from, reward);
+            emit Alchemy(from, reward);
         }
         // burn
         if (to == address(0)) {
             uint mining = s.mining;
             for (uint i; i < ids.length; i++) {
-                require(ids[i] > mining, 'DeMineNFT: mined or mining token');
+                require(ids[i] > mining, 'DeMineNFT: token mined or mining');
                 s.tokens[ids[i]].supply -= amounts[i];
             }
         }
@@ -131,7 +131,7 @@ contract ERC1155Facet is
         if (from == address(0)) {
              uint mining = s.mining;
              for (uint i; i < ids.length; i++) {
-                require(ids[i] > mining, 'DeMineNFT: mined or mining token');
+                require(ids[i] > mining, 'DeMineNFT: token mined or mining');
                 s.tokens[ids[i]].supply += amounts[i];
             }
         }

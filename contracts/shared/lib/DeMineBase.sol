@@ -47,6 +47,14 @@ abstract contract DeMineBase is
         }
     }
 
+    function getFallbackAddress() external view returns (address) {
+        return DiamondBaseStorage.layout().fallbackAddress;
+    }
+
+    function setFallbackAddress(address fallbackAddress) external {
+        DiamondBaseStorage.layout().fallbackAddress = fallbackAddress;
+    }
+
     function _clone() internal returns(address cloned) {
         cloned = Clones.clone(address(this));
         emit Clone(address(this), cloned);

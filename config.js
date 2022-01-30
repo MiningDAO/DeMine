@@ -10,7 +10,8 @@ const config = {
     accounts: [
         process.env.DEPLOYER_DEV,
         process.env.ADMIN_DEV,
-        process.env.CUSTODIAN_DEV
+        process.env.CUSTODIAN_DEV,
+        process.env.ALCHEMIST
     ],
     wrapped: {
         usd: {

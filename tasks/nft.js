@@ -16,16 +16,14 @@ task("nft-init", "init wrapped token")
             'DeMineERC20', localNetworkConfig[args.coin].wrapped
         );
 
-        const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
         const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
         const facetCuts = [await common.genDiamondFacetCut(hre)];
+        const init = common.diamondInit(erc1155Facet, facetCuts);
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
         console.log('Will initialize DeMineNFT ' + args.contract + ' with: ');
         console.log(JSON.stringify({
             owner: admin.address,
-            diamondFacet: diamondFacet.address,
-            erc1155Facet: erc1155Facet.address,
             fallbackAddress: erc1155Facet.address,
             facetCuts: facetCuts,
             income: {
@@ -41,9 +39,7 @@ task("nft-init", "init wrapped token")
         await common.prompt(async function() {
             return await nft.connect(admin).initialize(
                 admin.address,
-                diamondFacet.address,
-                erc1155Facet.address,
-                facetCuts,
+                init,
                 income.address,
                 custodian.address,
                 royaltyBps,
@@ -63,9 +59,9 @@ task('nft-clone', 'Deploy clone of demine nft')
         const coinConfig = localNetworkConfig[args.coin];
         const income = await ethers.getContractAt('DeMineERC20', coinConfig.wrapped);
 
-        const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
         const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
         const facetCuts = [await common.genDiamondFacetCut(hre)];
+        const init = common.diamondInit(erc1155Facet, facetCuts);
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
         const Base = await common.getDeployment(hre, 'DeMineNFT');
@@ -73,8 +69,6 @@ task('nft-clone', 'Deploy clone of demine nft')
         console.log('Will clone DeMineNFT from ' + Base.address + ' with: ');
         console.log(JSON.stringify({
             owner: admin.address,
-            diamondFacet: diamondFacet.address,
-            erc1155Facet: erc1155Facet.address,
             fallbackAddress: erc1155Facet.address,
             facetCuts: facetCuts,
             income: {
@@ -91,9 +85,7 @@ task('nft-clone', 'Deploy clone of demine nft')
         const { events } = await common.prompt(async function() {
             return await Base.create(
                 admin.address,
-                diamondFacet.address,
-                erc1155Facet.address,
-                facetCuts,
+                init,
                 income.address,
                 custodian.address,
                 royaltyBps,
