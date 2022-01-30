@@ -5,6 +5,8 @@ pragma solidity 0.8.4;
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import '../../nft/interfaces/IERC1155Rewardable.sol';
+
 struct Account {
     uint start; // starting from 2**256 - 1 - start
     uint end;
@@ -22,7 +24,7 @@ struct AppStorage {
 
     IERC20 income;
     IERC20 payment;
-    address nft; // DeMineNFT contract address
+    IERC1155Rewardable nft; // DeMineNFT contract address
     address payee; // payee account address, could be contract
 
     bool initialized;

@@ -123,7 +123,9 @@ task('wrapped-mint', 'mint new nft tokens')
         console.log('Will mint wrapped coin ' + args.coin + ' with following info:');
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
-            return await erc20.connect(admin).mint(args.amount);
+            return await erc20.connect(admin).mint(
+                custodian.address, args.amount
+            );
         });
     });
 
@@ -131,23 +133,26 @@ task('wrapped-burn', 'burn wrapped tokens')
     .addParam('coin', 'wrapped token type, usd/btc/eth/fil')
     .addParam('amount', 'amount to burn', undefined, types.int)
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        const { admin } = await ethers.getNamedSigners();
+        const { admin, custodian } = await ethers.getNamedSigners();
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
 
         const coin = localConfig[network.name][args.coin].wrapped;
         const erc20 = await ethers.getContractAt('ERC20Facet', coin);
-        const balance = await erc20.balanceOf(admin.address);
+        const balance = await erc20.balanceOf(custodian.address);
         assert(balance.toNumber() >= args.amount, 'insufficient balance to bunr');
         const info = {
             contract: coin,
-            from: admin.address,
+            from: custodian.address,
             currentBalance: balance.toNumber(),
             toBurn: args.amount
         };
         console.log('Will burn wrapped coin ' + args.coin + ' with following info:');
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
+            await erc20.connect(custodian).transfer(
+                admin.address, args.amount
+            );
             return await erc20.connect(admin).burn(args.amount);
         });
     });

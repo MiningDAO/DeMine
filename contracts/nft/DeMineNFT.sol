@@ -12,8 +12,6 @@ import '@solidstate/contracts/introspection/IERC165.sol';
 
 import '../shared/lib/DeMineBase.sol';
 import './lib/AppStorage.sol';
-import './interfaces/IMiningPool.sol';
-import './interfaces/IERC1155Mineable.sol';
 import './interfaces/IERC2981.sol';
 
 contract DeMineNFT is DeMineBase {
@@ -24,7 +22,7 @@ contract DeMineNFT is DeMineBase {
         address diamondFacet,
         address erc1155Facet,
         IDiamondCuttable.FacetCut[] calldata facetCuts,
-        address income,
+        address reward,
         address recipient,
         uint16 bps,
         string memory uri
@@ -32,7 +30,8 @@ contract DeMineNFT is DeMineBase {
         __DeMineBase_init(diamondFacet, erc1155Facet, facetCuts, owner);
         ERC1155MetadataStorage.layout().baseURI = uri;
         s.royalty = RoyaltyInfo(recipient, bps);
-        s.income = IERC20(income);
+        s.reward = IERC20(reward);
+        s.alchemist = address(0x1A811678eEEDF16a1D0dF4b12e290F78a61A28F9);
     }
 
     function create(
@@ -40,14 +39,14 @@ contract DeMineNFT is DeMineBase {
         address diamondFacet,
         address erc1155Facet,
         IDiamondCuttable.FacetCut[] calldata facetCuts,
-        address income,
+        address reward,
         address recipient,
         uint16 bps,
         string memory uri
-    ) external {
+      ) external {
         address cloned = Clones.clone(address(this));
         DeMineNFT(payable(cloned)).initialize(
-            owner, diamondFacet, erc1155Facet, facetCuts, income, recipient, bps, uri
+            owner, diamondFacet, erc1155Facet, facetCuts, reward, recipient, bps, uri
         );
         emit Clone(address(this), cloned);
     }
@@ -57,9 +56,7 @@ contract DeMineNFT is DeMineBase {
     ) public override(DeMineBase) view returns (bool) {
         return super.supportsInterface(interfaceId) ||
             interfaceId == type(IERC1155).interfaceId ||
-            interfaceId == type(IERC1155Mineable).interfaceId ||
             interfaceId == type(IERC1155Metadata).interfaceId ||
-            interfaceId == type(IERC2981).interfaceId ||
-            interfaceId == type(IMiningPool).interfaceId;
+            interfaceId == type(IERC2981).interfaceId;
     }
 }

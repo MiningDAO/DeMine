@@ -9,7 +9,7 @@ contract ERC20Facet is ERC20, OwnableInternal {
         _burn(msg.sender, amount);
     }
 
-    function mint(uint256 amount) external onlyOwner {
-        _mint(msg.sender, amount);
+    function mint(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
     }
 }

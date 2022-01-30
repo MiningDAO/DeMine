@@ -8,6 +8,7 @@ import '@solidstate/contracts/access/SafeOwnable.sol';
 import '@solidstate/contracts/access/IERC173.sol';
 import '@solidstate/contracts/introspection/IERC165.sol';
 import '@solidstate/contracts/proxy/diamond/DiamondBase.sol';
+import '@solidstate/contracts/proxy/diamond/DiamondBaseStorage.sol';
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
 import '../facets/DiamondFacet.sol';
@@ -42,14 +43,7 @@ abstract contract DeMineBase is
             )
         );
         require(success, string(returndata));
-        // set fallback address
-        (success, returndata) = diamondFacet.delegatecall(
-            abi.encodeWithSelector(
-                DiamondFacet.setFallbackAddress.selector,
-                fallbackAddress
-            )
-        );
-        require(success, string(returndata));
+        DiamondBaseStorage.layout().fallbackAddress = fallbackAddress;
         OwnableStorage.layout().setOwner(owner);
     }
 

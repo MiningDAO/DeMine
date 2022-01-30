@@ -12,10 +12,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
+import '../../nft/interfaces/IERC1155Rewardable.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/Util.sol';
-import '../../nft/interfaces/IMiningPool.sol';
-import '../../nft/interfaces/IERC1155Mineable.sol';
 import '../lib/AppStorage.sol';
 import '../lib/BillingStorage.sol';
 
@@ -29,10 +28,21 @@ contract BillingFacet is PausableModifier, OwnableInternal {
 
     using SafeERC20 for IERC20;
 
-    event RewardTokenSold(address indexed, uint, uint);
-    event CloseBilling(uint indexed);
-    event BillingSale(uint indexed, uint, uint);
-    event ResetShrink(uint indexed);
+    event RewardTokenSold(address indexed billing, uint sold, uint paid);
+    event CloseBilling(uint indexed billing);
+    event BillingSale(uint indexed, uint expireAt);
+    event LockPrice(uint indexed, uint indexed);
+    event Withdraw(address indexed recipient, uint amount);
+
+    /**
+     * @notice withdraw payment from contract
+     * @param recipient Address of account to accept payment
+     * @param amount Amount to withdraw
+     */
+    function withdraw(address recipient, uint amount) external onlyOwner {
+        s.payment.safeTransfer(recipient, amount);
+        emit Withdraw(recipient, amount);
+    }
 
     /**
      * @notice It will try to sell income token at Uniswap
@@ -45,37 +55,46 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             'DeMineAgent: billing in progress'
         );
         uint billing = s.billing;
-        address nft = s.nft;
-        IMiningPool pool = IMiningPool(nft);
-        uint balance = IERC1155Mineable(nft).balanceOf(address(this), billing);
-        if (balance > 0) {
-            uint income = alchemize(pool, billing);
-            uint debt = s.tokenCost * balance;
-            (bool success, uint sold) = trySwap(
-                l.swapRouter, address(s.income), address(s.payment), income, debt
-            );
-            if (success) {
-                s.statements[billing] = Statement(balance, income - sold, 0);
-                close(l, billing);
-            } else {
-                s.statements[billing] = Statement(balance, income, debt);
-                uint saleExpireAt = block.timestamp + l.saleDuration;
-                l.saleExpireAt = saleExpireAt;
-                l.stage = BillingStorage.Stage.SALE_ONGOING;
-                emit BillingSale(billing, block.timestamp, saleExpireAt);
-            }
-        } else {
+        IERC1155Rewardable nft = s.nft;
+        uint balance = nft.balanceOf(address(this), billing);
+        uint debt = s.tokenCost * balance;
+        if (debt == 0) {
             close(l, billing);
+            return;
         }
-        if (l.shrinked > 0) {
-            shrink(l, nft);
+        address alchemist = nft.getAlchemist();
+        uint prevBalance = s.income.balanceOf(address(this));
+        nft.safeTransferFrom(
+            address(this), alchemist, billing, balance, ''
+        );
+        uint income = s.income.balanceOf(address(this)) - prevBalance;
+        if (income == 0) {
+            s.statements[billing].balance = balance;
+            s.statements[billing].debt = debt;
+            s.deposit -= s.statements[billing].debt;
+            close(l, billing);
+            return;
+        }
+        (bool success, uint sold) = trySwap(
+            l.swapRouter, address(s.income), address(s.payment), income, debt
+        );
+        if (success) {
+            s.statements[billing].balance = balance;
+            s.statements[billing].income = income - sold;
+            close(l, billing);
+        } else {
+            s.statements[billing] = Statement(balance, income, debt);
+            uint saleExpireAt = block.timestamp + l.saleDuration;
+            l.saleExpireAt = saleExpireAt;
+            l.stage = BillingStorage.Stage.SALE_ONGOING;
+            emit BillingSale(billing, saleExpireAt);
         }
     }
 
     /**
      * @notice lock price to buy income token in income token sale
      */
-    function lockPrice() external returns(uint, uint) {
+    function lockPrice() external returns(uint unitSize, uint unitPrice) {
         BillingStorage.Layout storage l = BillingStorage.layout();
         require(
             l.stage == BillingStorage.Stage.SALE_ONGOING,
@@ -85,16 +104,13 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         uint price = getNormalizedChainlinkPriceWithDiscount(l);
         uint incomeBase = base(s.income);
         uint maxCostTokenTraded = price * st.income / incomeBase;
-        (
-            uint unitSize,
-            uint unitPrice
-        ) = maxCostTokenTraded > st.debt
+        (unitSize, unitPrice) = maxCostTokenTraded > st.debt
             ? calcUnitPrice(price, incomeBase)
             : calcUnitPrice(st.debt, st.income);
         l.lockedPrices[msg.sender] = BillingStorage.LockedPrice(
             unitSize, unitPrice, block.timestamp + l.priceLockDuration
         );
-        return (unitSize, unitPrice);
+        emit LockPrice(unitSize, unitPrice);
     }
 
     /**
@@ -116,37 +132,30 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             Util.ceil(st.debt, p.unitPrice),
             st.income / p.unitSize
         );
-        uint subtotal = unitToBuy * p.unitPrice;
+        uint checkout = unitToBuy * p.unitPrice;
         uint rewardTokenSold = unitToBuy * p.unitSize;
         s.statements[billing].income = st.income - rewardTokenSold;
-        if (subtotal < st.debt) {
-            s.statements[billing].debt = st.debt - subtotal;
+        if (checkout < st.debt) {
+            s.statements[billing].debt = st.debt - checkout;
         } else {
             s.statements[billing].debt = 0;
             close(l, s.billing);
         }
-        s.payment.safeTransferFrom(msg.sender, s.payee, subtotal);
+        s.payment.safeTransferFrom(msg.sender, s.payee, checkout);
         s.income.safeTransfer(msg.sender, rewardTokenSold);
-        emit RewardTokenSold(msg.sender, rewardTokenSold, subtotal);
+        emit RewardTokenSold(msg.sender, rewardTokenSold, checkout);
     }
 
-    /**
-     * @notice manually close the billing by paying cost with user deposit.
-     *         In this case, the pool will be shrinked starting from current
-     *         mining token.
-     */
-    function closeBilling() external onlyOwner {
+    function manualCloseBilling() external onlyOwner {
         BillingStorage.Layout storage l = BillingStorage.layout();
+        BillingStorage.Stage stage = l.stage;
         require(
-            l.stage == BillingStorage.Stage.SALE_ONGOING && block.timestamp > l.saleExpireAt,
-            'DeMineAgent: no sale expired'
+            stage == BillingStorage.Stage.SALE_ONGOING &&
+                block.timestamp > l.saleExpireAt,
+            'DeMineAgent: no action required yet'
         );
         uint billing = s.billing;
-        Statement memory st = s.statements[s.billing];
-        s.deposit -= st.debt;
-        if (l.shrinked == 0) {
-            shrink(l, s.nft);
-        }
+        s.deposit -= s.statements[s.billing].debt;
         close(l, billing);
     }
 
@@ -166,34 +175,6 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             total += income - (income / balance) * balance;
         }
         s.income.safeTransferFrom(address(this), recipient, total);
-    }
-
-    /**
-     * @notice disable shrink. Token already shrinked will not be affected
-     */
-    function resetShrink() external onlyOwner {
-        BillingStorage.Layout storage l = BillingStorage.layout();
-        emit ResetShrink(l.shrinked);
-        l.shrinked = 0;
-    }
-
-    /**
-     * @dev shrink to current mining token + s.shrinkSize
-     */
-    function shrink(BillingStorage.Layout storage l, address nft) private {
-        uint mining = IERC1155Mineable(nft).getMining();
-        uint start = Util.max2(l.shrinked, mining) + 1;
-        uint end = mining + l.shrinkSize;
-        if (start < end) {
-            uint[] memory ids = new uint[](end - start + 1);
-            uint[] memory amounts = new uint[](end - start + 1);
-            for (uint id = start; id <= end; id++) {
-                ids[id - start] = id;
-                amounts[id - start] = IERC1155Mineable(nft).balanceOf(address(this), id);
-            }
-            IERC1155Mineable(nft).burnBatch(ids, amounts);
-            l.shrinked = end;
-        }
     }
 
     function getStatement(uint token) external view returns(Statement memory) {
@@ -269,12 +250,6 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             uint unitSize = Util.ceil(income, cost);
             return (unitSize, Util.ceil(cost, income / unitSize));
         }
-    }
-
-    function alchemize(IMiningPool pool, uint billing) private returns(uint) {
-        uint[] memory toBurn = new uint[](1);
-        toBurn[0] = billing;
-        return pool.alchemize(toBurn);
     }
 
     function close(BillingStorage.Layout storage l, uint billing) private {

@@ -4,7 +4,6 @@ pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/introspection/ERC165.sol';
-import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -57,7 +56,7 @@ contract MortgageFacet is
         }
         s.payment.safeTransferFrom(msg.sender, s.payee, totalCost);
         emit Redeem(msg.sender, ids, amounts);
-        IERC1155(s.nft).safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
+        s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
     }
 
     /**
@@ -67,14 +66,14 @@ contract MortgageFacet is
      */
     function adjustDeposit() external whenNotPaused {
         Account memory account = readAccount(msg.sender);
-        require(account.start < s.billing, 'DeMineAgent: clear billed tokens first');
+        require(account.start >= s.billing, 'DeMineAgent: payoff debt first');
         require(account.maxBalance > 0, 'DeMineAgent: no need to adjust');
 
         Account memory update = Account(account.start, account.end, 0);
-        while (update.start <= update.end && s.balances[update.start][msg.sender] == 0) {
+        while (s.balances[update.start][msg.sender] == 0 && update.start <= update.end) {
             update.start += 1;
         }
-        while (update.end >= update.start && s.balances[update.end][msg.sender] == 0) {
+        while (s.balances[update.end][msg.sender] == 0 && update.end >= update.start) {
             update.end -= 1;
         }
         if (update.start > update.end) {
@@ -127,7 +126,7 @@ contract MortgageFacet is
         bytes calldata data
     ) external override returns (bytes4) {
         require(
-            msg.sender == s.nft && from == address(0),
+            msg.sender == address(s.nft) && from == address(0),
             'DeMineAgent: only minted tokens from DeMineNFT allowed'
         );
         (address mortgager) = abi.decode(data, (address));
@@ -145,14 +144,15 @@ contract MortgageFacet is
     }
 
     /**
-     * @notice payoff debt from billing. Ensure you have a valid start and
-     *         end set for msg.sender to prevent infinite loop
+     * @notice payoff debt from start to end. Ensure you have a
+     *         valid start set to prevent infinite loop
      */
-    function payoff() external whenNotPaused {
+    function payoff(uint end) external whenNotPaused {
         uint income;
         uint debt;
         Account memory account = readAccount(msg.sender);
-        for (uint id = account.start; id < s.billing; id++) {
+        require(end < s.billing, 'DeMineAgent: end larger than billing');
+        for (uint id = account.start; id <= end; id++) {
             uint balance = s.balances[id][msg.sender];
             if (balance > 0) {
                 Statement memory st = s.statements[id];
@@ -161,6 +161,7 @@ contract MortgageFacet is
                 s.balances[id][msg.sender] = 0;
             }
         }
+        s.accounts[msg.sender].start = end + 1;
         s.payment.safeTransferFrom(s.payee, msg.sender, debt);
         s.deposit += debt;
         s.income.safeTransfer(msg.sender, income);

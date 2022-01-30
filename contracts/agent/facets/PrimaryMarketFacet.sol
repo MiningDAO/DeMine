@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.4;
 
-import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
-
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -140,7 +138,7 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
         }
         s.payment.safeTransferFrom(msg.sender, s.payee, cs.totalCost);
         s.payment.safeTransferFrom(msg.sender, from, cs.totalPay - cs.totalCost);
-        IERC1155(s.nft).safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
+        s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
         emit Claim(msg.sender, from, ids, amounts);
         return amounts;
     }

@@ -6,8 +6,8 @@ pragma experimental ABIEncoderV2;
 import '@solidstate/contracts/proxy/diamond/IDiamondCuttable.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol';
 
+import '../nft/interfaces/IERC1155Rewardable.sol';
 import '../shared/lib/DeMineBase.sol';
-import '../nft/interfaces/IMiningPool.sol';
 import './lib/AppStorage.sol';
 
 contract DeMineAgent is DeMineBase {
@@ -24,8 +24,9 @@ contract DeMineAgent is DeMineBase {
         uint256 tokenCost
     ) external initializer {
         __DeMineBase_init(diamondFacet, mortgageFacet, facetCuts, owner);
-        s.nft = nft;
-        s.income = IERC20(IMiningPool(nft).treasureSource());
+        IERC1155Rewardable nftContract = IERC1155Rewardable(nft);
+        s.nft = nftContract;
+        s.income = IERC20(nftContract.getRewardToken());
         s.payment = IERC20(payment);
         s.payee = payee;
         s.tokenCost = tokenCost;

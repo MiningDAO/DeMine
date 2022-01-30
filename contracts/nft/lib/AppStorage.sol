@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 struct Token {
     uint supply;
-    uint income;
+    uint reward;
 }
 
 struct RoyaltyInfo {
@@ -15,8 +15,9 @@ struct RoyaltyInfo {
 }
 
 struct AppStorage {
-    IERC20 income;
+    IERC20 reward;
     uint mining;
-    mapping(uint => Token) tokens;
+    address alchemist;
     RoyaltyInfo royalty;
+    mapping(uint => Token) tokens;
 }
