@@ -9,14 +9,12 @@ import '../shared/lib/DeMineBase.sol';
 contract DeMineERC20 is DeMineBase {
     function initialize(
         address owner,
-        address diamondFacet,
-        address erc20Facet,
-        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        DiamondInit memory d,
         string memory name,
         string memory symbol,
         uint8 decimals
     ) external initializer {
-        __DeMineBase_init(diamondFacet, erc20Facet, facetCuts, owner);
+        __DeMineBase_init(d, owner);
         ERC20MetadataStorage.Layout storage l = ERC20MetadataStorage.layout();
         l.name = name;
         l.symbol = symbol;
@@ -25,16 +23,14 @@ contract DeMineERC20 is DeMineBase {
 
     function create(
         address owner,
-        address diamondFacet,
-        address erc20Facet,
-        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        DiamondInit memory d,
         string memory name,
         string memory symbol,
         uint8 decimals
     ) external {
         address cloned = _clone();
         DeMineERC20(payable(cloned)).initialize(
-            owner, diamondFacet, erc20Facet, facetCuts, name, symbol, decimals
+            owner, d, name, symbol, decimals
         );
     }
 

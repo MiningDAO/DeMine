@@ -15,15 +15,13 @@ contract DeMineAgent is DeMineBase {
 
     function initialize(
         address owner,
-        address diamondFacet,
-        address mortgageFacet,
-        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        DiamondInit memory d,
         address nft,
         address payment,
         address payee,
         uint256 tokenCost
     ) external initializer {
-        __DeMineBase_init(diamondFacet, mortgageFacet, facetCuts, owner);
+        __DeMineBase_init(d, owner);
         IERC1155Rewardable nftContract = IERC1155Rewardable(nft);
         s.nft = nftContract;
         s.income = IERC20(nftContract.getRewardToken());
@@ -34,9 +32,7 @@ contract DeMineAgent is DeMineBase {
 
     function create(
         address owner,
-        address diamondFacet,
-        address mortgageFacet,
-        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        DiamondInit memory d,
         address nft,
         address payment,
         address payee,
@@ -44,7 +40,7 @@ contract DeMineAgent is DeMineBase {
     ) external {
         address cloned = _clone();
         DeMineAgent(payable(cloned)).initialize(
-            owner, diamondFacet, mortgageFacet, facetCuts, nft, payment, payee, tokenCost
+            owner, d, nft, payment, payee, tokenCost
         );
     }
 

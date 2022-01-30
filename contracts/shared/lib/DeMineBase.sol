@@ -24,27 +24,27 @@ abstract contract DeMineBase is
 {
     event Clone(address indexed from, address indexed cloned);
 
-    using OwnableStorage for OwnableStorage.Layout;
+    struct DiamondInit{
+        address fallbackAddress;
+        bytes4[] selectors;
+        bytes32[] facetsSlotPosition;
+        bytes32[] selectorSlots;
+    }
 
     function __DeMineBase_init(
-        address diamondFacet,
-        address fallbackAddress,
-        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        DiamondInit memory d,
         address owner
     ) internal onlyInitializing {
-        OwnableStorage.layout().setOwner(msg.sender);
-        // set facet cuts
-        (bool success, bytes memory returndata) = diamondFacet.delegatecall(
-            abi.encodeWithSelector(
-                IDiamondCuttable.diamondCut.selector,
-                facetCuts,
-                address(0),
-                ""
-            )
-        );
-        require(success, string(returndata));
-        DiamondBaseStorage.layout().fallbackAddress = fallbackAddress;
-        OwnableStorage.layout().setOwner(owner);
+        OwnableStorage.layout().owner = owner;
+        DiamondBaseStorage.Layout storage l = DiamondBaseStorage.layout();
+        l.fallbackAddress = d.fallbackAddress;
+        l.selectorCount = uint16(d.selectors.length);
+        for (uint i; i < d.selectors.length; i++) {
+            l.facets[d.selectors[i]] = d.facetsSlotPosition[i];
+        }
+        for (uint i; i < d.selectorSlots.length; i++) {
+            l.selectorSlots[i] = d.selectorSlots[i];
+        }
     }
 
     function _clone() internal returns(address cloned) {

@@ -19,15 +19,13 @@ contract DeMineNFT is DeMineBase {
 
     function initialize(
         address owner,
-        address diamondFacet,
-        address erc1155Facet,
-        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        DiamondInit memory d,
         address reward,
         address recipient,
         uint16 bps,
         string memory uri
     ) external initializer {
-        __DeMineBase_init(diamondFacet, erc1155Facet, facetCuts, owner);
+        __DeMineBase_init(d, owner);
         ERC1155MetadataStorage.layout().baseURI = uri;
         s.royalty = RoyaltyInfo(recipient, bps);
         s.reward = IERC20(reward);
@@ -36,9 +34,7 @@ contract DeMineNFT is DeMineBase {
 
     function create(
         address owner,
-        address diamondFacet,
-        address erc1155Facet,
-        IDiamondCuttable.FacetCut[] calldata facetCuts,
+        DiamondInit memory d,
         address reward,
         address recipient,
         uint16 bps,
@@ -46,7 +42,7 @@ contract DeMineNFT is DeMineBase {
       ) external {
         address cloned = Clones.clone(address(this));
         DeMineNFT(payable(cloned)).initialize(
-            owner, diamondFacet, erc1155Facet, facetCuts, reward, recipient, bps, uri
+            owner, d, reward, recipient, bps, uri
         );
         emit Clone(address(this), cloned);
     }
