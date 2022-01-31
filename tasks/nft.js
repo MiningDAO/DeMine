@@ -10,22 +10,31 @@ task("nft-init", "init wrapped token")
         common.validateCoin(args.coin);
 
         const { admin, custodian } = await ethers.getNamedSigners();
-        const nft = await ethers.getContractAt('DeMineNFT', args.contract);
+        const nft = await ethers.getContractAt('Diamond', args.contract);
         let localNetworkConfig = localConfig[network.name] || {};
         const income = await ethers.getContractAt(
             'DeMineERC20', localNetworkConfig[args.coin].wrapped
         );
 
         const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
-        const facetCuts = [await common.genDiamondFacetCut(hre)];
-        const init = common.diamondInit(erc1155Facet, facetCuts);
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
+        const initArgs = [
+            admin.address,
+            [],
+            [],
+            [],
+            erc1155Facet.address,
+            ethers.utils.defaultAbiCoder.encode(
+                ["address", "uint8", "address", "string"],
+                [custodian.address, royaltyBps, income.address, uri]
+            ),
+            await genInterfaces('IERC1155Rewardable')
+        ];
         console.log('Will initialize DeMineNFT ' + args.contract + ' with: ');
         console.log(JSON.stringify({
             owner: admin.address,
             fallbackAddress: erc1155Facet.address,
-            facetCuts: facetCuts,
             income: {
                 address: income.address,
                 name: await income.name(),
@@ -33,18 +42,10 @@ task("nft-init", "init wrapped token")
                 decimals: await income.decimals()
             },
             royaltyRecipient: custodian.address,
-            royaltyBps: royaltyBps,
-            baseUri: uri
+            royaltyBps: royaltyBps
         }, null, 2));
         await common.prompt(async function() {
-            return await nft.connect(admin).initialize(
-                admin.address,
-                init,
-                income.address,
-                custodian.address,
-                royaltyBps,
-                uri
-            );
+            return await nft.connect(admin).init(initArgs);
         });
     });
 
@@ -60,17 +61,26 @@ task('nft-clone', 'Deploy clone of demine nft')
         const income = await ethers.getContractAt('DeMineERC20', coinConfig.wrapped);
 
         const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
-        const facetCuts = [await common.genDiamondFacetCut(hre)];
-        const init = common.diamondInit(erc1155Facet, facetCuts);
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
-        const Base = await common.getDeployment(hre, 'DeMineNFT');
+        const initArgs = [
+            admin.address,
+            [],
+            [],
+            [],
+            erc1155Facet.address,
+            ethers.utils.defaultAbiCoder.encode(
+                ["address", "uint8", "address", "string"],
+                [custodian.address, royaltyBps, income.address, uri]
+            ),
+            await genInterfaces('IERC1155Rewardable')
+        ];
 
+        const Base = await common.getDeployment(hre, 'DeMineNFT');
         console.log('Will clone DeMineNFT from ' + Base.address + ' with: ');
         console.log(JSON.stringify({
             owner: admin.address,
             fallbackAddress: erc1155Facet.address,
-            facetCuts: facetCuts,
             income: {
                 address: income.address,
                 name: await income.name(),
@@ -83,14 +93,7 @@ task('nft-clone', 'Deploy clone of demine nft')
         }, null, 2));
 
         const { events } = await common.prompt(async function() {
-            return await Base.create(
-                admin.address,
-                init,
-                income.address,
-                custodian.address,
-                royaltyBps,
-                uri
-            );
+            return await Base.create(initArgs);
         });
         const { args: [from, cloned] } = events.find(
             function(e) { return e.event === 'Clone'; }
@@ -151,9 +154,8 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
         console.log('Will finalize with following info:');
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
-            return await miningPoolFacet.connect(admin).finalize(
-                custodian.address, args.income
-            );
+            // TODO: deposit total to nft contract
+            return await miningPoolFacet.connect(admin).finalize(args.income);
         });
     });
 

@@ -35,11 +35,11 @@ contract ERC1155Facet is
     event Finalize(uint indexed, uint);
 
     function init(bytes memory args) internal override onlyInitializing {
-        (address recipient, uint16 bps, address reward) =
-            abi.decode(args, (address, uint16, address));
+        (address recipient, uint16 bps, address reward, string memory uri) =
+            abi.decode(args, (address, uint16, address, string));
         s.royalty = RoyaltyInfo(recipient, bps);
         s.reward = IERC20(reward);
-        s.alchemist = address(0x1A811678eEEDF16a1D0dF4b12e290F78a61A28F9);
+        _setBaseURI(uri);
     }
 
     function finalize(uint reward) external onlyOwner {
@@ -102,8 +102,8 @@ contract ERC1155Facet is
         return address(s.reward);
     }
 
-    function getAlchemist() external override view returns(address) {
-        return s.alchemist;
+    function getAlchemist() external override pure returns(address) {
+        return _alchemist();
     }
 
     function _beforeTokenTransfer(
@@ -115,7 +115,7 @@ contract ERC1155Facet is
         bytes memory data
     ) internal virtual override(ERC1155BaseInternal) {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
-        address alchemist = s.alchemist;
+        address alchemist = _alchemist();
         require(from != alchemist, 'DeMineNFT: from alchemist');
         // alchemize
         if (to == alchemist) {
@@ -145,5 +145,9 @@ contract ERC1155Facet is
                 s.tokens[ids[i]].supply += amounts[i];
             }
         }
+    }
+
+    function _alchemist() private pure returns(address) {
+        return address(0x1A811678eEEDF16a1D0dF4b12e290F78a61A28F9);
     }
 }

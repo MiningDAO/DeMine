@@ -17,7 +17,6 @@ struct RoyaltyInfo {
 struct AppStorage {
     IERC20 reward;
     uint mining;
-    address alchemist;
     RoyaltyInfo royalty;
     mapping(uint => Token) tokens;
 }

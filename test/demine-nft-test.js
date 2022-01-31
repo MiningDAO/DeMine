@@ -10,18 +10,27 @@ async function facetAddress(name) {
 
 async function cloneWrapped(coin) {
     const { admin } = await hre.ethers.getNamedSigners();
-    const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
+    const diamond = await common.getDeployment(hre, 'Diamond');
 
     const wrappedConfig = hre.localConfig.wrapped[coin];
-    const erc20Facet = await common.getDeployment(hre, 'ERC20Facet');
-    const wrapped = await common.getDeployment(hre, 'DeMineERC20');
-    const tx = await wrapped.create(
+    const fallback = await common.getDeployment(hre, 'ERC20Facet');
+    const initArgs = await common.diamondInitArgs(
+        hre,
         admin.address,
-        [erc20Facet.address, [], [], []],
-        wrappedConfig.name,
-        wrappedConfig.symbol,
-        wrappedConfig.decimals
+        fallback.address,
+        ethers.utils.defaultAbiCoder.encode(
+            ["string", "string", "uint8"],
+            [
+                wrappedConfig.name,
+                wrappedConfig.symbol,
+                wrappedConfig.decimals
+            ]
+        ),
+        [],
+        ['@solidstate/contracts/token/ERC20/IERC20.sol:IERC20']
     );
+    const Base = await common.getDeployment(hre, 'Diamond');
+    const tx = await Base.create(initArgs);
     const { events: events } = await tx.wait();
     const { args: [from, cloned] } = events.find(
         function(e) { return e.event === 'Clone'; }
@@ -31,18 +40,22 @@ async function cloneWrapped(coin) {
 
 async function cloneNFT(coin) {
     const { admin, custodian } = await hre.ethers.getNamedSigners();
-    const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
-    const facetCuts = [await common.genDiamondFacetCut(hre)];
-    const init = common.diamondInit(erc1155Facet.address, facetCuts);
-    const Base = await common.getDeployment(hre, 'DeMineNFT');
-    const tx = await Base.create(
+    const fallback = await common.getDeployment(hre, 'ERC1155Facet');
+    const rewardToken = await cloneWrapped(coin);
+    const uri = localConfig.tokenUri[coin];
+    const initArgs = await common.diamondInitArgs(
+        hre,
         admin.address,
-        init,
-        await cloneWrapped(coin),
-        custodian.address,
-        100,
-        localConfig.tokenUri[coin]
+        fallback.address,
+        ethers.utils.defaultAbiCoder.encode(
+            ["address", "uint8", "address", "string"],
+            [custodian.address, 100, rewardToken, uri]
+        ),
+        [],
+        ['IERC1155Rewardable']
     );
+    const Base = await common.getDeployment(hre, 'Diamond');
+    const tx = await Base.create(initArgs);
     const { events: events } = await tx.wait();
     const { args: [from, cloned] } = events.find(
         function(e) { return e.event === 'Clone'; }
@@ -69,9 +82,9 @@ describe("DeMineNFT", function () {
         nft = await cloneNFT(coin);
     });
 
-    it("DeMineAdmin", async function () {
+    it("DiamondAdmin", async function () {
         const { deployer, admin, custodian } = await hre.ethers.getNamedSigners();
-        const main = await hre.ethers.getContractAt('DeMineNFT', nft);
+        const main = await hre.ethers.getContractAt('Diamond', nft);
         const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
 
         // SafeOwnable
@@ -119,40 +132,14 @@ describe("DeMineNFT", function () {
 
     it("Diamond", async function () {
         const { admin } = await hre.ethers.getNamedSigners();
-        const facet = await hre.ethers.getContractAt('DiamondFacet', nft);
-        const diamondFacet = (await hre.deployments.get('DiamondFacet')).address;
-
-       await facet.connect(admin).diamondCut([
-            [
-                diamondFacet,
-                0,
-                await common.genSelectors(hre, [
-                    ['IDiamondLoupe', [
-                        'facets', 'facetFunctionSelectors', 'facetAddresses', 'facetAddress'
-                    ]]
-                ])
-            ]
-        ], address0, []);
-
-        const expected = {[await facetAddress('DiamondFacet')]: 5};
+        const main = await hre.ethers.getContractAt('Diamond', nft);
 
         // IDiamondLoupe
-        const facets = await facet.facets();
-        for (let [facet, selectors] of facets) {
-            expect(selectors.length).to.equal(expected[facet]);
-        }
+        const facets = await main.facets();
+        expect(facets.length).to.be.equal(0);
 
-        const selectors = await facet.facetFunctionSelectors(diamondFacet);
-        expect(selectors.length).to.equal(expected[diamondFacet]);
-
-        const addresses = await facet.facetAddresses();
-        const expectedAddresses = Object.keys(expected);
-        expect(addresses).to.include.members(expectedAddresses);
-
-        const artifact = await hre.deployments.getArtifact('DiamondFacet');
-        const iface = new hre.ethers.utils.Interface(artifact.abi);
-        const selector = iface.getSighash('facets');
-        expect(await facet.facetAddress(selector)).to.equal(diamondFacet);
+        const addresses = await main.facetAddresses();
+        expect(addresses.length).to.be.equal(0);
     });
 
     it("IERC1155", async function () {

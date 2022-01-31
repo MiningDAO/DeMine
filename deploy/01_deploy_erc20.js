@@ -6,11 +6,6 @@ module.exports = async ({ ethers, deployments }) => {
         from: deployer.address,
         log: true
     });
-
-    await deploy('DeMineERC20', {
-        from: deployer.address,
-        log: true
-    });
 };
 
 module.exports.tags = ['DeMineERC20', 'DeMine'];
