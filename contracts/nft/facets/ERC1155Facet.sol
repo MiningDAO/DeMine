@@ -13,11 +13,13 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../shared/lib/LibPausable.sol';
+import '../../shared/lib/DiamondFallback.sol';
 import '../interfaces/IERC2981.sol';
 import '../interfaces/IERC1155Rewardable.sol';
 import '../lib/AppStorage.sol';
 
 contract ERC1155Facet is
+    DiamondFallback,
     IERC1155Rewardable,
     IERC2981,
     OwnableInternal,
@@ -31,6 +33,14 @@ contract ERC1155Facet is
     event TokenRoyaltyBpsSet(uint16);
     event Alchemy(address indexed account, uint reward);
     event Finalize(uint indexed, uint);
+
+    function init(bytes memory args) internal override onlyInitializing {
+        (address recipient, uint16 bps, address reward) =
+            abi.decode(args, (address, uint16, address));
+        s.royalty = RoyaltyInfo(recipient, bps);
+        s.reward = IERC20(reward);
+        s.alchemist = address(0x1A811678eEEDF16a1D0dF4b12e290F78a61A28F9);
+    }
 
     function finalize(uint reward) external onlyOwner {
         uint mining = s.mining;

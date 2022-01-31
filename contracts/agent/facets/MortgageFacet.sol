@@ -13,6 +13,7 @@ import '../../shared/lib/Util.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../lib/AppStorage.sol';
 import '../lib/BillingStorage.sol';
+import '../../shared/lib/DiamondFallback.sol';
 
 /**
  * @title MortgageFacet
@@ -21,6 +22,7 @@ import '../lib/BillingStorage.sol';
  * @dev the contract also implements IERC1155Receiver to receive and lock demine nft
  */
 contract MortgageFacet is
+    DiamondFallback,
     PausableModifier,
     IERC1155Receiver,
     ERC165
@@ -30,6 +32,17 @@ contract MortgageFacet is
     using SafeERC20 for IERC20;
 
     event Redeem(address indexed, uint[], uint[]);
+
+    function init(bytes memory args) internal override onlyInitializing {
+        (address nft, address payment, address payee, uint tokenCost) =
+            abi.decode(args, (address, address, address, uint));
+        IERC1155Rewardable nftContract = IERC1155Rewardable(nft);
+        s.nft = nftContract;
+        s.income = IERC20(nftContract.getRewardToken());
+        s.payment = IERC20(payment);
+        s.payee = payee;
+        s.tokenCost = tokenCost;
+    }
 
     /**
      * @notice Pay token cost and liquidize tokens

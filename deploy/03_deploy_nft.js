@@ -6,11 +6,6 @@ module.exports = async ({ ethers, deployments }) => {
         from: deployer.address,
         log: true
     });
-
-    await deploy('DeMineNFT', {
-        from: deployer.address,
-        log: true
-    });
 };
 
 module.exports.tags = ['DeMineNFT', 'DeMine'];
