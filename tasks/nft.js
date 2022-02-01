@@ -2,6 +2,17 @@ const { types } = require("hardhat/config");
 const assert = require("assert");
 const common = require("../lib/common.js");
 
+function getNFT(hre, coin) {
+    const contracts = require(hre.localConfig.contracts);
+    const nft = ((contracts[hre.network.name] || {})[coin] || {}).nft || {};
+    assert(nft.target, "No contract found");
+    return nft;
+}
+
+function getRewardPerToken() {
+    return 0;
+}
+
 task('nft-clone', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
@@ -74,18 +85,14 @@ task('nft-clone', 'Deploy clone of demine nft')
 
 task('nft-finalize', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'Coin of DeMineNFT')
-    .addParam('reward', 'reward per token', undefined, types.int)
-    .addParam('mining', 'for validation, incase we finalized wrong token', undefined, types.int)
-    .setAction(async (args, { ethers, network, localConfig } = hre) => {
+    .addOptionalParam('reward', 'reward per token to set')
+    .setAction(async (args, { ethers, network } = hre) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
-        assert(args.reward >= 0, 'Income has to be non-negative number');
 
-        let nft = localConfig[network.name][args.coin].nft;
-        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
+        const nft = getNFT(hre, args.coin);
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
         const mining = await erc1155Facet.getMiningToken();
-        assert(ethers.BigNumber.from(args.mining).eq(mining), 'wrong mining cycle');
-
         const [
             [supply, rewardPerToken]
         ] = await erc1155Facet.getTokenInfo([mining]);
@@ -93,31 +100,34 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
             rewardPerToken.eq(ethers.BigNumber.from(0)),
             'unexpected reward per token ' + rewardPerToken + ' for token id ' + mining
         );
-        const total = ethers.BigNumber.from(args.reward).mul(supply);
+
+        const reward = args.reward || getRewardPerToken();
+        const total = ethers.BigNumber.from(reward).mul(supply);
 
         const { admin, custodian } = await ethers.getNamedSigners();
-        const reward = await ethers.getContractAt(
-            '@solidstate/contracts/token/ERC20/IERC20.sol:IERC20',
+        const rewardToken = await ethers.getContractAt(
+            '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
             await erc1155Facet.getRewardToken()
         );
-        const allowance = await reward.allowance(custodian.address, nft);
+        const allowance = await rewardToken.allowance(custodian.address, nft.target);
         assert(
             allowance.gte(total),
             'Insufficient allowance, current=' + allowance + ', required=' + total
         );
 
-        const balance = await reward.balanceOf(custodian.address);
+        const balance = await rewardToken.balanceOf(custodian.address);
         assert(
             balance.gte(total),
             'Insufficient balance, current=' + balance + ', required=' + total
         );
 
         const info = {
-            tokenId: mining.toNumber(),
+            source: nft.source,
+            contract: nft.target,
+            miningToken: mining.toNumber(),
             supply: supply.toNumber(),
-            reward: args.reward,
+            reward: reward,
             total: total.toNumber(),
-            rewardSource: custodian.address,
             allowance: allowance.toNumber(),
             balance: balance.toNumber()
         };
@@ -125,24 +135,23 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
             // TODO: deposit total to nft contract
-            return await erc1155Facet.connect(admin).finalize(args.reward);
+            return await erc1155Facet.connect(admin).finalize(reward);
         });
     });
 
 task('nft-mint', 'mint new demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
-    .addParam('recipient', 'recipient of minted tokens')
     .addParam('start', 'start token id', undefined, types.int)
     .addParam('end', 'end token id', undefined, types.int)
     .addParam('supply', 'supply per token', undefined, types.int)
-    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        const { admin } = await ethers.getNamedSigners();
+    .addOptionalParam('to', 'recipient of minted tokens')
+    .setAction(async (args, { ethers, network, deployments } = hre) => {
+        const { admin, custodian } = await ethers.getNamedSigners();
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
-        const account = ethers.utils.getAddress(args.recipient);
 
-        let nft = localConfig[network.name][args.coin].nft;
-        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
+        const nft = getNFT(hre, args.coin);
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
         const mining = await erc1155Facet.getMiningToken();
         assert(ethers.BigNumber.from(args.start).gt(mining), 'You cannot start from mined token')
         assert(args.end > args.start && args.end - args.start < 1000, 'Too long duration')
@@ -152,9 +161,11 @@ task('nft-mint', 'mint new demine nft tokens')
             ids.push(i);
             amounts.push(args.supply);
         }
+        const to = args.to || custodian.address;
         const info = {
-            contract: nft,
-            recipient: args.recipient,
+            source: nft.source,
+            contract: nft.target,
+            to: to,
             ids: JSON.stringify(ids),
             amounts: JSON.stringify(amounts)
         };
@@ -162,7 +173,72 @@ task('nft-mint', 'mint new demine nft tokens')
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
             return await erc1155Facet.connect(admin).mintBatch(
-                account, ids, amounts, []
+                to, ids, amounts, []
+            );
+        });
+    });
+
+task('nft-burn', 'burn demine nft tokens')
+    .addParam('coin', 'Coin of DeMineNFT')
+    .addParam('start', 'start token id', undefined, types.int)
+    .addParam('end', 'end token id', undefined, types.int)
+    .addParam('amounts', 'amount to burn per token')
+    .setAction(async (args, { ethers, network, deployments } = hre) => {
+        const { admin } = await ethers.getNamedSigners();
+        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
+        common.validateCoin(args.coin);
+
+        const nft = getNFT(hre, args.coin);
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
+        const mining = await erc1155Facet.getMiningToken();
+        assert(ethers.BigNumber.from(args.start).gt(mining), 'You cannot start from mined token')
+        assert(args.end > args.start && args.end - args.start < 500, 'Too long duration')
+
+        const amounts = args.amounts.split(',').map(i => parseInt(i));
+        assert(amounts.length == args.end - args.start + 1, 'amounts array length mismatch');
+        const ids = Array(args.end - args.start + 1).fill().map((_, idx) => args.start + idx);
+        const info = {
+            source: nft.source,
+            contract: nft.target,
+            from: admin.address,
+            ids: JSON.stringify(ids),
+            amounts: args.amounts
+        };
+        console.log('Will burn nft with following info:');
+        console.log(JSON.stringify(info, null, 2));
+        await common.prompt(async function() {
+            return await erc1155Facet.connect(admin).burnBatch(ids, amounts);
+        });
+    });
+
+task('nft-transfer', 'transfer demine nft tokens')
+    .addParam('coin', 'Coin of DeMineNFT')
+    .addParam('to', 'address of recipient')
+    .addParam('ids', 'token ids, comma seperated')
+    .addParam('amounts', 'amounts, comma seperated')
+    .setAction(async (args, { ethers, network, deployments } = hre) => {
+        const { admin, custodian } = await ethers.getNamedSigners();
+
+        const to = ethers.utils.getAddress(args.to);
+        const ids = args.ids.split(',').map(i => parseInt(i));
+        const amounts = args.amounts.split(',').map(i => parseInt(i));
+        assert(ids.length == amounts.length, 'array length mismatch');
+
+        const nft = getNFT(hre, args.coin);
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
+        const info = {
+            source: nft.source,
+            contract: nft.target,
+            from: custodian.address,
+            to: to.address,
+            ids: JSON.stringify(ids),
+            amounts: JSON.stringify(amounts)
+        };
+        console.log('Will transfer nft with following info:');
+        console.log(JSON.stringify(info, null, 2));
+        await common.prompt(async function() {
+            return await erc1155Facet.connect(custodian).safeBatchTransferFrom(
+                custodian.address, to, ids, amounts, []
             );
         });
     });
@@ -170,24 +246,25 @@ task('nft-mint', 'mint new demine nft tokens')
 task('nft-reward', 'check reward of user')
     .addParam('coin', 'Coin to check')
     .addParam('who', 'account address')
-    .addParam('from', 'from token id to mining', undefined, types.int)
+    .addParam('start', 'start token id', undefined, types.int)
     .setAction(async (args, { ethers, network }) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
-        assert(range.length == 1, 'malformed range')
+        const account = ethers.utils.getAddress(args.who);
 
-        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
+        const nft = getNFT(hre, args.coin);
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
         const mining = (await erc1155Facet.getMiningToken()).toNumber();
-        assert(args.from < mining, 'start exceeding mining token ' + mining);
-        const ids = Array(mining - args.from + 1).fill().map((_, i) => i + args.from);
+        assert(args.start < mining, 'start exceeding mining token ' + mining);
+        const ids = Array(mining - args.start).fill().map((_, i) => i + args.start);
         var tokenInfo = await erc1155Facet.getTokenInfo(ids);
         var balances = await erc1155Facet.balanceOfBatch(
-            Array(mining - args.from).fill(account), ids
+            Array(mining - args.start).fill(account), ids
         );
         var result = {total: 0, perToken: []};
-        for (let i = args.from; i < mining; i++) {
-            let info = tokenInfo[i - args.from];
-            let balance = balances[i - args.from];
+        for (let i = args.start; i < mining; i++) {
+            let info = tokenInfo[i - args.start];
+            let balance = balances[i - args.start];
             result.total += balance.mul(info[1]).toNumber();
             result.perToken.push({
                 tokenId: i,
@@ -204,13 +281,13 @@ task('nft-balance', 'check DeMineNFT balance for user')
     .addParam('who', 'account address')
     .addParam('start', 'start token id', undefined, types.int)
     .addParam('end', 'end token id', undefined, types.int)
-    .setAction(async (args, { ethers, network, localConfig }) => {
+    .setAction(async (args, { ethers, network }) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
-
-        let nft = localConfig[network.name][args.coin].nft;
-        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
         const account = ethers.utils.getAddress(args.who);
+
+        const nft = getNFT(hre, args.coin);
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
         const start = args.start, end = args.end;
         assert(end >= start, 'end must be larger than start');
         assert(end - start <= 365, 'you can only check one-year data');
@@ -231,15 +308,16 @@ task('nft-balance', 'check DeMineNFT balance for user')
 
 task('nft-inspect', 'Inspect state of DeMineNFT contract')
     .addParam('coin', 'Coin to deploy')
-    .setAction(async (args, { ethers, network, localConfig }) => {
+    .addOptionalParam('history', 'Num of historical tokens to look back', 5, types.int)
+    .setAction(async (args, { ethers, network }) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
 
-        const nft = localConfig[network.name][args.coin].nft;
-        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
+        const nft = getNFT(hre, args.coin);
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
         const mining = (await erc1155Facet.getMiningToken()).toNumber();
         var history = [];
-        var start = Math.max(mining - 5, 0);
+        var start = Math.max(mining - args.history, 0);
         if (mining > start) {
             var tokenInfo = await erc1155Facet.getTokenInfo(
                 Array(mining - start).fill().map((_, i) => i + start)
@@ -254,16 +332,18 @@ task('nft-inspect', 'Inspect state of DeMineNFT contract')
             }
         }
 
-        const diamond = await ethers.getContractAt('Diamond', nft);
+        const diamond = await ethers.getContractAt('Diamond', nft.target);
         const royaltyInfo = await erc1155Facet.royaltyInfo(1, 10000);
         const reward = await ethers.getContractAt(
-            '@solidstate/contracts/token/ERC20/IERC20.sol:IERC20',
+            '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
             await erc1155Facet.getRewardToken()
         );
-        const balance = await reward.balanceOf(nft);
+
+        const balance = await reward.balanceOf(nft.target);
         const [miningToken] = await erc1155Facet.getTokenInfo([mining]);
         console.log(JSON.stringify({
-            address: nft,
+            source: nft.source,
+            address: nft.target,
             owner: await diamond.owner(),
             nomineeOwner: await diamond.nomineeOwner(),
             reward: {
