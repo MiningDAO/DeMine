@@ -2,27 +2,28 @@ const { types } = require("hardhat/config");
 const assert = require("assert");
 const common = require("../lib/common.js");
 
-async function getReward(hre, coin) {
-    const contracts = require(hre.localConfig.contracts);
-    const coinConfig = contracts[hre.network.name][coin];
-    if (coinConfig.wrapped === undefined) {
-        coinConfig.wrapped = hre.run('wrapped-clone', { coin: coin });
-    }
-    return await ethers.getContractAt(
-        '@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol:IERC20Metadata',
-        coinConfig.wrapped
-    );
-}
-
 task('nft-clone', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
 
-        const { admin, custodian } = await ethers.getNamedSigners();
-        const reward = await getReward(hre, args.coin);
+        const diamond = await common.getDeployment(hre, 'Diamond');
+        const contracts = require(localConfig.contracts);
+        const coinConfig = (contracts[network.name] || {})[args.coin] || {};
+        if (coinConfig.nft && coinConfig.nft.target && coinConfig.nft.source == diamond.address) {
+            console.log("Nothing changed, skipping");
+            return;
+        }
 
+        const wrapped = (coinConfig.wrapped && coinConfig.wrapped.target)
+            || await hre.run('wrapped-clone', { coin: args.coin });
+        const reward = await ethers.getContractAt(
+            '@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol:IERC20Metadata',
+            wrapped
+        );
+
+        const { admin, custodian } = await ethers.getNamedSigners();
         const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
@@ -37,7 +38,6 @@ task('nft-clone', 'Deploy clone of demine nft')
             [],
             ['IERC1155Rewardable', 'IERC1155']
         );
-        const diamond = await common.getDeployment(hre, 'Diamond');
         console.log('Will clone DeMineNFT from ' + diamond.address + ' with: ');
         console.log(JSON.stringify({
             source: diamond.address,
@@ -63,7 +63,12 @@ task('nft-clone', 'Deploy clone of demine nft')
             function(e) { return e.event === 'Clone'; }
         );
         console.log('Cloned contract DeMineNFT at ' + cloned);
-        common.saveContract(hre, args.coin, 'nft', cloned);
+        common.saveContract(
+            hre, args.coin, 'nft', {
+                source: diamond.address,
+                target: cloned
+            }
+        );
         return cloned;
     });
 
@@ -166,7 +171,7 @@ task('nft-reward', 'check reward of user')
     .addParam('coin', 'Coin to check')
     .addParam('who', 'account address')
     .addParam('from', 'from token id to mining', undefined, types.int)
-    .setAction(async (args, { ethers, network, localConfig }) => {
+    .setAction(async (args, { ethers, network }) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
         assert(range.length == 1, 'malformed range')

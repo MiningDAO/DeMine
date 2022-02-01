@@ -1,16 +1,42 @@
 {
   "bsc": {
     "btc": {
-      "wrapped": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c"
+      "wrapped": {
+        "target": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c"
+      }
+    },
+    "usd": {
+      "wrapped": {
+        "target": "0xe9e7cea3dedca5984780bafc599bd69add087d56"
+      }
     }
   },
   "bscdev": {
     "btc": {
-      "wrapped": "0x507F5821359504a8E19A913e7da9ef037E6AA567",
-      "nft": "0xE190435e6eE506BF2085f1dB5Db32885C25C8BD4"
+      "wrapped": {
+        "source": "0xB9942aFE15a45900FEc923bB991Bb88dE9BDA306",
+        "target": "0x507F5821359504a8E19A913e7da9ef037E6AA567"
+      },
+      "nft": {
+        "source": "0xB9942aFE15a45900FEc923bB991Bb88dE9BDA306",
+        "target": "0xE190435e6eE506BF2085f1dB5Db32885C25C8BD4"
+      }
     },
     "usd": {
-      "wrapped": "0x4D59421952814868010C59071Fb6cBC9A8c6435a"
+      "wrapped": {
+        "source": "0xB9942aFE15a45900FEc923bB991Bb88dE9BDA306",
+        "target": "0x4D59421952814868010C59071Fb6cBC9A8c6435a"
+      }
+    },
+    "eth": {
+      "wrapped": {
+        "source": "0xB9942aFE15a45900FEc923bB991Bb88dE9BDA306",
+        "target": "0x5d3d22170057FE49d5463A7D71F99360c0866509"
+      },
+      "nft": {
+        "source": "0xB9942aFE15a45900FEc923bB991Bb88dE9BDA306",
+        "target": "0xa885c1086799C8F18B8c1Fe87200174F25e9CFA5"
+      }
     }
   },
   "matic": {
