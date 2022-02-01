@@ -1,0 +1,28 @@
+{
+  "bsc": {
+    "btc": {
+      "wrapped": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c"
+    }
+  },
+  "bscdev": {
+    "btc": {
+      "wrapped": "0x507F5821359504a8E19A913e7da9ef037E6AA567",
+      "nft": "0xE190435e6eE506BF2085f1dB5Db32885C25C8BD4"
+    },
+    "usd": {
+      "wrapped": "0x4D59421952814868010C59071Fb6cBC9A8c6435a"
+    }
+  },
+  "matic": {
+    "btc": {
+      "nft": "0x3AD522Cb2ee0BB8F078E3F4E330A7Ec9027E910D",
+      "wrapped": "0x38d38f83A45cc6FC916cA8badd77d61006aeB89F"
+    }
+  },
+  "maticdev": {
+    "btc": {
+      "nft": "0xD6E4d388c77095D2C4D42b318e2C43F1DbDDf22d",
+      "wrapped": "0xD0A49ba8042721B6289D872fB73782936BFbd97E"
+    }
+  }
+}

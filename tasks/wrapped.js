@@ -1,45 +1,6 @@
 const assert = require("assert");
 const common = require("../lib/common.js");
 
-task("wrapped-init", "init wrapped token")
-    .addParam('contract', 'contract address')
-    .addParam('coin', 'coin type')
-    .setAction(async function(args, { ethers, localConfig } = hre) {
-        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-        args.coin == 'usd' || common.validateCoin(args.coin);
-
-        const { admin } = await ethers.getNamedSigners();
-        const config = localConfig.wrapped[args.coin];
-        const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
-        const erc20Facet = await common.getDeployment(hre, 'ERC20Facet');
-        const erc20 = await ethers.getContractAt('DeMineERC20', args.contract);
-        const facetCuts = [await common.genDiamondFacetCut(hre)];
-
-        console.log('Will initialize DeMineERC20 ' + args.contract + ' with: ');
-        console.log(JSON.stringify({
-            contractToInitialize: erc20.address,
-            owner: admin.address,
-            diamondFacet: diamonFacet.address,
-            erc20Facet: erc20Facet.address,
-            fallbackAddress: erc20Facet.address,
-            facetCuts: facetCuts,
-            name: config.name,
-            symbol: config.symbol,
-            decimals: config.decimals,
-        }, null, 2));
-        await common.prompt(async function() {
-            return await erc20.connect(admin).initialize(
-                admin.address,
-                diamonFacet.address,
-                erc20Facet.address,
-                facetCuts,
-                config.name,
-                config.symbol,
-                config.decimals
-            );
-        });
-    });
-
 task("wrapped-clone", "clone wrapped token")
     .addParam('coin', 'coin type')
     .setAction(async function(args, { ethers } = hre) {
@@ -47,39 +8,40 @@ task("wrapped-clone", "clone wrapped token")
         args.coin == 'usd' || common.validateCoin(args.coin);
 
         const { admin } = await ethers.getNamedSigners();
-        const Base = await common.getDeployment(hre, 'DeMineERC20');
+        const Base = await common.getDeployment(hre, 'Diamond');
         const config = localConfig.wrapped[args.coin];
-        const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
-        const erc20Facet = await common.getDeployment(hre, 'ERC20Facet');
-        const facetCuts = [await common.genDiamondFacetCut(hre)];
 
+        const fallback = await common.getDeployment(hre, 'ERC20Facet');
+        const initArgs = await common.diamondInitArgs(
+            hre,
+            admin.address,
+            fallback.address,
+            ethers.utils.defaultAbiCoder.encode(
+                ["string", "string", "uint8"],
+                [config.name, config.symbol, config.decimals]
+            ),
+            [],
+            ['@solidstate/contracts/token/ERC20/IERC20.sol:IERC20']
+        );
         console.log('Will clone DeMineERC20 from ' + Base.address + ' with: ');
         console.log(JSON.stringify({
             source: Base.address,
             owner: admin.address,
-            diamondFacet: diamonFacet.address,
-            erc20Facet: erc20Facet.address,
-            fallbackAddress: erc20Facet.address,
-            facetCuts: facetCuts,
-            name: config.name,
-            symbol: config.symbol,
-            decimals: config.decimals
+            fallback: fallback.address,
+            fallbackInitArgs: {
+                name: config.name,
+                symbol: config.symbol,
+                decimals: config.decimals
+            }
         }, null, 2));
         const { events } = await common.prompt(async function() {
-            return await Base.create(
-                admin.address,
-                diamondFacet.address,
-                erc20Facet.address,
-                facetCuts,
-                config.name,
-                config.symbol,
-                config.decimals
-            );
+            return await Base.create(initArgs);
         });
         const { args: [_from, cloned] } = events.find(
             function(e) { return e.event === 'Clone'; }
         );
         console.log('Cloned DeMineERC20 at ' + cloned);
+        common.saveContract(hre, args.coin, 'wrapped', cloned);
         return cloned;
     });
 

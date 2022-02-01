@@ -52,7 +52,7 @@ async function cloneNFT(coin) {
             [custodian.address, 100, rewardToken, uri]
         ),
         [],
-        ['IERC1155Rewardable']
+        ['IERC1155Rewardable', 'IERC1155']
     );
     const Base = await common.getDeployment(hre, 'Diamond');
     const tx = await Base.create(initArgs);
@@ -210,6 +210,23 @@ describe("DeMineNFT", function () {
         const newBaseUri = 'https://www.tokeninfo.com/token/';
         await facet.connect(admin).setURI(newBaseUri);
         expect(await facet.uri(1)).to.equal(newBaseUri + '1');
+    });
+
+    it('IERC165', async function() {
+        const { admin, custodian } = await hre.ethers.getNamedSigners();
+        const diamond = await hre.ethers.getContractAt('Diamond', nft);
+
+        expect(
+            await diamond.supportsInterface(
+                await common.genInterface(hre, 'IERC1155')
+            )
+        ).to.be.true;
+
+        expect(
+            await diamond.supportsInterface(
+                await common.genInterface(hre, 'IERC1155Rewardable')
+            )
+        ).to.be.true;
     });
 
     it('IERC2981', async function() {

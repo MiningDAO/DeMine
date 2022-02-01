@@ -18,4 +18,4 @@ module.exports = async ({ ethers, deployments, localConfig }) => {
     });
 };
 
-module.exports.tags = ['DeMineAgent', 'DeMine'];
+module.exports.tags = ['DeMineAgent', 'DeMineProd'];

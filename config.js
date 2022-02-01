@@ -1,4 +1,6 @@
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 
 const config = {
     tokenUri: {
@@ -8,11 +10,16 @@ const config = {
     },
     royaltyBps: 100,
     accounts: [
-        process.env.DEPLOYER_DEV,
-        process.env.ADMIN_DEV,
-        process.env.CUSTODIAN_DEV,
+        process.env.DEPLOYER,
+        process.env.ADMIN,
+        process.env.CUSTODIAN,
         process.env.ALCHEMIST
     ],
+    contracts: path.resolve(__dirname, './contracts.json'),
+    alchemy: {
+        matic: process.env.ALCHEMY_MATIC,
+        maticdev: process.env.ALCHEMY_MATIC_DEV
+    },
     wrapped: {
         usd: {
             name: 'DeMine Wrapped USD',
@@ -35,44 +42,7 @@ const config = {
             decimals: 18
         }
     },
-    matic: {
-        alchemy: process.env.ALCHEMY_API_KEY_POLYGON_MAINNET,
-        scan: process.env.POLYGON_SCAN_API_KEY,
-        usd: {
-            wrapped: process.env.DPAY_POLYGON_MAINNET
-        },
-        btc: {
-            nft: process.env.DEMINE_NFT_BTC_PLOYGON_MAINNET,
-            wrapped: process.env.DBTC_POLYGON_MAINNET
-        },
-        eth: {
-            nft: process.env.DEMINE_NFT_ETH_PLOYGON_MAINNET,
-            wrapped: process.env.DETH_POLYGON_MAINNET
-        }
-    },
-    maticdev: {
-        alchemy: process.env.ALCHEMY_API_KEY_POLYGON_DEV,
-        scan: process.env.POLYGON_SCAN_API_KEY,
-        usd: {
-            wrapped: process.env.DPAY_POLYGON_DEV
-        },
-        btc: {
-            nft: process.env.DEMINE_NFT_BTC_PLOYGON_DEV,
-            wrapped: process.env.DBTC_POLYGON_DEV
-        },
-        eth: {
-            nft: process.env.DEMINE_NFT_ETH_PLOYGON_DEV,
-            wrapped: process.env.DETH_POLYGON_DEV
-        },
-        fil: {
-            nft: process.env.DEMINE_NFT_FIL_POLYGON_DEV,
-            wrapped: process.env.DFIL_NFT_FIL
-        },
-    },
-    arbitrumdev: {
-        alchemy: process.env.ALCHEMY_API_KEY_ARBITRUM_DEV
-    },
-    enableGasReporter: (process.env.REPORT_GAS) ? true : false
+    enableGasReporter: true
 };
 
 module.exports = config;
