@@ -20,6 +20,16 @@ const config = {
         matic: process.env.ALCHEMY_MATIC,
         maticdev: process.env.ALCHEMY_MATIC_DEV
     },
+    antpool: {
+        userId: process.env.ANTPOOL_SIGN_ID,
+        key: process.env.ANTPOOL_KEY,
+        secret: process.env.ANTPOOL_SECRET,
+        feePercent: 0.005
+    },
+    binance: {
+        key: process.env.BINANCE_KEY,
+        secret: process.env.BINANCE_SECRET
+    },
     wrapped: {
         usd: {
             name: 'DeMine Wrapped USD',

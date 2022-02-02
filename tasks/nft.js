@@ -1,6 +1,8 @@
 const { types } = require("hardhat/config");
 const assert = require("assert");
 const common = require("../lib/common.js");
+const antpool = require("../lib/antpool.js");
+const binance = require("../lib/binance.js");
 
 function getNFT(hre, coin) {
     const contracts = require(hre.localConfig.contracts);
@@ -9,9 +11,11 @@ function getNFT(hre, coin) {
     return nft;
 }
 
-function getRewardPerToken() {
-    return 0;
-}
+task('nft-test', 'Deploy clone of demine nft')
+    .addParam('coin', 'Coin to deploy')
+    .setAction(async (args, { localConfig } = hre) => {
+        await binance.assetDetails(localConfig, args.coin);
+    });
 
 task('nft-clone', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
@@ -54,7 +58,7 @@ task('nft-clone', 'Deploy clone of demine nft')
             source: diamond.address,
             owner: admin.address,
             fallback: erc1155Facet.address,
-            fallbackInitArgs: {
+              fallbackInitArgs: {
                 reward: {
                     address: reward.address,
                     name: await reward.name(),
@@ -92,49 +96,43 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
 
         const nft = getNFT(hre, args.coin);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
-        const mining = await erc1155Facet.getMiningToken();
-        const [
-            [supply, rewardPerToken]
-        ] = await erc1155Facet.getTokenInfo([mining]);
-        assert(
-            rewardPerToken.eq(ethers.BigNumber.from(0)),
-            'unexpected reward per token ' + rewardPerToken + ' for token id ' + mining
-        );
-
-        const reward = args.reward || getRewardPerToken();
-        const total = ethers.BigNumber.from(reward).mul(supply);
-
-        const { admin, custodian } = await ethers.getNamedSigners();
+        const { admin } = await ethers.getNamedSigners();
         const rewardToken = await ethers.getContractAt(
             '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
             await erc1155Facet.getRewardToken()
         );
-        const allowance = await rewardToken.allowance(custodian.address, nft.target);
-        assert(
-            allowance.gte(total),
-            'Insufficient allowance, current=' + allowance + ', required=' + total
-        );
+        const mining = await erc1155Facet.getMiningToken();
+        const [[supply,]] = await erc1155Facet.getTokenInfo([mining]);
 
-        const balance = await rewardToken.balanceOf(custodian.address);
+        const [
+            hashrate,
+            rewardFromAntpool
+        ] = await antpool.getRewardPerTHV2(localConfig, args.coin);
         assert(
-            balance.gte(total),
-            'Insufficient balance, current=' + balance + ', required=' + total
+            args.reward !== undefined || hashrate >= supply,
+            "Error: Valid hashrate is lower than token supply!!!"
         );
+        const reward = args.reward || rewardFromAntpool;
+        const totalReward = ethers.BigNumber.from(reward).mul(supply);
 
         const info = {
             source: nft.source,
             contract: nft.target,
             miningToken: mining.toNumber(),
-            supply: supply.toNumber(),
+            "hashrate(TH/s)": supply.toNumber(),
+            "realHashrate(TH/s)": hashrate,
             reward: reward,
-            total: total.toNumber(),
-            allowance: allowance.toNumber(),
-            balance: balance.toNumber()
+            rewardFromAntpool: rewardFromAntpool,
+            totalReward: totalReward.toNumber(),
+            totalEarned: rewardFromAntpool * hashrate
         };
         console.log('Will finalize with following info:');
         console.log(JSON.stringify(info, null, 2));
+        hashrate >= supply || console.log(
+            "Warning: Valid hashrate is lower than token supply!!!"
+        );
         await common.prompt(async function() {
-            // TODO: deposit total to nft contract
+            // move total deposit from binance to smart contract directly
             return await erc1155Facet.connect(admin).finalize(reward);
         });
     });
