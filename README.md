@@ -12,6 +12,9 @@ npx hardhat test
 npx hardhat node
 node scripts/sample-script.js
 npx hardhat help
+npx hardhat nft-xxx
+npx hardhat wrapped-xxx
+npx hardhat agent-xxx
 ```
 
 # Operation Workflow
@@ -25,10 +28,10 @@ All released token are locked at DeMineAgent contract at default. There are two 
 - Token issuer can list these tokens for sale with a price and anyone can claim these tokens. Each listing can specify (buyer, price, amounts). Only buyer can claim these tokens listed. If buyer is not specified, anyone can claim these tokens.
 Once tokens are liquidized, they are free to trade at market.
 
-## Reward Distribution
+## 
 We will send reward to nft contract and set the rewardPerToken for each token.
 
-## Cashout and burn
+## Alchemize
 User can burn their tokens and cashout reward tokens. However, user cannot cashout/burn unrewarded tokens.
 
 ## Billing
@@ -38,16 +41,14 @@ We need receive cost of tokens to pay billing of mining farm, including electric
 
 There are 10 contracts deployed:
 
- - Pausable: to pause/unpause the contract
- - Custodian: set checking/saving accounts holding assets
- - ERC20Payable: support multiple ERC20 token payments, in our case it's stable coin
- - PoolMetadata: set pool metedata, incluing owner, tokeCost, tokenPrice
- - CycleMetadata: set cycle metadata, including reward and supply
- - DeMineNFTMetadata: set token level allowance and price for locked tokens
- - DeMineNFTController: provide functions for users to liquidize locked tokens, also provide functions for owner to create pool and add supply
- - DeMineNFT: ERC1155 related funcitonalities, also provide function for users to cashout their tokens
  - Diamond: contract to provide diamond related functionalities
- - DeMine: the proxy contract holding state
+ - ERC20Facet: support multiple ERC20 token payments, in our case it's stable coin
+ - MortgageFacet: contract to mortgage computation power to get tokens
+ - PrimaryMarketFacet: contract to sell locked nfts
+ - BillingFacet: contract to sell earnings to pay bills
+
+All nft/agent/erc20 contracts are at contracts.json file. The part of the file is auto-generated so take care when editing it.
+All BSC wrapped token are from: https://www.binance.org/en/assets-proof.
 
 # Account System
 
@@ -58,6 +59,3 @@ There are 10 contracts deployed:
     - reserved cost for billing
     - cashed out reward for billing
     - recipient of royalty of token transfer
-- DeMineNFT: the nft contract, holding nft tokens and reward tokens mined
-- DeMineAgent: the agent contract, holding income from selling tokens for token issuer
-- Rewarder: account holding all mined coins to reward DeMineNFT contract, could be same with Custodian

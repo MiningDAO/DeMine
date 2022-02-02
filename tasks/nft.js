@@ -4,6 +4,16 @@ const common = require("../lib/common.js");
 const antpool = require("../lib/antpool.js");
 const binance = require("../lib/binance.js");
 
+function binanceConfig(localConfig, network) {
+    assert(
+        network.name == 'bsc' || network.name == 'bscdev',
+        'Error: Only bsc and bscdev network are supported'
+    );
+    return network.name == 'bsc'
+        ? localConfig.binance.prod
+        : localConfig.binance.test;
+}
+
 function getNFT(hre, coin) {
     const contracts = require(hre.localConfig.contracts);
     const nft = ((contracts[hre.network.name] || {})[coin] || {}).nft || {};
@@ -13,8 +23,12 @@ function getNFT(hre, coin) {
 
 task('nft-test', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
-    .setAction(async (args, { localConfig } = hre) => {
-        await binance.assetDetails(localConfig, args.coin);
+    .setAction(async (args, { network, localConfig } = hre) => {
+        console.log(await antpool.getRewardPerTHV2(
+            localConfig.antpool,
+            args.coin.toUpperCase(),
+            common.yesterday()
+        ));
     });
 
 task('nft-clone', 'Deploy clone of demine nft')
@@ -89,51 +103,82 @@ task('nft-clone', 'Deploy clone of demine nft')
 
 task('nft-finalize', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'Coin of DeMineNFT')
-    .addOptionalParam('reward', 'reward per token to set')
+    .addFlag('enforce', 'enforce to set even the hashrate is smaller than supply')
     .setAction(async (args, { ethers, network } = hre) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
 
         const nft = getNFT(hre, args.coin);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
-        const { admin } = await ethers.getNamedSigners();
+        const { admin, custodian } = await ethers.getNamedSigners();
+        console.log("Querying reward token of nft contract...");
         const rewardToken = await ethers.getContractAt(
             '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
             await erc1155Facet.getRewardToken()
         );
+        console.log("Querying mining token of nft contract...");
         const mining = await erc1155Facet.getMiningToken();
         const [[supply,]] = await erc1155Facet.getTokenInfo([mining]);
 
-        const [
-            hashrate,
-            rewardFromAntpool
-        ] = await antpool.getRewardPerTHV2(localConfig, args.coin);
-        assert(
-            args.reward !== undefined || hashrate >= supply,
-            "Error: Valid hashrate is lower than token supply!!!"
+        console.log("Querying antpool ...");
+        const {
+            hashrate, totalEarned, tokenValue
+        } = await antpool.getRewardPerTHV2(
+            localConfig.antpool, args.coin, common.yesterday()
         );
-        const reward = args.reward || rewardFromAntpool;
-        const totalReward = ethers.BigNumber.from(reward).mul(supply);
+        const totalReward = ethers.BigNumber.from(tokenValue).mul(supply);
+
+        console.log("Querying custodian balance...");
+        const custodianBalance = await rewardToken.balanceOf(custodian.address);
+        var treasureSource = {
+            source: 'custodian',
+            balance: custodianBalance.toNumber()
+        }
+        if (treasureSource.balance < totalReward) {
+            console.log("Querying binance antpool ...");
+            assert(network.name == 'bsc', 'Error: insufficient balance');
+            treasureSource.source = 'binance';
+            treasureSource.balance = await binance.balanceOf(
+                binanceConfig(localConfig, network),
+                args.coin.toUpperCase()
+            ) * (10 ** rewardToken.decimals);
+        }
 
         const info = {
             source: nft.source,
             contract: nft.target,
             miningToken: mining.toNumber(),
-            "hashrate(TH/s)": supply.toNumber(),
-            "realHashrate(TH/s)": hashrate,
-            reward: reward,
-            rewardFromAntpool: rewardFromAntpool,
+            tokenValue: tokenValue,
+            tokenSupply: supply.toNumber(),
+            hashrate: hashrate,
             totalReward: totalReward.toNumber(),
-            totalEarned: rewardFromAntpool * hashrate
+            totalEarned: totalEarned,
+            treasureSource: treasureSource
         };
-        console.log('Will finalize with following info:');
+        console.log('Finalize Info:');
         console.log(JSON.stringify(info, null, 2));
-        hashrate >= supply || console.log(
-            "Warning: Valid hashrate is lower than token supply!!!"
-        );
+        if (hashrate.value < supply) {
+            const errMsg = "Effective hashrate is lower than token supply!"
+            assert(args.enforce, "Error: " + errMsg);
+            console.log('Warning: ' + errMsg);
+        }
         await common.prompt(async function() {
-            // move total deposit from binance to smart contract directly
-            return await erc1155Facet.connect(admin).finalize(reward);
+            if (totalReward > 0) {
+                if (treasureSource.source == 'custodian') {
+                    await rewardToken.connect(custodian).transfer(nft.target, totalReward);
+                } else if (treasureSource.source == 'binance') {
+                    await binance.withdraw(
+                        binanceConfig(localConfig, network),
+                        {
+                            coin: args.coin.toUpperCase(),
+                            network: network.name.toUpperCase(),
+                            address: nft.target,
+                            amount: totalReward.toNumber() / (10 ** rewardToken.decimals())
+                        }
+                    );
+                }
+            }
+            return await erc1155Facet.connect(admin).finalize(tokenValue);
         });
     });
 
@@ -267,7 +312,7 @@ task('nft-reward', 'check reward of user')
             result.perToken.push({
                 tokenId: i,
                 balance: balance.toNumber(),
-                rewardPerToken: info[1].toNumber()
+                tokenValue: info[1].toNumber()
             })
         }
         console.log(JSON.stringify(result, null, 2));

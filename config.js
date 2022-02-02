@@ -24,11 +24,23 @@ const config = {
         userId: process.env.ANTPOOL_SIGN_ID,
         key: process.env.ANTPOOL_KEY,
         secret: process.env.ANTPOOL_SECRET,
-        feePercent: 0.005
+        feePercent: 0.005,
+        btc: {
+            decimals: 8,
+            unit: 'TH'
+        }
     },
     binance: {
-        key: process.env.BINANCE_KEY,
-        secret: process.env.BINANCE_SECRET
+        prod: {
+            key: process.env.BINANCE_KEY,
+            secret: process.env.BINANCE_SECRET,
+            api: 'https://api.binance.com'
+        },
+        test: {
+            key: process.env.BINANCE_TEST_KEY,
+            secret: process.env.BINANCE_TEST_SECRET,
+            api: 'https://testnet.binance.vision'
+        }
     },
     wrapped: {
         usd: {
