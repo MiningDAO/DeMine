@@ -254,7 +254,7 @@ describe("DeMineNFT", function () {
         common.compareArray(await facet.royaltyInfo(1, 1000), [admin.address, 100]);
     });
 
-    it.only('Mining', async function() {
+    it('Mining', async function() {
         // setup
         const { admin, custodian } = await hre.ethers.getNamedSigners();
         const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
