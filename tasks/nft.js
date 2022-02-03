@@ -1,6 +1,7 @@
 const { types } = require("hardhat/config");
 const assert = require("assert");
 const common = require("../lib/common.js");
+const token = require("../lib/token.js");
 const antpool = require("../lib/antpool.js");
 const binance = require("../lib/binance.js");
 
@@ -23,11 +24,11 @@ function getNFT(hre, coin) {
 
 task('nft-test', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
-    .setAction(async (args, { network, localConfig } = hre) => {
-        console.log(await antpool.getRewardPerTHV2(
+    .setAction(async (args, { localConfig } = hre) => {
+        console.log(await antpool.userHashrateChart(
             localConfig.antpool,
-            args.coin.toUpperCase(),
-            common.yesterday()
+            args.coin,
+            token.yesterday()
         ));
     });
 
@@ -56,7 +57,7 @@ task('nft-clone', 'Deploy clone of demine nft')
         const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
-        const initArgs = await common.diamondInitArgs(
+        const initArgs = await common.genInitArgs(
             hre,
             admin.address,
             erc1155Facet.address,
@@ -118,13 +119,12 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
         );
         console.log("Querying mining token of nft contract...");
         const mining = await erc1155Facet.getMiningToken();
-        const [[supply,]] = await erc1155Facet.getTokenInfo([mining]);
 
         console.log("Querying antpool ...");
         const {
             hashrate, totalEarned, tokenValue
         } = await antpool.getRewardPerTHV2(
-            localConfig.antpool, args.coin, common.yesterday()
+            localConfig.antpool, args.coin, token.yesterday()
         );
         const totalReward = ethers.BigNumber.from(tokenValue).mul(supply);
 
@@ -411,7 +411,7 @@ task('nft-inspect', 'Inspect state of DeMineNFT contract')
     });
 
 async function genERC1155FacetCut(hre) {
-    return await common.genFacetCut(hre, 'ERC1155Facet', [
+    return await diamond.genFacetCut(hre, 'ERC1155Facet', [
         ['IERC1155', [
             'balanceOf',
             'balanceOfBatch',

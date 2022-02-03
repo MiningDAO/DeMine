@@ -12,7 +12,6 @@ struct RoyaltyInfo {
 struct AppStorage {
     IERC20 earningToken;
     RoyaltyInfo royalty;
-    mapping(uint => uint) supply;
 
     // Oracle
     uint128 finalized;

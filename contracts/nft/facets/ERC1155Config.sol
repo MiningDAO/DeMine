@@ -46,14 +46,4 @@ abstract contract ERC1155Config is
     function _alchemist() internal pure returns(address) {
         return address(0x1A811678eEEDF16a1D0dF4b12e290F78a61A28F9);
     }
-
-    function supplyOf(
-        uint[] calldata ids
-    ) external view returns(uint[] memory) {
-        uint[] memory res = new uint[](ids.length);
-        for (uint i; i < ids.length; i++) {
-            res[i] = s.supply[ids[i]];
-        }
-        return res;
-    }
 }

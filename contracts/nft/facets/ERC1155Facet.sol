@@ -36,7 +36,6 @@ contract ERC1155Facet is
         s.royalty = RoyaltyInfo(recipient, bps);
         s.earningToken = IERC20(earningTokenAdd);
         _setBaseURI(uri);
-        s.finalized = origin();
     }
 
     function mintBatch(
@@ -78,18 +77,6 @@ contract ERC1155Facet is
             }
             s.earningToken.safeTransfer(from, totalEarning);
             emit Alchemy(from, totalEarning);
-        }
-        // burn
-        if (to == address(0)) {
-            for (uint i; i < ids.length; i++) {
-                s.supply[ids[i]] -= amounts[i];
-            }
-        }
-        // mint
-        if (from == address(0)) {
-             for (uint i; i < ids.length; i++) {
-                s.supply[ids[i]] += amounts[i];
-            }
         }
     }
 

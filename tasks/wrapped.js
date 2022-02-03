@@ -25,7 +25,7 @@ task("wrapped-clone", "clone wrapped token")
         const { admin } = await ethers.getNamedSigners();
         const config = localConfig.wrapped[args.coin];
         const fallback = await common.getDeployment(hre, 'ERC20Facet');
-        const initArgs = await common.diamondInitArgs(
+        const initArgs = await common.genInitArgs(
             hre,
             admin.address,
             fallback.address,

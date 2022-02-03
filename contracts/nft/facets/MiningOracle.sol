@@ -6,18 +6,19 @@ pragma experimental ABIEncoderV2;
 import './Base.sol';
 
 abstract contract MiningOracle is Base {
-    event Finalize(uint128 indexed, uint128 indexed, uint);
+    event Finalize(uint128 indexed, uint);
 
     function finalize(uint128 timestamp, uint earningPerToken) external onlyOwner {
         require(
-            (timestamp - s.finalized) % 86400 == 0,
-            'MiningOracle: you can only finalized daily'
+            timestamp > s.finalized && timestamp % 86400 == 0,
+            'DeMineNFT: invalid timestamp'
         );
-        s.daily[timestamp] = earningPerToken;
-        uint128 thisWeek = timestamp - (timestamp - origin()) % 604800;
-        s.weekly[thisWeek] += earningPerToken;
         s.finalized = timestamp;
-        emit Finalize(timestamp, thisWeek, earningPerToken);
+        s.daily[timestamp] = earningPerToken;
+        for(uint128 i = 0; i < 7; i++) {
+            s.weekly[timestamp + i * 86400] += earningPerToken;
+        }
+        emit Finalize(timestamp, earningPerToken);
     }
 
     function finalized() external view returns(uint128) {
@@ -37,16 +38,13 @@ abstract contract MiningOracle is Base {
     {
         // daily token
         if (end - start == 86400) {
-            value = s.daily[start];
-        }
+            value = s.daily[end];
         // weekly token
-        if (end - start == 604800) {
-            value = s.weekly[start];
+        } else if (end - start == 604800) {
+            value = s.weekly[end];
+        // biweekly token
+        } else if (end - start == 1209600) {
+            value = s.weekly[end] + s.weekly[end - 604800];
         }
-    }
-
-    function origin() public pure returns(uint128) {
-        // 1615507200 = 2021-03-12 00:00:00 GMT
-        return 1615507200;
     }
 }
