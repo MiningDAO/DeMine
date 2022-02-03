@@ -62,7 +62,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             close(l, billing);
             return;
         }
-        address alchemist = nft.getAlchemist();
+        address alchemist = nft.alchemist();
         uint prevBalance = s.income.balanceOf(address(this));
         nft.safeTransferFrom(
             address(this), alchemist, billing, balance, ''
