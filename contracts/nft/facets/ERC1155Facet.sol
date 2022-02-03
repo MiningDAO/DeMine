@@ -16,6 +16,7 @@ import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/DiamondFallback.sol';
 import '../interfaces/IERC2981.sol';
 import '../interfaces/IERC1155Rewardable.sol';
+import '../interfaces/IMiningOracle.sol';
 import '../lib/AppStorage.sol';
 
 contract ERC1155Facet is
@@ -31,22 +32,19 @@ contract ERC1155Facet is
     using SafeERC20 for IERC20;
 
     event TokenRoyaltyBpsSet(uint16);
-    event Alchemy(address indexed account, uint reward);
-    event Finalize(uint indexed, uint);
+    event Alchemy(address indexed account, uint earning);
 
     function init(bytes memory args) internal override onlyInitializing {
-        (address recipient, uint16 bps, address reward, string memory uri) =
-            abi.decode(args, (address, uint16, address, string));
+        (
+            address recipient,
+            uint16 bps,
+            address earningTokenAdd,
+            string memory uri
+        ) = abi.decode(args, (address, uint16, address, string));
         s.royalty = RoyaltyInfo(recipient, bps);
-        s.reward = IERC20(reward);
+        s.earningToken = IERC20(earningTokenAdd);
+        s.finalized = IMiningOracle(address(this)).origin();
         _setBaseURI(uri);
-    }
-
-    function finalize(uint reward) external onlyOwner {
-        uint mining = s.mining;
-        s.tokens[mining].reward = reward;
-        s.mining = mining + 1;
-        emit Finalize(mining, reward);
     }
 
     function mintBatch(
@@ -84,26 +82,22 @@ contract ERC1155Facet is
         return (r.recipient, (value * r.bps) / 10000);
     }
 
-    function getTokenInfo(
-        uint[] calldata ids
-    ) external view returns(Token[] memory) {
-        Token[] memory res = new Token[](ids.length);
-        for (uint i; i < ids.length; i++) {
-            res[i] = s.tokens[ids[i]];
-        }
-        return res;
-    }
-
-    function getMiningToken() external view returns(uint) {
-        return s.mining;
-    }
-
-    function getRewardToken() external override view returns(address) {
-        return address(s.reward);
+    function earningToken() external override view returns(address) {
+        return address(s.earningToken);
     }
 
     function getAlchemist() external override pure returns(address) {
         return _alchemist();
+    }
+
+    function supplyOf(
+        uint[] calldata ids
+    ) external view returns(uint[] memory) {
+        uint[] memory res = new uint[](ids.length);
+        for (uint i; i < ids.length; i++) {
+            res[i] = s.supply[ids[i]];
+        }
+        return res;
     }
 
     function _beforeTokenTransfer(
@@ -120,34 +114,42 @@ contract ERC1155Facet is
         // alchemize
         if (to == alchemist) {
             require(!LibPausable.layout().paused, 'Pausable: paused');
-            uint mining = s.mining;
-            uint reward;
+            uint earning;
+            IMiningOracle oracle = IMiningOracle(address(this));
+            uint finalized = oracle.finalized();
             for (uint i; i < ids.length; i++) {
-                require(ids[i] < mining, 'DeMineNFT: token not mined');
-                reward += amounts[i] * s.tokens[ids[i]].reward;
+                require(uint128(ids[i]) <= finalized, 'DeMineNFT: token not mined');
+                earning += amounts[i] * oracle.earning(ids[i]);
             }
-            s.reward.safeTransfer(from, reward);
-            emit Alchemy(from, reward);
+            s.earningToken.safeTransfer(from, earning);
+            emit Alchemy(from, earning);
         }
         // burn
         if (to == address(0)) {
-            uint mining = s.mining;
+            uint128 today = beginOfDay(uint128(block.timestamp));
             for (uint i; i < ids.length; i++) {
-                require(ids[i] > mining, 'DeMineNFT: token mined or mining');
-                s.tokens[ids[i]].supply -= amounts[i];
+                uint128 start = uint128(ids[i] >> 128);
+                require(start > today, 'DeMineNFT: token mined or mining');
+                s.supply[ids[i]] -= amounts[i];
             }
         }
         // mint
         if (from == address(0)) {
-             uint mining = s.mining;
+             uint128 today = beginOfDay(uint128(block.timestamp));
              for (uint i; i < ids.length; i++) {
-                require(ids[i] > mining, 'DeMineNFT: token mined or mining');
-                s.tokens[ids[i]].supply += amounts[i];
+                uint128 start = uint128(ids[i] >> 128);
+                require(start > today, 'DeMineNFT: token mined or mining');
+                s.supply[ids[i]] += amounts[i];
             }
         }
     }
 
     function _alchemist() private pure returns(address) {
         return address(0x1A811678eEEDF16a1D0dF4b12e290F78a61A28F9);
+    }
+
+    function beginOfDay(uint128 timestamp) private view returns(uint128) {
+        uint128 origin = IMiningOracle(address(this)).origin();
+        return timestamp - (timestamp - origin) % 86400; // daily
     }
 }

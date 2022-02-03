@@ -38,7 +38,7 @@ contract MortgageFacet is
             abi.decode(args, (address, address, address, uint));
         IERC1155Rewardable nftContract = IERC1155Rewardable(nft);
         s.nft = nftContract;
-        s.income = IERC20(nftContract.getRewardToken());
+        s.income = IERC20(nftContract.earningToken());
         s.payment = IERC20(payment);
         s.payee = payee;
         s.tokenCost = tokenCost;
