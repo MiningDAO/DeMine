@@ -15,20 +15,20 @@ const config = {
         process.env.CUSTODIAN,
         process.env.ALCHEMIST
     ],
-    contracts: path.resolve(__dirname, './contracts.json'),
+    statePath: path.join(__dirname, './state/'),
     alchemy: {
         matic: process.env.ALCHEMY_MATIC,
         maticdev: process.env.ALCHEMY_MATIC_DEV
     },
+    hashPerToken: {
+        btc: 1000000000,
+    },
     antpool: {
+        api: 'https://antpool.com/api/',
         userId: process.env.ANTPOOL_SIGN_ID,
         key: process.env.ANTPOOL_KEY,
         secret: process.env.ANTPOOL_SECRET,
         feePercent: 0.005,
-        btc: {
-            decimals: 8,
-            unit: 'TH'
-        }
     },
     binance: {
         prod: {
@@ -40,6 +40,16 @@ const config = {
             key: process.env.BINANCE_TEST_KEY,
             secret: process.env.BINANCE_TEST_SECRET,
             api: 'https://testnet.binance.vision'
+        }
+    },
+    scan: {
+        bsc: {
+            api: "https://api.bscscan.com/api",
+            key : process.env.BSC_SCAN_KEY
+        },
+        bscdev: {
+            api: "https://api-testnet.bscscan.com/api",
+            key: process.env.BSC_SCAN_KEY
         }
     },
     wrapped: {

@@ -56,6 +56,12 @@ module.exports = {
             accounts: config.accounts
         }
     },
+    etherscan: {
+        apiKey: {
+            bsc: config.scan.bsc,
+            bscTestnet: config.scan.bscdev
+        }
+    },
     namedAccounts: {
         deployer: {
             default: 0

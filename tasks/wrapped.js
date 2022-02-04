@@ -1,5 +1,6 @@
 const assert = require("assert");
 const common = require("../lib/common.js");
+const state = require("../lib/state.js");
 
 function getWrapped(hre, coin) {
     const contracts = require(hre.localConfig.contracts);
@@ -47,17 +48,20 @@ task("wrapped-clone", "clone wrapped token")
                 decimals: config.decimals
             }
         }, null, 2));
-        const { events } = await common.prompt(async function() {
+        const { events } = receipt = await common.prompt(async function() {
             return await diamond.create(initArgs);
         });
         const { args: [_from, cloned] } = events.find(
             function(e) { return e.event === 'Clone'; }
         );
         console.log('Cloned DeMineERC20 at ' + cloned);
-        common.saveContract(
-            hre, args.coin, 'wrapped', {
-                source: diamond.address,
-                target: cloned
+        state.updateContract(
+            hre, args.coin, {
+                'wrapped': {
+                    source: diamond.address,
+                    target: cloned,
+                    txReceipt: receipt
+                }
             }
         );
         return cloned;

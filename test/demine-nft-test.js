@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const common = require("../lib/common.js");
 const token = require("../lib/token.js");
+const time = require("../lib/time.js");
 const diamond = require("../lib/diamond.js");
 const hre = require("hardhat");
 const address0 = hre.ethers.constants.AddressZero;
@@ -266,21 +267,42 @@ describe("DeMineNFT", function () {
 
         // mint
         const daily = token.genTokenIds('2022-02-02', '2022-12-02', 'daily');
-        expect(daily.length).to.equal(token.days('2022-02-02', '2022-12-02'));
+        const days = function(start, end) {
+            return Math.floor(
+                (
+                    new Date(end).getTime() + 86400000 - new Date(start).getTime()
+                ) / 86400000
+            );
+        };
+        expect(daily.length).to.equal(days('2022-02-02', '2022-12-02'));
         const dailyAmounts = Array(daily.length).fill(100);
         await erc1155.connect(admin).mintBatch(
             custodian.address, token.encode(ethers, daily), dailyAmounts, []
         );
 
         const weekly = token.genTokenIds('2022-02-02', '2022-12-02', 'weekly');
-        expect(weekly.length).to.equal(token.weeks('2022-02-02', '2022-12-02'));
+        const weeks = function(start, end) {
+            return Math.floor(
+                (
+                    new Date(end).getTime() + 86400000- new Date(start).getTime()
+                ) / (86400000 * 7)
+            );
+        };
+        expect(weekly.length).to.equal(weeks('2022-02-02', '2022-12-02'));
         const weeklyAmounts = Array(weekly.length).fill(200);
         await erc1155.connect(admin).mintBatch(
             custodian.address, token.encode(ethers, weekly), weeklyAmounts, []
         );
 
         const biweekly = token.genTokenIds('2022-02-02', '2022-12-02', 'biweekly');
-        expect(biweekly.length).to.equal(token.biweeks('2022-02-02', '2022-12-02'));
+        const biweeks = function(start, end) {
+            return Math.floor(
+                (
+                    new Date(end).getTime() + 86400000- new Date(start).getTime()
+                ) / (86400000 * 7 * 2)
+            );
+        };
+        expect(biweekly.length).to.equal(biweeks('2022-02-02', '2022-12-02'));
         const biweeklyAmounts = Array(biweekly.length).fill(300);
         await erc1155.connect(admin).mintBatch(
             custodian.address, token.encode(ethers, biweekly), biweeklyAmounts, []
@@ -289,7 +311,7 @@ describe("DeMineNFT", function () {
         // finalize
         const finalize = async function(date, reward) {
             await income.connect(custodian).transfer(nft, 600 * reward);
-            var finalized = token.toEpoch(new Date(date));
+            var finalized = time.toEpoch(new Date(date));
             checkEvent(
                 await erc1155.connect(admin).finalize(finalized, reward),
                 nft,
@@ -301,7 +323,7 @@ describe("DeMineNFT", function () {
 
         await expect(
             erc1155.connect(admin).finalize(
-                token.toEpoch(new Date('2022-02-02T12:00:00Z')),
+                time.toEpoch(new Date('2022-02-02T12:00:00Z')),
                 1
             )
         ).to.be.revertedWith('DeMineNFT: invalid timestamp')
@@ -313,8 +335,7 @@ describe("DeMineNFT", function () {
 
         await expect(
             erc1155.connect(admin).finalize(
-                token.toEpoch(new Date('2022-02-02')),
-                1
+                time.toEpoch(new Date('2022-02-02')), 1
             )
         ).to.be.revertedWith('DeMineNFT: invalid timestamp')
 
