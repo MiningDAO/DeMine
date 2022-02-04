@@ -17,15 +17,6 @@ function binanceConfig(localConfig, network) {
         : localConfig.binance.test;
 }
 
-task('nft-test', 'Deploy clone of demine nft')
-    .addParam('coin', 'Coin to deploy')
-    .setAction(async (args, { localConfig } = hre) => {
-        common.print(await antpool.statsYesterday(
-            localConfig.antpool,
-            args.coin
-        ));
-    });
-
 task('nft-clone', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
@@ -445,19 +436,3 @@ task('nft-inspect', 'Inspect state of DeMineNFT contract')
             }
         }, undefined, 2));
     });
-
-async function genERC1155FacetCut(hre) {
-    return await diamond.genFacetCut(hre, 'ERC1155Facet', [
-        ['IERC1155', [
-            'balanceOf',
-            'balanceOfBatch',
-            'isApprovedForAll',
-            'setApprovalForAll',
-            'safeTransferFrom',
-            'safeBatchTransferFrom',
-        ]],
-        ['IERC1155Metadata', ['uri']],
-        ['IERC2981', ['royaltyInfo']],
-        ['ERC1155Facet', ['mintBatch', 'burnBatch', 'setURI', 'setRoyaltyInfo']]
-    ]);
-}
