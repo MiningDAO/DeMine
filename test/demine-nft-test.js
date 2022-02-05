@@ -11,6 +11,12 @@ async function facetAddress(name) {
     return facet.address;
 }
 
+function genTokenIds(startDate, endDate, type) {
+    start = time.toEpoch(new Date(startDate));
+    end = time.toEpoch(new Date(endDate)) + 86400;
+    return token.genTokenIds(start, end, type)
+}
+
 async function cloneWrapped(coin) {
     const { admin } = await hre.ethers.getNamedSigners();
     const wrappedConfig = hre.localConfig.wrapped[coin];
@@ -79,23 +85,23 @@ describe("DeMineNFT", function () {
     var nft;
 
     beforeEach(async function() {
-        await hre.deployments.fixture(['DeMineProd', 'DeMineTest']);
+        await hre.deployments.fixture(['DeMineDev']);
         nft = await cloneNFT(coin);
     });
 
     it("TokenId", async function() {
         const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
-        var tokenIds = token.genTokenIds('2022-02-02', '2022-02-05', 'daily');
+        var tokenIds = genTokenIds('2022-02-02', '2022-02-05', 'daily');
         expect(tokenIds.length).to.equal(4);
 
-        tokenIds = token.genTokenIds('2022-02-05', '2022-02-18', 'weekly');
+        tokenIds = genTokenIds('2022-02-05', '2022-02-18', 'weekly');
         expect(tokenIds.length).to.equal(2);
-        tokenIds = token.genTokenIds('2022-02-05', '2022-02-17', 'weekly');
+        tokenIds = genTokenIds('2022-02-05', '2022-02-17', 'weekly');
         expect(tokenIds.length).to.equal(1);
 
-        tokenIds = token.genTokenIds('2022-02-11', '2022-03-09', 'biweekly');
+        tokenIds = genTokenIds('2022-02-11', '2022-03-09', 'biweekly');
         expect(tokenIds.length).to.equal(1);
-        tokenIds = token.genTokenIds('2022-02-11', '2022-03-10', 'biweekly');
+        tokenIds = genTokenIds('2022-02-11', '2022-03-10', 'biweekly');
         expect(tokenIds.length).to.equal(2);
     });
 
@@ -117,7 +123,7 @@ describe("DeMineNFT", function () {
         expect(await main.paused()).to.be.true;
 
         // mint not paused
-        var tokenIds = token.genTokenIds('2022-02-12', '2022-02-13', 'daily')
+        var tokenIds = genTokenIds('2022-02-12', '2022-02-13', 'daily')
         var encoded = token.encode(ethers, tokenIds);
         await erc1155.connect(deployer).mintBatch(
             custodian.address, encoded, [50, 50], []
@@ -129,8 +135,9 @@ describe("DeMineNFT", function () {
         ).safeBatchTransferFrom(
             custodian.address, admin.address, encoded, [49, 49], []
         );
+
         // transfer to alchemist paused
-        await erc1155.connect(deployer).finalize(tokenIds[1].end, 0),
+        await erc1155.connect(deployer).finalize(tokenIds[1].endTs, 0),
         await expect(
             erc1155.connect(
                 custodian
@@ -266,7 +273,7 @@ describe("DeMineNFT", function () {
         await income.connect(custodian).approve(nft, 10000000);
 
         // mint
-        const daily = token.genTokenIds('2022-02-02', '2022-12-02', 'daily');
+        const daily = genTokenIds('2022-02-02', '2022-12-02', 'daily');
         const days = function(start, end) {
             return Math.floor(
                 (
@@ -280,7 +287,7 @@ describe("DeMineNFT", function () {
             custodian.address, token.encode(ethers, daily), dailyAmounts, []
         );
 
-        const weekly = token.genTokenIds('2022-02-02', '2022-12-02', 'weekly');
+        const weekly = genTokenIds('2022-02-02', '2022-12-02', 'weekly');
         const weeks = function(start, end) {
             return Math.floor(
                 (
@@ -294,7 +301,7 @@ describe("DeMineNFT", function () {
             custodian.address, token.encode(ethers, weekly), weeklyAmounts, []
         );
 
-        const biweekly = token.genTokenIds('2022-02-02', '2022-12-02', 'biweekly');
+        const biweekly = genTokenIds('2022-02-02', '2022-12-02', 'biweekly');
         const biweeks = function(start, end) {
             return Math.floor(
                 (
@@ -328,11 +335,13 @@ describe("DeMineNFT", function () {
             )
         ).to.be.revertedWith('DeMineNFT: invalid timestamp')
 
+        const earning = async function(id) {
+            return await erc1155.earning(token.encodeOne(ethers, id));
+        }
         await finalize('2022-02-03', 1);
-        expect(await erc1155.earning(token.encodeOne(ethers, daily[0]))).to.equal(1);
-        expect(await erc1155.earning(token.encodeOne(ethers, weekly[0]))).to.equal(1);
-        expect(await erc1155.earning(token.encodeOne(ethers, biweekly[0]))).to.equal(1);
-
+        expect(await earning(daily[0])).to.equal(1);
+        expect(await earning(weekly[0])).to.equal(1);
+        expect(await earning(biweekly[0])).to.equal(1);
         await expect(
             erc1155.connect(admin).finalize(
                 time.toEpoch(new Date('2022-02-02')), 1
@@ -340,42 +349,34 @@ describe("DeMineNFT", function () {
         ).to.be.revertedWith('DeMineNFT: invalid timestamp')
 
         await finalize('2022-02-09', 2);
-        expect(await erc1155.earning(token.encodeOne(ethers, daily[0]))).to.equal(1);
-        expect(await erc1155.earning(token.encodeOne(ethers, daily[6]))).to.equal(2);
-
-        expect(await erc1155.earning(token.encodeOne(ethers, weekly[0]))).to.equal(3);
-        expect(await erc1155.earning(token.encodeOne(ethers, weekly[1]))).to.equal(0);
-
-        expect(await erc1155.earning(token.encodeOne(ethers, biweekly[0]))).to.equal(3);
+        expect(await earning(daily[0])).to.equal(1);
+        expect(await earning(daily[6])).to.equal(2);
+        expect(await earning(weekly[0])).to.equal(3);
+        expect(await earning(weekly[1])).to.equal(0);
+        expect(await earning(biweekly[0])).to.equal(3);
 
         await finalize('2022-02-10', 3);
-        expect(await erc1155.earning(token.encodeOne(ethers, daily[6]))).to.equal(2);
-        expect(await erc1155.earning(token.encodeOne(ethers, daily[7]))).to.equal(3);
-
-        expect(await erc1155.earning(token.encodeOne(ethers, weekly[0]))).to.equal(3);
-        expect(await erc1155.earning(token.encodeOne(ethers, weekly[1]))).to.equal(3);
-
-        expect(await erc1155.earning(token.encodeOne(ethers, biweekly[0]))).to.equal(6);
+        expect(await earning(daily[6])).to.equal(2);
+        expect(await earning(daily[7])).to.equal(3);
+        expect(await earning(weekly[0])).to.equal(3);
+        expect(await earning(weekly[1])).to.equal(3);
+        expect(await earning(biweekly[0])).to.equal(6);
 
         await finalize('2022-02-16', 4);
-        expect(await erc1155.earning(token.encodeOne(ethers, daily[7]))).to.equal(3);
-        expect(await erc1155.earning(token.encodeOne(ethers, daily[13]))).to.equal(4);
-
-        expect(await erc1155.earning(token.encodeOne(ethers, weekly[1]))).to.equal(7);
-        expect(await erc1155.earning(token.encodeOne(ethers, weekly[2]))).to.equal(0);
-
-        expect(await erc1155.earning(token.encodeOne(ethers, biweekly[0]))).to.equal(10);
-        expect(await erc1155.earning(token.encodeOne(ethers, biweekly[1]))).to.equal(0);
+        expect(await earning(daily[7])).to.equal(3);
+        expect(await earning(daily[13])).to.equal(4);
+        expect(await earning(weekly[1])).to.equal(7);
+        expect(await earning(weekly[2])).to.equal(0);
+        expect(await earning(biweekly[0])).to.equal(10);
+        expect(await earning(biweekly[1])).to.equal(0);
 
         await finalize('2022-02-17', 5);
-        expect(await erc1155.earning(token.encodeOne(ethers, daily[13]))).to.equal(4);
-        expect(await erc1155.earning(token.encodeOne(ethers, daily[14]))).to.equal(5);
-
-        expect(await erc1155.earning(token.encodeOne(ethers, weekly[1]))).to.equal(7);
-        expect(await erc1155.earning(token.encodeOne(ethers, weekly[2]))).to.equal(5);
-
-        expect(await erc1155.earning(token.encodeOne(ethers, biweekly[0]))).to.equal(10);
-        expect(await erc1155.earning(token.encodeOne(ethers, biweekly[1]))).to.equal(5);
+        expect(await earning(daily[13])).to.equal(4);
+        expect(await earning(daily[14])).to.equal(5);
+        expect(await earning(weekly[1])).to.equal(7);
+        expect(await earning(weekly[2])).to.equal(5);
+        expect(await earning(biweekly[0])).to.equal(10);
+        expect(await earning(biweekly[1])).to.equal(5);
 
         // alchemize
         const alchemist = await erc1155.alchemist();
@@ -421,21 +422,14 @@ describe("DeMineNFT", function () {
             'Alchemy',
             [custodian.address, 2900]
         );
+        const balanceOf = async function(address, id) {
+            return await erc1155.balanceOf(address, token.encodeOne(ethers, id));
+        };
         expect(await income.balanceOf(nft)).to.equal(6100);
-        expect(
-            await erc1155.balanceOf(custodian.address, token.encodeOne(ethers, daily[13]))
-        ).to.equal(0);
-         expect(
-            await erc1155.balanceOf(custodian.address, token.encodeOne(ethers, daily[14]))
-        ).to.equal(0);
-         expect(
-            await erc1155.balanceOf(custodian.address, token.encodeOne(ethers, weekly[0]))
-        ).to.equal(100);
-        expect(
-            await erc1155.balanceOf(custodian.address, token.encodeOne(ethers, weekly[1]))
-        ).to.equal(100);
-        expect(
-            await erc1155.balanceOf(custodian.address, token.encodeOne(ethers, biweekly[0]))
-        ).to.equal(200);
+        expect(await balanceOf(custodian.address, daily[13])).to.equal(0);
+        expect(await balanceOf(custodian.address, daily[14])).to.equal(0);
+        expect(await balanceOf(custodian.address, weekly[0])).to.equal(100);
+        expect(await balanceOf(custodian.address, weekly[1])).to.equal(100);
+        expect(await balanceOf(custodian.address, biweekly[0])).to.equal(200);
     });
 });
