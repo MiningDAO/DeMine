@@ -32,9 +32,6 @@ contract Diamond is
 
     struct InitArgs {
         address owner;
-        bytes4[] selectors;
-        bytes32[] facetsSlotPosition;
-        bytes32[] selectorSlots;
         address fallbackAddress;
         bytes fallbackInitArgs;
         bytes4[] interfaces;
@@ -42,8 +39,8 @@ contract Diamond is
 
     function init(InitArgs calldata args) external initializer {
         OwnableStorage.layout().setOwner(args.owner);
-        DiamondBaseStorage.Layout storage l = DiamondBaseStorage.layout();
 
+        DiamondBaseStorage.Layout storage l = DiamondBaseStorage.layout();
         l.fallbackAddress = args.fallbackAddress;
         (bool success, bytes memory result) = args.fallbackAddress.delegatecall(
             abi.encodeWithSignature(
@@ -52,14 +49,6 @@ contract Diamond is
             )
         );
         require(success, string(result));
-
-        l.selectorCount = uint16(args.selectors.length);
-        for (uint i; i < args.selectors.length; i++) {
-            l.facets[args.selectors[i]] = args.facetsSlotPosition[i];
-        }
-        for (uint i; i < args.selectorSlots.length; i++) {
-            l.selectorSlots[i] = args.selectorSlots[i];
-       }
 
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
         for (uint i; i < args.interfaces.length; i++) {
@@ -77,11 +66,7 @@ contract Diamond is
         return DiamondBaseStorage.layout().fallbackAddress;
     }
 
-    function setFallbackAddress(address fallbackAddress) external {
-        DiamondBaseStorage.layout().fallbackAddress = fallbackAddress;
-    }
-
-    function setSupportedInterface(bytes4 interfaceId, bool supported) external {
+    function setSupportedInterface(bytes4 interfaceId, bool supported) onlyOwner external {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
         erc165.setSupportedInterface(interfaceId, supported);
     }

@@ -21,8 +21,7 @@ async function cloneWrapped(coin) {
     const { admin } = await hre.ethers.getNamedSigners();
     const wrappedConfig = hre.localConfig.wrapped[coin];
     const fallback = await common.getDeployment(hre, 'ERC20Facet');
-    const initArgs = await diamond.genInitArgs(
-        hre,
+    const initArgs = [
         admin.address,
         fallback.address,
         ethers.utils.defaultAbiCoder.encode(
@@ -33,9 +32,14 @@ async function cloneWrapped(coin) {
                 wrappedConfig.decimals
             ]
         ),
-        [],
-        ['@solidstate/contracts/token/ERC20/IERC20.sol:IERC20']
-    );
+        await diamond.genInterfaces(
+            hre,
+            [
+                '@solidstate/contracts/token/ERC20/IERC20.sol:IERC20',
+                '@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol:IERC20Metadata',
+            ]
+        )
+    ];
     const Base = await common.getDeployment(hre, 'Diamond');
     const tx = await Base.create(initArgs);
     const { events: events } = await tx.wait();
@@ -50,17 +54,18 @@ async function cloneNFT(coin) {
     const fallback = await common.getDeployment(hre, 'ERC1155Facet');
     const rewardToken = await cloneWrapped(coin);
     const uri = localConfig.tokenUri[coin];
-    const initArgs = await diamond.genInitArgs(
-        hre,
+    const initArgs = [
         admin.address,
         fallback.address,
         ethers.utils.defaultAbiCoder.encode(
             ["address", "uint8", "address", "string"],
             [custodian.address, 100, rewardToken, uri]
         ),
-        [],
-        ['IERC1155Rewardable', 'IERC1155']
-    );
+        await diamond.genInterfaces(
+            hre,
+            ['IERC1155Rewardable', 'IERC1155', 'IERC1155Metadata']
+        )
+    ];
     const Base = await common.getDeployment(hre, 'Diamond');
     const tx = await Base.create(initArgs);
     const { events: events } = await tx.wait();
@@ -110,22 +115,29 @@ describe("DeMineNFT", function () {
         const main = await hre.ethers.getContractAt('Diamond', nft);
         const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
 
-        // SafeOwnable
-        expect(await main.owner()).to.equal(admin.address);
-        await main.connect(admin).transferOwnership(deployer.address);
-        expect(await main.nomineeOwner()).to.equal(deployer.address);
-        await main.connect(deployer).acceptOwnership();
-        expect(await main.owner()).to.equal(deployer.address);
+        //set fallback address
+        const fallback = await common.getDeployment(hre, 'ERC1155Facet');
+        await expect(
+            await main.connect(custodian).getFallbackAddress()
+        ).to.equal(fallback.address);
 
         // Pausable
         expect(await main.paused()).to.be.false;
-        await main.connect(deployer).pause();
+        await expect(
+            main.connect(custodian).pause()
+        ).to.be.revertedWith('Ownable: sender must be owner');
+        await main.connect(admin).pause();
         expect(await main.paused()).to.be.true;
 
         // mint not paused
         var tokenIds = genTokenIds('2022-02-12', '2022-02-13', 'daily')
         var encoded = token.encode(ethers, tokenIds);
-        await erc1155.connect(deployer).mintBatch(
+        await expect(
+            erc1155.connect(custodian).mintBatch(
+                custodian.address, encoded, [50, 50], []
+            )
+        ).to.be.revertedWith('Ownable: sender must be owner');
+        await erc1155.connect(admin).mintBatch(
             custodian.address, encoded, [50, 50], []
         );
 
@@ -137,7 +149,7 @@ describe("DeMineNFT", function () {
         );
 
         // transfer to alchemist paused
-        await erc1155.connect(deployer).finalize(tokenIds[1].endTs, 0),
+        await erc1155.connect(admin).finalize(tokenIds[1].endTs, 0),
         await expect(
             erc1155.connect(
                 custodian
@@ -150,20 +162,53 @@ describe("DeMineNFT", function () {
             )
         ).to.be.revertedWith("Pausable: paused");
 
-        await main.connect(deployer).unpause();
+        await main.connect(admin).unpause();
         expect(await main.paused()).to.be.false;
+
+        // SafeOwnable
+        expect(await main.owner()).to.equal(admin.address);
+        await main.connect(admin).transferOwnership(deployer.address);
+        expect(await main.nomineeOwner()).to.equal(deployer.address);
+        await main.connect(deployer).acceptOwnership();
+        expect(await main.owner()).to.equal(deployer.address);
     });
 
     it("Diamond", async function () {
-        const { admin } = await hre.ethers.getNamedSigners();
-        const main = await hre.ethers.getContractAt('Diamond', nft);
+        const { admin, custodian } = await hre.ethers.getNamedSigners();
+        const contract = await hre.ethers.getContractAt('IDiamondCuttable', nft);
+
+        // IDiamondCuttable
+        const erc20 = await common.getDeployment(hre, 'ERC20Facet');
+        const facetCut = await diamond.genFacetCut(
+            hre,
+            'ERC20Facet',
+            [
+                [
+                    '@solidstate/contracts/token/ERC20/IERC20.sol:IERC20',
+                    ['transfer', 'allowance', 'approve']
+                ],
+            ]
+        );
+        await expect(
+            contract.connect(custodian).diamondCut(
+                [facetCut], address0, []
+            )
+        ).to.be.revertedWith('Ownable: sender must be owner');
+        await contract.connect(admin).diamondCut([facetCut], address0, []);
 
         // IDiamondLoupe
-        const facets = await main.facets();
-        expect(facets.length).to.be.equal(0);
+        const loupe = await hre.ethers.getContractAt('IDiamondLoupe', nft);
+        const facets = await loupe.facets();
+        expect(facets.length).to.be.equal(1);
 
-        const addresses = await main.facetAddresses();
-        expect(addresses.length).to.be.equal(0);
+        const selectors = await loupe.facetFunctionSelectors(erc20.address);
+        expect(selectors.length).to.be.equal(3);
+
+        const addresses = await loupe.facetAddresses();
+        expect(addresses.length).to.be.equal(1);
+
+        const facetAddress = await loupe.facetAddress(selectors[0]);
+        expect(facetAddress).to.be.equal(erc20.address);
     });
 
     it("IERC1155", async function () {
@@ -232,6 +277,9 @@ describe("DeMineNFT", function () {
         expect(await facet.uri(1)).to.equal(baseUri + '1');
 
         const newBaseUri = 'https://www.tokeninfo.com/token/';
+        await expect(
+            facet.connect(custodian).setURI(newBaseUri)
+        ).to.be.revertedWith('Ownable: sender must be owner');
         await facet.connect(admin).setURI(newBaseUri);
         expect(await facet.uri(1)).to.equal(newBaseUri + '1');
     });
@@ -251,6 +299,19 @@ describe("DeMineNFT", function () {
                 await diamond.genInterface(hre, 'IERC1155Rewardable')
             )
         ).to.be.true;
+
+        const iface = await diamond.genInterface(
+            hre,
+            '@solidstate/contracts/token/ERC20/IERC20.sol:IERC20'
+        );
+
+        expect(await base.supportsInterface(iface)).to.be.false;
+        await expect(
+            base.connect(custodian).setSupportedInterface(iface, true)
+        ).to.be.revertedWith('Ownable: sender must be owner');
+        await base.connect(admin).setSupportedInterface(iface, true);
+
+        expect(await base.supportsInterface(iface)).to.be.true;
     });
 
     it('IERC2981', async function() {
@@ -258,6 +319,9 @@ describe("DeMineNFT", function () {
         const facet = await hre.ethers.getContractAt('ERC1155Facet', nft);
 
         common.compareArray(await facet.royaltyInfo(1, 1000), [custodian.address, 10]);
+        await expect(
+            facet.connect(custodian).setRoyaltyInfo(admin.address, 1000)
+        ).to.be.revertedWith('Ownable: sender must be owner');
         await facet.connect(admin).setRoyaltyInfo(admin.address, 1000);
         common.compareArray(await facet.royaltyInfo(1, 1000), [admin.address, 100]);
     });
