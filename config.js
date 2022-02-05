@@ -24,7 +24,7 @@ const config = {
         bsc: '0x427119f5080320Da94B78BB55d75fb48B708346e'
     },
     hashPerToken: {
-        btc: 1000000000,
+        btc: 1000000000000,
     },
     antpool: {
         api: 'https://antpool.com/api/',

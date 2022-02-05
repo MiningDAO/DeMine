@@ -4,9 +4,8 @@ const diamond = require("../lib/diamond.js");
 const state = require("../lib/state.js");
 
 function getWrapped(hre, coin) {
-    const contracts = require(hre.localConfig.contracts);
-    const wrapped = ((contracts[hre.network.name] || {})[coin] || {}).wrapped || {};
-    assert(wrapped.target, "No contract found");
+    const wrapped = state.tryLoadWrappedClone(hre, coin);
+    assert(wrapped && wrapped.target, "No contract found");
     return wrapped;
 }
 
@@ -99,17 +98,17 @@ task('wrapped-mint', 'mint new nft tokens')
     .addParam('coin', 'wrapped token type, btc/eth/fil')
     .addParam('amount', 'amount to mint', undefined, types.int)
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        const { admin, custodian } = await ethers.getNamedSigners();
+        const { admin } = await ethers.getNamedSigners();
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
 
         const wrapped = getWrapped(hre, args.coin);
         const erc20 = await ethers.getContractAt('ERC20Facet', wrapped.target);
-        const balance = await erc20.balanceOf(custodian.address);
+        const balance = await erc20.balanceOf(admin.address);
         const info = {
             source: wrapped.source,
             contract: wrapped.target,
-            to: custodian.address,
+            to: admin.address,
             currentBalance: balance.toNumber(),
             toMint: args.amount
         };
@@ -117,7 +116,7 @@ task('wrapped-mint', 'mint new nft tokens')
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
             return await erc20.connect(admin).mint(
-                custodian.address, args.amount
+                admin.address, args.amount
             );
         });
     });
