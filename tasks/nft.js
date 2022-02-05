@@ -386,7 +386,7 @@ task('nft-transfer', 'transfer demine nft tokens')
             source: nft.source,
             contract: nft.target,
             from: admin.address,
-            to: to.address,
+            to: to,
             numTokenTypes: ids.length,
             id: ids.map(id => id.startDate.split('T')[0]).join(','),
             amount: amounts.join(',')

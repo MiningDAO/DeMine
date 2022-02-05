@@ -94,6 +94,25 @@ task('wrapped-inspect', 'Inspect state of DeMineERC20 contract')
         return result;
     });
 
+task("wrapped-balance", "check balance")
+    .addParam('coin', 'wrapped token type, btc/eth/fil')
+    .addParam('who', 'address to check')
+    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
+        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
+        common.validateCoin(args.coin);
+        const wrapped = getWrapped(hre, args.coin);
+        const erc20 = await ethers.getContractAt('ERC20Facet', wrapped.target);
+        const balance = await erc20.balanceOf(args.who);
+        common.print({
+            source: wrapped.source,
+            erc20: wrapped.target,
+            account: args.who,
+            balance: balance.toString()
+        });
+        return balance;
+    });
+
+
 task('wrapped-mint', 'mint new nft tokens')
     .addParam('coin', 'wrapped token type, btc/eth/fil')
     .addParam('amount', 'amount to mint', undefined, types.int)
