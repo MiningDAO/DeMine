@@ -20,6 +20,9 @@ const config = {
         matic: process.env.ALCHEMY_MATIC,
         maticdev: process.env.ALCHEMY_MATIC_DEV
     },
+    custodian: {
+        bsc: '0x427119f5080320Da94B78BB55d75fb48B708346e'
+    },
     hashPerToken: {
         btc: 1000000000,
     },

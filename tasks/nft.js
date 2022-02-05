@@ -9,41 +9,43 @@ const token = require("../lib/token.js");
 const antpool = require("../lib/antpool.js");
 const binance = require("../lib/binance.js");
 
-function parsePeriod(period) {
-    const [start, end] = period.split(',');
-    var startTs, endTs;
-    if (time.validateDate(start) && time.validateDate(end)) {
-        startTs = time.toEpoch(new Date(start));
-        endTs = time.toEpoch(new Date(end));
-    } else {
-        startTs = parseInt(start);
-        endTs = parseInt(end);
+function getCustodian(hre) {
+    const custodian = hre.localConfig.custodian[hre.network.name];
+    if (custodian) {
+        return custodian;
     }
-    assert(startTs % 86400 == 0, 'invalid start date, must be 00:00:00 of day');
-    assert(endTs % 86400 == 0, 'invalid start date, must be 00:00:00 of day');
-    return [startTs, endTs];
+    return hre.ethers.getNamedSigners().custodian.address;
 }
 
-function parseTokenIds(args) {
-    const [startTs, endTs] = parsePeriod(args.period);
-    assert(token.validateTokenType(args.type), 'invalid token type');
-    const tokenIds = token.genTokenIds(startTs, endTs, args.type);
+function parseTs(value) {
+    if (time.validateDate(value)) {
+        return time.toEpoch(new Date(value));
+    } else {
+        return parseInt(value);
+    }
+}
+
+function parsePeriod(input) {
+    const [start, end, type] = input.split(',');
+    assert(token.validateTokenType(type), 'invalid token type');
+    const startTs = parseTs(start);
+    const endTs = parseTs(end);
+    assert(startTs % 86400 == 0, 'invalid start date, must be 00:00:00 of day');
+    assert(endTs % 86400 == 0, 'invalid start date, must be 00:00:00 of day');
+    return [startTs, endTs, type];
+}
+
+function parseTokenIds(tokens) {
+    const [startTs, endTs, type] = parsePeriod(tokens);
+    const tokenIds = token.genTokenIds(startTs, endTs, type);
     assert(tokenIds.length > 0, 'No token will be issued');
     return tokenIds;
 }
 
 function parseToken(input) {
-    const [startTs, endTs] = parsePeriod(input);
-    if (endTs - startTs == 86400) {
-        return token.genTokenId(startTs, 'daily');
-    }
-    if (endTs - startTs == 86400 * 7) {
-        return token.genTokenId(startTs, 'weekly');
-    }
-    if (endTs - startTs == 86400 * 14) {
-        return token.genTokenId(startTs, 'biweekly');
-    }
-    throw 'Invalid token input';
+    const [start, type] = input.split(',');
+    const startTs = parseTs(start);
+    return token.genTokenId(startTs, type);
 }
 
 function binanceConfig(localConfig, network) {
@@ -66,7 +68,7 @@ task('nft-clone', 'Deploy clone of demine nft')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
         validateCommon(args, hre);
 
-        const { admin, custodian } = await ethers.getNamedSigners();
+        const { admin } = await ethers.getNamedSigners();
         const base = await common.getDeployment(hre, 'Diamond');
         const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
         const contracts = state.tryLoadContracts(hre, args.coin);
@@ -87,6 +89,7 @@ task('nft-clone', 'Deploy clone of demine nft')
             wrapped
         );
 
+        const custodian = custodian(hre);
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
         const initArgs = await diamond.genInitArgs(
@@ -95,7 +98,7 @@ task('nft-clone', 'Deploy clone of demine nft')
             erc1155Facet.address,
             ethers.utils.defaultAbiCoder.encode(
                 ["address", "uint8", "address", "string"],
-                [custodian.address, royaltyBps, reward.address, uri]
+                [custodian, royaltyBps, reward.address, uri]
             ),
             [],
             ['IERC1155Rewardable', 'IERC1155']
@@ -113,7 +116,7 @@ task('nft-clone', 'Deploy clone of demine nft')
                     symbol: await reward.symbol(),
                     decimals: await reward.decimals()
                 },
-                royaltyRecipient: custodian.address,
+                royaltyRecipient: custodian,
                 royaltyBps: royaltyBps,
                 baseUri: uri
             }
@@ -194,23 +197,22 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
         const toDeposit = ethers.BigNumber.from(tokenValue).mul(supply);
         var deposit = {
             source: 'custodian',
-            balance: await rewardToken.balanceOf(custodian.address), // bignumber
+            toBalance: await rewardToken.balanceOf(nft.target), // bignumber
+            fromBalance: await rewardToken.balanceOf(custodian.address), // bignumber
             amount: toDeposit // bignumber
         }
-        if (deposit.balance.lt(deposit.amount)) {
+        if (deposit.fromBalance.lt(deposit.amount)) {
             const errMsg = "Insufficient custodian balance";
             assert(network.name == 'bsc', 'Error: ' + errMsg);
             logger.warn(errMsg + ", using binance account...");
-            deposit = {
-                source: 'binance',
-                balance: await binance.balanceOf(
-                    binanceConfig(localConfig, network),
-                    args.coin.toUpperCase()
-                ), // float
-                amount: toDeposit.toNumber() / (10 ** decimals()) // float
-            };
+            deposit.source = 'binance';
+            deposit.fromBalance = await binance.balanceOf(
+                binanceConfig(localConfig, network),
+                args.coin.toUpperCase()
+            ); // float
+            deoposit.amount = toDeposit.toNumber() / (10 ** decimals()); // float
             assert(
-                deposit.balance > deposit.amount,
+                deposit.fromBalance > deposit.amount,
                 'Error: insufficient balance at binance account'
             );
         }
@@ -228,7 +230,8 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
             antpool: poolStats,
             deposit: {
                 source: deposit.source,
-                balance: deposit.balance.toString(),
+                fromBalance: deposit.fromBalance.toString(),
+                toBalance: deposit.toBalance.toString(),
                 amount: deposit.amount.toString()
             }
         });
@@ -263,27 +266,34 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
         });
     });
 
+task('nft-init-supply', 'init supply.json and load logs')
+    .addParam('coin', 'Coin of DeMineNFT')
+    .setAction(async (args, { ethers, network, deployments } = hre) => {
+        validateCommon(args, hre);
+        const nft = state.loadNFTClone(hre, args.coin);
+        await state.initSupply(hre, args.coin, nft);
+    });
+
 task('nft-mint', 'mint new demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
-    .addParam('period', 'date range, format: yyyy-MM-dd,yyyy-MM-dd')
-    .addParam('type', 'token type, specify daily, weekly or biweekly')
-    .addParam('supply', 'supply per token', undefined, types.int)
+    .addParam('tokens', 'date range and token type, format: 2022-02-02,2022-02-10,daily')
+    .addParam('amount', 'amount per token', undefined, types.int)
     .addOptionalParam('to', 'recipient of minted tokens')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
         validateCommon(args, hre);
 
-        const tokenIds = parseTokenIds(args);
+        const ids = parseTokenIds(args.tokens);
         const { admin, custodian } = await ethers.getNamedSigners();
         const nft = state.loadNFTClone(hre, args.coin);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
 
         assert(
-            tokenIds[0].start > time.epoch() + 43200,
-            'Choose a different start date'
+            ids[0].startTs > time.epoch() + 43200,
+            `Choose a different start date, it takes time to setup everything!`
         );
         var amounts = [];
-        for (let i = 0; i < tokenIds.length; i++) {
-            amounts.push(args.supply);
+        for (let i = 0; i < ids.length; i++) {
+            amounts.push(args.amount);
         }
 
         const to = args.to || custodian.address;
@@ -291,92 +301,111 @@ task('nft-mint', 'mint new demine nft tokens')
             source: nft.source,
             contract: nft.target,
             to: to,
-            ids: JSON.stringify(tokenIds),
-            amounts: JSON.stringify(amounts)
+            numTokenTypes: ids.length,
+            amountPerToken: args.amount,
+            tokenStartDate: ids.map(id => id.startDate.split('T')[0])
         };
         console.log('Will mint nft with following info:');
         console.log(JSON.stringify(info, null, 2));
-        await common.prompt(async function() {
-            const txReceipt = await erc1155Facet.connect(admin).mintBatch(
-                to, token.encode(ethers, tokenIds), amounts, []
+        const txReceipt = await common.prompt(async function() {
+            return await erc1155Facet.connect(admin).mintBatch(
+                to, token.encode(ethers, ids), amounts, []
             );
-            console.log(txReceipt);
-            state.updateAndSaveSupply(txReceipt);
         });
+        state.updateAndSaveSupply(hre, args.coin, nft, txReceipt);
+    });
+
+task('nft-list-token', 'list tokens')
+    .addParam('coin', 'Coin of DeMineNFT')
+    .addParam('tokens', 'date range and token type, format: 2022-02-02,2022-02-10,daily')
+    .setAction(async (args, { ethers, network, deployments } = hre) => {
+        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
+        common.validateCoin(args.coin);
+        const nft = state.loadNFTClone(hre, args.coin);
+        const ids = parseTokenIds(args.tokens);
+        console.log(JSON.stringify({
+            source: nft.source,
+            contract: nft.target,
+            numTokenTypes: ids.length,
+            id: ids.map(id => id.startDate.split('T')[0]).join(','),
+        }, null, 2));
+        return ids;
     });
 
 task('nft-burn', 'burn demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
-    .addParam('period', 'date range, format: yyyy-MM-dd,yyyy-MM-dd')
-    .addParam('type', 'token type, specify daily, weekly or biweekly')
+    .addParam('tokens', 'date range and token type, format: 2022-02-02,2022-02-10,daily')
     .addParam('amounts', 'amount to burn per token')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
 
-        const tokenIds = parseTokenIds(args);
+        const ids = parseTokenIds(args.tokens);
         const { admin } = await ethers.getNamedSigners();
         const nft = state.loadNFTClone(hre, args.coin);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
 
         assert(
-            tokenIds[0].start > time.epoch() + 86400,
+            ids[0].startTs > time.epoch() + 86400,
             'Too late to burn the first token, choose a different start date'
         );
         const amounts = args.amounts.split(',').map(i => parseInt(i));
-        assert(amounts.length == tokenIds.length, 'amounts array length mismatch');
+        assert(amounts.length == ids.length, 'amounts array length mismatch');
         const info = {
             source: nft.source,
             contract: nft.target,
             from: admin.address,
-            ids: JSON.stringify(tokenIds),
-            amounts: args.amounts
+            numTokenTypes: ids.length,
+            id: ids.map(id => id.startDate.split('T')[0]).join(','),
+            amounts: amounts.join(',')
         };
         console.log('Will burn nft with following info:');
         console.log(JSON.stringify(info, null, 2));
-        await common.prompt(async function() {
-            const txReceipt = await erc1155Facet.connect(admin).burnBatch(
+        const txReceipt = await common.prompt(async function() {
+            return await erc1155Facet.connect(admin).burnBatch(
                 token.encode(ethers, ids),
                 amounts
             );
-            console.log(txReceipt);
-            state.updateAndSaveSupply(txReceipt);
         });
+        state.updateAndSaveSupply(hre, args.coin, nft, txReceipt);
+
     });
 
 task('nft-transfer', 'transfer demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
     .addParam('to', 'address of recipient')
-    .addParam('token', 'token id, format: start,end')
-    .addParam('amount', 'amount to transfer', undefined, types.int)
+    .addParam('tokens', 'date range and token type, format: 2022-02-02,2022-02-10,daily')
+    .addParam('amounts', 'amount to transfer')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
         validateCommon(args, hre);
 
-        const { admin, custodian } = await ethers.getNamedSigners();
-        const id = parseToken(args.token);
+        const { admin } = await ethers.getNamedSigners();
+        const ids = parseTokenIds(args.tokens);
         const to = ethers.utils.getAddress(args.to);
         const nft = state.loadNFTClone(hre, args.coin);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
+        const amounts = args.amounts.split(',').map(i => parseInt(i));
         const info = {
             source: nft.source,
             contract: nft.target,
-            from: custodian.address,
+            from: admin.address,
             to: to.address,
-            id: id,
-            amount: amount
+            numTokenTypes: ids.length,
+            id: ids.map(id => id.startDate.split('T')[0]).join(','),
+            amount: amounts.join(',')
         };
         console.log('Will transfer nft with following info:');
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
-            return await erc1155Facet.connect(custodian).safeBatchTransferFrom(
-                custodian.address, to, token.encodeOne(ethers, id), amount, []
+            return await erc1155Facet.connect(admin).safeBatchTransferFrom(
+                admin.address, to, token.encode(ethers, ids), amounts, []
             );
         });
     });
 
 task('nft-token', 'check earning for token starting with date specified')
     .addParam('coin', 'Coin to check')
-    .addParam('token', 'token id, format: start,end')
+    .addParam('token', 'token id, format: start,type')
     .setAction(async (args, { ethers, network } = hre) => {
         validateCommon(args, hre);
 
@@ -398,7 +427,7 @@ task('nft-token', 'check earning for token starting with date specified')
 task('nft-balance', 'check DeMineNFT balance for user')
     .addParam('coin', 'Coin to check')
     .addParam('who', 'account address')
-    .addParam('token', 'token id, format: start,end')
+    .addParam('token', 'token id, format: start,type')
     .setAction(async (args, { ethers, network }) => {
         validateCommon(args, hre);
 
