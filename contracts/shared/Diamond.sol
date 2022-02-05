@@ -4,7 +4,6 @@ pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/access/SafeOwnable.sol';
-import '@solidstate/contracts/access/SafeOwnable.sol';
 import '@solidstate/contracts/access/IERC173.sol';
 import '@solidstate/contracts/introspection/IERC165.sol';
 import '@solidstate/contracts/introspection/ERC165Storage.sol';

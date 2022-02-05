@@ -2,6 +2,7 @@ require('@nomiclabs/hardhat-waffle');
 require('hardhat-contract-sizer');
 require('hardhat-gas-reporter');
 require('hardhat-deploy');
+require("@nomiclabs/hardhat-etherscan");
 require('hardhat-deploy-ethers');
 require('./tasks/wrapped.js');
 require('./tasks/nft.js');
@@ -58,8 +59,8 @@ module.exports = {
     },
     etherscan: {
         apiKey: {
-            bsc: config.scan.bsc,
-            bscTestnet: config.scan.bscdev
+            bsc: config.scan.bsc.key,
+            bscTestnet: config.scan.bscdev.key
         }
     },
     namedAccounts: {

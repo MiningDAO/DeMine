@@ -89,7 +89,7 @@ task('nft-clone', 'Deploy clone of demine nft')
             wrapped
         );
 
-        const custodian = custodian(hre);
+        const custodian = getCustodian(hre);
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
         const initArgs = await diamond.genInitArgs(
