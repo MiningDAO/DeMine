@@ -8,4 +8,4 @@ module.exports = async ({ ethers, deployments }) => {
     });
 };
 
-module.exports.tags = ['DeMineTest'];
+module.exports.tags = ['DeMineDev'];

@@ -1,5 +1,6 @@
 const assert = require("assert");
 const common = require("../lib/common.js");
+const diamond = require("../lib/diamond.js");
 const state = require("../lib/state.js");
 
 function getWrapped(hre, coin) {
@@ -15,18 +16,22 @@ task("wrapped-clone", "clone wrapped token")
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         args.coin == 'usd' || common.validateCoin(args.coin);
 
-        const diamond = await common.getDeployment(hre, 'Diamond');
-        const contracts = require(localConfig.contracts);
-        const coinConfig = ((contracts[network.name] || {})[args.coin] || {}).wrapped || {};
-        if (coinConfig.target && coinConfig.source == diamond.address) {
+        const { admin } = await ethers.getNamedSigners();
+        const base = await common.getDeployment(hre, 'Diamond');
+        const fallback = await common.getDeployment(hre, 'ERC20Facet');
+        const wrapped = state.tryLoadWrappedClone(hre, args.coin);
+        if (
+            wrapped &&
+            wrapped.target &&
+            wrapped.source == base.address &&
+            wrapped.fallback == fallback.address
+        ) {
             console.log("Nothing changed, skipping");
             return;
         }
 
-        const { admin } = await ethers.getNamedSigners();
         const config = localConfig.wrapped[args.coin];
-        const fallback = await common.getDeployment(hre, 'ERC20Facet');
-        const initArgs = await common.genInitArgs(
+        const initArgs = await diamond.genInitArgs(
             hre,
             admin.address,
             fallback.address,
@@ -37,9 +42,9 @@ task("wrapped-clone", "clone wrapped token")
             [],
             ['@solidstate/contracts/token/ERC20/IERC20.sol:IERC20']
         );
-        console.log('Will clone DeMineERC20 from ' + diamond.address + ' with: ');
+        console.log('Will clone DeMineERC20 from ' + base.address + ' with: ');
         console.log(JSON.stringify({
-            source: diamond.address,
+            source: base.address,
             owner: admin.address,
             fallback: fallback.address,
             fallbackInitArgs: {
@@ -49,7 +54,7 @@ task("wrapped-clone", "clone wrapped token")
             }
         }, null, 2));
         const { events } = receipt = await common.prompt(async function() {
-            return await diamond.create(initArgs);
+            return await base.create(initArgs);
         });
         const { args: [_from, cloned] } = events.find(
             function(e) { return e.event === 'Clone'; }
@@ -58,8 +63,9 @@ task("wrapped-clone", "clone wrapped token")
         state.updateContract(
             hre, args.coin, {
                 'wrapped': {
-                    source: diamond.address,
+                    source: base.address,
                     target: cloned,
+                    fallback: fallback.address,
                     txReceipt: receipt
                 }
             }

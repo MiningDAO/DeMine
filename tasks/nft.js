@@ -3,6 +3,7 @@ const assert = require("assert");
 const common = require("../lib/common.js");
 const time = require("../lib/time.js");
 const state = require("../lib/state.js");
+const diamond = require("../lib/diamond.js");
 const token = require("../lib/token.js");
 const antpool = require("../lib/antpool.js");
 const binance = require("../lib/binance.js");
@@ -23,26 +24,30 @@ task('nft-clone', 'Deploy clone of demine nft')
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
         common.validateCoin(args.coin);
 
-        const diamond = await common.getDeployment(hre, 'Diamond');
-
-        const nft = state.loadNFTClone(hre, args.coin);
-        if (nft && nft.target && nft.source == diamond.address) {
+        const { admin, custodian } = await ethers.getNamedSigners();
+        const base = await common.getDeployment(hre, 'Diamond');
+        const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
+        const contracts = state.tryLoadContracts(hre, args.coin);
+        if (
+            contracts.nft &&
+            contracts.nft.target &&
+            contracts.nft.source == base.address &&
+            contracts.nft.fallback == erc1155Facet.address
+        ) {
             logger.warning("Nothing changed, exiting");
             return;
         }
 
-        const wrapped = (coinConfig.wrapped && coinConfig.wrapped.target)
+        const wrapped = (contracts.wrapped && contracts.wrapped.target)
             || await hre.run('wrapped-clone', { coin: args.coin });
         const reward = await ethers.getContractAt(
             '@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol:IERC20Metadata',
             wrapped
         );
 
-        const { admin, custodian } = await ethers.getNamedSigners();
-        const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
-        const initArgs = await common.genInitArgs(
+        const initArgs = await diamond.genInitArgs(
             hre,
             admin.address,
             erc1155Facet.address,
@@ -53,9 +58,10 @@ task('nft-clone', 'Deploy clone of demine nft')
             [],
             ['IERC1155Rewardable', 'IERC1155']
         );
-        console.log('Will clone DeMineNFT from ' + diamond.address + ' with: ');
+        console.log('Will clone DeMineNFT from ' + base.address + ' with: ');
         console.log(JSON.stringify({
-            source: diamond.address,
+            network: network.name,
+            source: base.address,
             owner: admin.address,
             fallback: erc1155Facet.address,
             fallbackInitArgs: {
@@ -72,7 +78,7 @@ task('nft-clone', 'Deploy clone of demine nft')
         }, null, 2));
 
         const { events } = receipt = await common.prompt(async function() {
-            return await diamond.create(initArgs);
+            return await base.create(initArgs);
         });
         const { args: [from, cloned] } = events.find(
             function(e) { return e.event === 'Clone'; }
@@ -81,9 +87,10 @@ task('nft-clone', 'Deploy clone of demine nft')
         state.updateContract(
             hre, args.coin, {
                 'nft': {
-                    source: diamond.address,
+                    source: base.address,
                     target: cloned,
-                    txReceipt: txReceipt
+                    fallback: erc1155Facet.address,
+                    txReceipt: receipt
                 }
             }
         );
@@ -130,7 +137,7 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
 
         const hashPerToken = localConfig.hashPerToken[args.coin.toLowerCase()];
         const hashrate = poolStats.hashrate / hashPerToken;
-        const supply = state.getAndUpdateSupply(hre, coin, nft, toFinalize);
+        const supply = state.getSupply(hre, coin, nft, toFinalize);
         if (hashrate < supply) {
             const errMsg = "Effective hashrate is lower than token supply!"
             assert(args.enforce, "Error: " + errMsg);
@@ -251,9 +258,11 @@ task('nft-mint', 'mint new demine nft tokens')
         console.log('Will mint nft with following info:');
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
-            return await erc1155Facet.connect(admin).mintBatch(
+            const txReceipt = await erc1155Facet.connect(admin).mintBatch(
                 to, token.encode(ethers, tokenIds), amounts, []
             );
+            console.log(txReceipt);
+            state.updateAndSaveSupply(txReceipt);
         });
     });
 
@@ -292,10 +301,12 @@ task('nft-burn', 'burn demine nft tokens')
         console.log('Will burn nft with following info:');
         console.log(JSON.stringify(info, null, 2));
         await common.prompt(async function() {
-            return await erc1155Facet.connect(admin).burnBatch(
+            const txReceipt = await erc1155Facet.connect(admin).burnBatch(
                 token.encode(ethers, ids),
                 amounts
             );
+            console.log(txReceipt);
+            state.updateAndSaveSupply(txReceipt);
         });
     });
 

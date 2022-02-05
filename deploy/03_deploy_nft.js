@@ -8,4 +8,4 @@ module.exports = async ({ ethers, deployments }) => {
     });
 };
 
-module.exports.tags = ['DeMineNFT', 'DeMineProd'];
+module.exports.tags = ['DeMineNFT', 'DeMineProd', 'DeMineDev'];
