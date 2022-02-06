@@ -3,17 +3,29 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
-import '../interfaces/IERC2981.sol';
-import '../interfaces/IERC1155Rewardable.sol';
-import './Base.sol';
+import '@solidstate/contracts/access/OwnableInternal.sol';
 import '@solidstate/contracts/token/ERC1155/metadata/ERC1155Metadata.sol';
 
+import '../interfaces/IERC2981.sol';
+import '../interfaces/IERC1155Rewardable.sol';
+import '../lib/AppStorage.sol';
+
 abstract contract ERC1155Config is
-    Base,
+    OwnableInternal,
     IERC2981,
     IERC1155Rewardable,
     ERC1155Metadata
 {
+    address constant _alchemist = address(
+        0x1A811678eEEDF16a1D0dF4b12e290F78a61A28F9
+    );
+    address public immutable custodian;
+    AppStorage internal s;
+
+    constructor(address _custodian) {
+        custodian = _custodian;
+    }
+
     event TokenRoyaltyBpsSet(uint16);
 
     function setURI(string memory baseURI) external onlyOwner {
@@ -36,14 +48,10 @@ abstract contract ERC1155Config is
     }
 
     function earningToken() external override view returns(address) {
-        return address(s.earningToken);
+        return s.earningToken;
     }
 
     function alchemist() external override pure returns(address) {
-        return _alchemist();
-    }
-
-    function _alchemist() internal pure returns(address) {
-        return address(0x1A811678eEEDF16a1D0dF4b12e290F78a61A28F9);
+        return _alchemist;
     }
 }

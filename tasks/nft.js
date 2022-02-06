@@ -92,17 +92,18 @@ task('nft-clone', 'Deploy clone of demine nft')
         const custodian = getCustodian(hre);
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
-        const initArgs = await diamond.genInitArgs(
-            hre,
+        const initArgs = [
             admin.address,
             erc1155Facet.address,
             ethers.utils.defaultAbiCoder.encode(
                 ["address", "uint8", "address", "string"],
                 [custodian, royaltyBps, reward.address, uri]
             ),
-            [],
-            ['IERC1155Rewardable', 'IERC1155']
-        );
+            await diamond.genInterfaces(
+                hre,
+                ['IERC1155Rewardable', 'IERC1155', 'IERC1155Metadata']
+            )
+        ];
         console.log('Will clone DeMineNFT from ' + base.address + ' with: ');
         console.log(JSON.stringify({
             network: network.name,
@@ -278,12 +279,11 @@ task('nft-mint', 'mint new demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
     .addParam('tokens', 'date range and token type, format: 2022-02-02,2022-02-10,daily')
     .addParam('amount', 'amount per token', undefined, types.int)
-    .addOptionalParam('to', 'recipient of minted tokens')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
         validateCommon(args, hre);
 
         const ids = parseTokenIds(args.tokens);
-        const { admin, custodian } = await ethers.getNamedSigners();
+        const { admin } = await ethers.getNamedSigners();
         const nft = state.loadNFTClone(hre, args.coin);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
 
@@ -292,23 +292,20 @@ task('nft-mint', 'mint new demine nft tokens')
             amounts.push(args.amount);
         }
 
-        const to = args.to || custodian.address;
         const info = {
             source: nft.source,
             contract: nft.target,
-            to: to,
             numTokenTypes: ids.length,
             amountPerToken: args.amount,
             tokenStartDate: ids.map(id => id.startDate.split('T')[0])
         };
         console.log('Will mint nft with following info:');
         console.log(JSON.stringify(info, null, 2));
-        const txReceipt = await common.prompt(async function() {
-            return await erc1155Facet.connect(admin).mintBatch(
-                to, token.encode(ethers, ids), amounts, []
+        await common.prompt(async function() {
+            return await erc1155Facet.connect(admin).mint(
+                token.encode(ethers, ids), amounts, []
             );
         });
-        state.updateAndSaveSupply(hre, args.coin, nft, txReceipt);
     });
 
 task('nft-list-token', 'list tokens')
@@ -358,14 +355,12 @@ task('nft-burn', 'burn demine nft tokens')
         };
         console.log('Will burn nft with following info:');
         console.log(JSON.stringify(info, null, 2));
-        const txReceipt = await common.prompt(async function() {
+        await common.prompt(async function() {
             return await erc1155Facet.connect(admin).burnBatch(
                 token.encode(ethers, ids),
                 amounts
             );
         });
-        state.updateAndSaveSupply(hre, args.coin, nft, txReceipt);
-
     });
 
 task('nft-transfer', 'transfer demine nft tokens')
@@ -410,12 +405,13 @@ task('nft-token', 'check earning for token starting with date specified')
         const nft = state.loadNFTClone(hre, args.coin);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
         const finalized = (await erc1155Facet.finalized()).toNumber();
-        const result = await erc1155Facet.earning(token.encodeOne(ethers, id));
+        const earning = await erc1155Facet.earning(token.encodeOne(ethers, id));
+        const supply = await erc1155Facet.supplyOf(token.encodeOne(ethers, id));
         console.log(JSON.stringify({
             token: id,
             contract: nft.target,
             earning: result.toString(),
-            supply: state.getSupply(hre, args.coin, nft, id.start).toString(),
+            supply: supply.toString(),
             lastestFinalized: finalized
         }, null, 2));
         return result;

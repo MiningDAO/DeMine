@@ -12,46 +12,78 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../shared/lib/DiamondFallback.sol';
 import '../../shared/lib/LibPausable.sol';
-import './MiningOracle.sol';
 import './ERC1155Config.sol';
 
 contract ERC1155Facet is
     DiamondFallback,
     ERC1155Base,
-    MiningOracle,
     ERC1155Config,
     ERC165
 {
     using SafeERC20 for IERC20;
 
+    event Finalize(uint128 indexed, uint);
     event Alchemy(address indexed account, uint totalEarning);
 
     function init(bytes memory args) internal override onlyInitializing {
         (
-            address recipient,
             uint16 bps,
-            address earningTokenAdd,
+            address _earningToken,
             string memory uri
-        ) = abi.decode(args, (address, uint16, address, string));
-        s.royalty = RoyaltyInfo(recipient, bps);
-        s.earningToken = IERC20(earningTokenAdd);
+        ) = abi.decode(args, (uint16, address, string));
+        s.royalty = RoyaltyInfo(custodian, bps);
+        s.earningToken = _earningToken;
         _setBaseURI(uri);
     }
 
-    function mintBatch(
-        address account,
+    constructor(address custodian) ERC1155Config(custodian) {}
+
+    function mint(
         uint[] calldata ids,
         uint[] calldata amounts,
         bytes memory data
     ) external onlyOwner {
-        _safeMintBatch(account, ids, amounts, data);
+        _safeMintBatch(custodian, ids, amounts, data);
     }
 
-    function burnBatch(
-        uint[] calldata ids,
-        uint[] calldata amounts
+    function finalize(
+        uint128 endOfDay,
+        uint earningPerToken
     ) external onlyOwner {
-        _burnBatch(msg.sender, ids, amounts);
+        require(
+            endOfDay > s.finalized && endOfDay % 86400 == 0,
+            'DeMineNFT: invalid timestamp'
+        );
+        s.finalized = endOfDay;
+        s.daily[endOfDay] = earningPerToken;
+        for(uint128 i = 0; i < 7; i++) {
+            s.weekly[endOfDay + i * 86400] += earningPerToken;
+        }
+        emit Finalize(endOfDay, earningPerToken);
+    }
+
+    function finalized() external view returns(uint128) {
+        return s.finalized;
+    }
+
+    function earning(uint tokenId) external view returns(uint) {
+        uint128 start = uint128(tokenId >> 128);
+        uint128 end = uint128(tokenId);
+        return _earning(start, end);
+    }
+
+    function supplyOf(uint id) external view returns(uint) {
+        return s.supply[id];
+    }
+
+    function supplyOfBatch(
+        uint[] calldata ids
+    ) external view returns(uint[] memory) {
+        uint[] memory res = new uint[](ids.length);
+        for (uint i = 0; i < ids.length; i++) {
+            res[i] = s.supply[ids[i]];
+        }
+        return res;
     }
 
     function _beforeTokenTransfer(
@@ -63,24 +95,50 @@ contract ERC1155Facet is
         bytes memory data
     ) internal virtual override(ERC1155BaseInternal) {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
-        address alchemist = _alchemist();
-        require(from != alchemist, 'DeMineNFT: from alchemist');
+        require(from != _alchemist, 'DeMineNFT: from alchemist');
         // alchemize
-        if (to == alchemist) {
+        if (to == _alchemist) {
+            require(from != custodian, 'DeMineNFT: from custodian');
             require(!LibPausable.layout().paused, 'Pausable: paused');
             uint totalEarning;
-            uint finalized = s.finalized;
+            uint lastFinalized = s.finalized;
             for (uint i; i < ids.length; i++) {
                 (uint128 start, uint128 end) = decode(ids[i]);
-                require(end <= finalized, 'DeMineNFT: token not finalized yet');
+                require(end <= lastFinalized, 'DeMineNFT: token not finalized yet');
                 totalEarning += amounts[i] * _earning(start, end);
             }
-            s.earningToken.safeTransfer(from, totalEarning);
+            IERC20(s.earningToken).safeTransfer(from, totalEarning);
             emit Alchemy(from, totalEarning);
+        }
+        if (from == address(0)) {
+            require(
+                to == custodian,
+                'DeMineNFT: you can only mint to custodian'
+            );
+            for (uint i = 0; i < ids.length; i++) {
+                s.supply[ids[i]] += amounts[i];
+            }
         }
     }
 
     function decode(uint tokenId) private pure returns(uint128, uint128) {
         return (uint128(tokenId >> 128), uint128(tokenId));
+    }
+
+    function _earning(uint128 start, uint128 end)
+        private
+        view
+        returns(uint value)
+    {
+        // daily token
+        if (end - start == 86400) {
+            value = s.daily[end];
+        // weekly token
+        } else if (end - start == 604800) {
+            value = s.weekly[end];
+        // biweekly token
+        } else if (end - start == 1209600) {
+            value = s.weekly[end] + s.weekly[end - 604800];
+        }
     }
 }
