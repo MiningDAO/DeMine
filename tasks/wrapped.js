@@ -52,9 +52,11 @@ task("wrapped-clone", "clone wrapped token")
                 decimals: config.decimals
             }
         }, null, 2));
-        const { events } = receipt = await common.prompt(async function() {
-            return await base.create(initArgs);
-        });
+        const { events } = receipt = await common.run(
+            async function() {
+                return await base.create(initArgs);
+            }
+        );
         const { args: [_from, cloned] } = events.find(
             function(e) { return e.event === 'Clone'; }
         );
@@ -133,7 +135,7 @@ task('wrapped-mint', 'mint new nft tokens')
         };
         console.log('Will mint wrapped coin ' + args.coin + ' with following info:');
         console.log(JSON.stringify(info, null, 2));
-        await common.prompt(async function() {
+        await common.run(async function() {
             return await erc20.connect(admin).mint(
                 admin.address, args.amount
             );
@@ -161,7 +163,7 @@ task('wrapped-burn', 'burn wrapped tokens')
         };
         console.log('Will burn wrapped coin ' + args.coin + ' with following info:');
         console.log(JSON.stringify(info, null, 2));
-        await common.prompt(async function() {
+        await common.run(async function() {
             return await erc20.connect(admin).burn(args.amount);
         });
     });

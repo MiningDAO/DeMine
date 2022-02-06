@@ -75,30 +75,28 @@ task('nft-clone', 'Deploy clone of demine nft')
             return;
         }
 
-        const wrapped = (contracts.wrapped && contracts.wrapped.target)
+        const wrapped = localConfig.wrapped[network.name][args.coin.toLowerCase()]
+            || (contracts.wrapped && contracts.wrapped.target)
             || await hre.run('wrapped-clone', { coin: args.coin });
         const reward = await ethers.getContractAt(
             '@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol:IERC20Metadata',
             wrapped
         );
 
-        const custodian = config.custodian(hre);
+        const custodian = await config.custodian(hre);
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
         const initArgs = [
             admin.address,
             erc1155Facet.address,
-            ethers.utils.defaultAbiCoder.encode(
-                ["address", "uint8", "address", "string"],
-                [custodian, royaltyBps, reward.address, uri]
-            ),
+            ethers.utils.defaultAbiCoder.encode(["address"], [reward.address]),
             await diamond.genInterfaces(
                 hre,
                 ['IERC1155Rewardable', 'IERC1155', 'IERC1155Metadata']
             )
         ];
-        console.log('Will clone DeMineNFT from ' + base.address + ' with: ');
-        console.log(JSON.stringify({
+        logger.info('Cloning DeMineNFT');
+        common.print({
             network: network.name,
             source: base.address,
             owner: admin.address,
@@ -114,11 +112,12 @@ task('nft-clone', 'Deploy clone of demine nft')
                 royaltyBps: royaltyBps,
                 baseUri: uri
             }
-        }, null, 2));
-
-        const { events } = receipt = await common.prompt(async function() {
-            return await base.create(initArgs);
         });
+        const { events } = receipt = await common.run(
+            async function() {
+                return await base.create(initArgs);
+            }
+        );
         const { args: [from, cloned] } = events.find(
             function(e) { return e.event === 'Clone'; }
         );
@@ -232,14 +231,14 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
 
         console.log("Step 1: Deposit");
         if (deposit.source == 'admin' && deposit.amount.gt(0)) {
-            await common.prompt(async function() {
+            await common.run(async function() {
                 return await rewardToken.connect(admin).transfer(
                     nft.target,
                     deposit.amount
                 );
             });
         } else if (deposit.source == 'binance' && deposit > 0) {
-            await common.prompt(async function() {
+            await common.run(async function() {
                 return await binance.withdraw(
                     binanceConfig(localConfig, network),
                     {
@@ -255,8 +254,10 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
         }
 
         console.log("Step 2: Finalize");
-        await common.prompt(async function() {
-            return await erc1155Facet.connect(admin).finalize(finalizing, tokenValue);
+        await common.run(async function() {
+            return await erc1155Facet.connect(
+                admin
+            ).finalize(finalizing, tokenValue);
         });
     });
 
@@ -294,7 +295,7 @@ task('nft-mint', 'mint new demine nft tokens')
         };
         console.log('Will mint nft with following info:');
         console.log(JSON.stringify(info, null, 2));
-        await common.prompt(async function() {
+        await common.run(async function() {
             return await erc1155Facet.connect(admin).mint(
                 token.encode(ethers, ids), amounts, []
             );
@@ -348,7 +349,7 @@ task('nft-burn', 'burn demine nft tokens')
         };
         console.log('Will burn nft with following info:');
         console.log(JSON.stringify(info, null, 2));
-        await common.prompt(async function() {
+        await common.run(async function() {
             return await erc1155Facet.connect(admin).burnBatch(
                 token.encode(ethers, ids),
                 amounts
@@ -381,7 +382,7 @@ task('nft-transfer', 'transfer demine nft tokens')
         };
         console.log('Will transfer nft with following info:');
         console.log(JSON.stringify(info, null, 2));
-        await common.prompt(async function() {
+        await common.run(async function() {
             return await erc1155Facet.connect(admin).safeBatchTransferFrom(
                 admin.address, to, token.encode(ethers, ids), amounts, []
             );
@@ -479,7 +480,7 @@ task('nft-inspect', 'Inspect state of DeMineNFT contract')
             balance: (await reward.balanceOf(nft.target)).toString()
         };
         logger.info('Generating summary...');
-        console.log(JSON.stringify({
+        common.print({
             source: nft.source,
             address: nft.target,
             ownership,
@@ -491,5 +492,5 @@ task('nft-inspect', 'Inspect state of DeMineNFT contract')
                 recipient: royaltyInfo[0],
                 bps: royaltyInfo[1].toNumber(),
             }
-        }, undefined, 2));
+        });
     });

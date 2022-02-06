@@ -57,10 +57,7 @@ async function cloneNFT(coin) {
     const initArgs = [
         admin.address,
         fallback.address,
-        ethers.utils.defaultAbiCoder.encode(
-            ["address", "uint8", "address", "string"],
-            [custodian.address, 100, rewardToken, uri]
-        ),
+        ethers.utils.defaultAbiCoder.encode(["address"], [rewardToken]),
         await diamond.genInterfaces(
             hre,
             ['IERC1155Rewardable', 'IERC1155', 'IERC1155Metadata']

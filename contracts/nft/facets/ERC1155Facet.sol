@@ -25,10 +25,10 @@ contract ERC1155Facet is
     event Finalize(uint128 indexed, uint);
     event Alchemy(address indexed account, uint totalEarning);
 
-    function init(bytes memory args) internal override onlyInitializing {
+    function init(bytes memory args) internal override {
         (address _earningToken) = abi.decode(args, (address));
-        s.royalty = RoyaltyInfo(custodian, 100);
         s.earningToken = _earningToken;
+        s.royalty = RoyaltyInfo(custodian, 100);
     }
 
     constructor(address custodian) ERC1155Config(custodian) {}
