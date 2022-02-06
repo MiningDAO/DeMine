@@ -26,14 +26,9 @@ contract ERC1155Facet is
     event Alchemy(address indexed account, uint totalEarning);
 
     function init(bytes memory args) internal override onlyInitializing {
-        (
-            uint16 bps,
-            address _earningToken,
-            string memory uri
-        ) = abi.decode(args, (uint16, address, string));
-        s.royalty = RoyaltyInfo(custodian, bps);
+        (address _earningToken) = abi.decode(args, (address));
+        s.royalty = RoyaltyInfo(custodian, 100);
         s.earningToken = _earningToken;
-        _setBaseURI(uri);
     }
 
     constructor(address custodian) ERC1155Config(custodian) {}
@@ -48,18 +43,24 @@ contract ERC1155Facet is
 
     function finalize(
         uint128 endOfDay,
-        uint earningPerToken
+        uint earningPerTPerDay,
+        uint effectiveHashratePerDay
     ) external onlyOwner {
         require(
             endOfDay > s.finalized && endOfDay % 86400 == 0,
             'DeMineNFT: invalid timestamp'
         );
         s.finalized = endOfDay;
-        s.daily[endOfDay] = earningPerToken;
+        s.daily[endOfDay] = earningPerTPerDay;
         for(uint128 i = 0; i < 7; i++) {
-            s.weekly[endOfDay + i * 86400] += earningPerToken;
+            s.weekly[endOfDay + i * 86400] += earningPerTPerDay;
         }
-        emit Finalize(endOfDay, earningPerToken);
+        IERC20(s.earningToken).safeTransferFrom(
+            custodian,
+            address(this),
+            effectiveHashratePerDay * earningPerTPerDay
+        );
+        emit Finalize(endOfDay, earningPerTPerDay);
     }
 
     function finalized() external view returns(uint128) {

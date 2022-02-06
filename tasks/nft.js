@@ -6,16 +6,9 @@ const time = require("../lib/time.js");
 const state = require("../lib/state.js");
 const diamond = require("../lib/diamond.js");
 const token = require("../lib/token.js");
+const config = require("../lib/config.js");
 const antpool = require("../lib/antpool.js");
 const binance = require("../lib/binance.js");
-
-function getCustodian(hre) {
-    const custodian = hre.localConfig.custodian[hre.network.name];
-    if (custodian) {
-        return custodian;
-    }
-    return hre.ethers.getNamedSigners().custodian.address;
-}
 
 function parseTs(value) {
     if (time.validateDate(value)) {
@@ -60,7 +53,7 @@ function binanceConfig(localConfig, network) {
 
 function validateCommon(args, hre) {
     assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-    common.validateCoin(args.coin);
+    config.validateCoin(args.coin);
 }
 
 task('nft-clone', 'Deploy clone of demine nft')
@@ -69,8 +62,8 @@ task('nft-clone', 'Deploy clone of demine nft')
         validateCommon(args, hre);
 
         const { admin } = await ethers.getNamedSigners();
-        const base = await common.getDeployment(hre, 'Diamond');
-        const erc1155Facet = await common.getDeployment(hre, 'ERC1155Facet');
+        const base = await config.getDeployment(hre, 'Diamond');
+        const erc1155Facet = await config.getDeployment(hre, 'ERC1155Facet');
         const contracts = state.tryLoadContracts(hre, args.coin);
         if (
             contracts.nft &&
@@ -89,7 +82,7 @@ task('nft-clone', 'Deploy clone of demine nft')
             wrapped
         );
 
-        const custodian = getCustodian(hre);
+        const custodian = config.custodian(hre);
         const royaltyBps = 100;
         const uri = localConfig.tokenUri[args.coin];
         const initArgs = [
@@ -197,9 +190,9 @@ task('nft-finalize', 'finalize cycle for DeMineNFT contract')
         const tokenValue = Math.floor(canonicalizedTotalEarned / hashrate);
         const toDeposit = ethers.BigNumber.from(tokenValue).mul(supply);
         var deposit = {
-            source: 'admin',
+            source: 'custodian',
             toBalance: await rewardToken.balanceOf(nft.target), // bignumber
-            fromBalance: await rewardToken.balanceOf(admin.address), // bignumber
+            fromBalance: await rewardToken.balanceOf(custodian), // bignumber
             amount: toDeposit // bignumber
         }
         if (deposit.fromBalance.lt(deposit.amount)) {
