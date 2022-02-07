@@ -77,7 +77,7 @@ abstract contract ERC1155Config is
     }
 
     function _earning(uint128 start, uint128 end)
-        private
+        internal
         view
         returns(uint value)
     {

@@ -31,7 +31,7 @@ task('abi', 'Prints abi of contract')
     });
 
 module.exports = {
-    solidity: '0.8.4',
+    solidity: '0.8.11',
     networks: {
         matic: {
             live: true,

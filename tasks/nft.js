@@ -93,7 +93,7 @@ task('nft-clone', 'Deploy clone of demine nft')
         });
         if (admin.signer) {
             await common.run(hre, async function() {
-                await custodian.connect(
+                return await custodian.connect(
                     admin.signer
                 ).custody(cloned, admin.address, true)
             });
