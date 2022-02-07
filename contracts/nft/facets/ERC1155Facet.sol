@@ -10,25 +10,24 @@ import '@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol';
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import '../../shared/lib/DiamondFallback.sol';
 import '../../shared/lib/LibPausable.sol';
+import '../../shared/lib/LibInitializable.sol';
 import './ERC1155Config.sol';
 
 contract ERC1155Facet is
-    DiamondFallback,
+    Initializable,
     ERC1155Base,
     ERC1155Config,
     ERC165
 {
     using SafeERC20 for IERC20;
 
-    event Finalize(uint128 indexed, uint);
+    event Finalize(uint128 indexed, uint indexed);
     event Alchemy(address indexed account, uint totalEarning);
 
-    function init(bytes memory args) internal override {
-        (address _earningToken) = abi.decode(args, (address));
+    function init(address _earningToken) external onlyInitializing {
         s.earningToken = _earningToken;
-        s.royalty = RoyaltyInfo(custodian, 100);
+        s.royalty = RoyaltyInfo(owner(), 100);
     }
 
     constructor(address custodian) ERC1155Config(custodian) {}
@@ -63,28 +62,10 @@ contract ERC1155Facet is
         emit Finalize(endOfDay, earningPerTPerDay);
     }
 
-    function finalized() external view returns(uint128) {
-        return s.finalized;
-    }
-
     function earning(uint tokenId) external view returns(uint) {
         uint128 start = uint128(tokenId >> 128);
         uint128 end = uint128(tokenId);
         return _earning(start, end);
-    }
-
-    function supplyOf(uint id) external view returns(uint) {
-        return s.supply[id];
-    }
-
-    function supplyOfBatch(
-        uint[] calldata ids
-    ) external view returns(uint[] memory) {
-        uint[] memory res = new uint[](ids.length);
-        for (uint i = 0; i < ids.length; i++) {
-            res[i] = s.supply[ids[i]];
-        }
-        return res;
     }
 
     function _beforeTokenTransfer(
@@ -104,26 +85,28 @@ contract ERC1155Facet is
             uint totalEarning;
             uint lastFinalized = s.finalized;
             for (uint i; i < ids.length; i++) {
-                (uint128 start, uint128 end) = decode(ids[i]);
+                uint128 end = uint128(ids[i]);
                 require(end <= lastFinalized, 'DeMineNFT: token not finalized yet');
+                uint128 start = uint128(ids[i] >> 128);
                 totalEarning += amounts[i] * _earning(start, end);
             }
             IERC20(s.earningToken).safeTransfer(from, totalEarning);
             emit Alchemy(from, totalEarning);
         }
+        // mint
         if (from == address(0)) {
-            require(
-                to == custodian,
-                'DeMineNFT: you can only mint to custodian'
-            );
             for (uint i = 0; i < ids.length; i++) {
                 s.supply[ids[i]] += amounts[i];
             }
         }
-    }
-
-    function decode(uint tokenId) private pure returns(uint128, uint128) {
-        return (uint128(tokenId >> 128), uint128(tokenId));
+        // release
+        if (from == custodian) {
+            uint lastFinalized = s.finalized;
+            for (uint i = 0; i < ids.length; i++) {
+                uint128 start = uint128(ids[i] >> 128);
+                require(start > lastFinalized, 'DeMineNFT: token is finalized');
+            }
+        }
     }
 
     function _earning(uint128 start, uint128 end)

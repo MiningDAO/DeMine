@@ -54,4 +54,22 @@ abstract contract ERC1155Config is
     function alchemist() external override pure returns(address) {
         return _alchemist;
     }
+
+    function finalized() external view returns(uint128) {
+        return s.finalized;
+    }
+
+    function supplyOf(uint id) external view returns(uint) {
+        return s.supply[id];
+    }
+
+    function supplyOfBatch(
+        uint[] calldata ids
+    ) external view returns(uint[] memory) {
+        uint[] memory res = new uint[](ids.length);
+        for (uint i = 0; i < ids.length; i++) {
+            res[i] = s.supply[ids[i]];
+        }
+        return res;
+    }
 }

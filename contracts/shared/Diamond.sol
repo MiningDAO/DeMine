@@ -32,9 +32,9 @@ contract Diamond is
 
     struct InitArgs {
         address owner;
-        address fallbackAddress;
-        bytes fallbackInitArgs;
         bytes4[] interfaces;
+        address fallbackAddress;
+        bytes data;
     }
 
     function init(InitArgs calldata args) external initializer {
@@ -42,12 +42,10 @@ contract Diamond is
 
         DiamondBaseStorage.Layout storage l = DiamondBaseStorage.layout();
         l.fallbackAddress = args.fallbackAddress;
-        (bool success, bytes memory result) = args.fallbackAddress.delegatecall(
-            abi.encodeWithSignature(
-                "__DiamondFallback_init(bytes)",
-                args.fallbackInitArgs
-            )
-        );
+        (
+            bool success,
+            bytes memory result
+        ) = args.fallbackAddress.delegatecall(args.data);
         require(success, string(result));
 
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();

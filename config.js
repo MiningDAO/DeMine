@@ -1,6 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const BigNumber = require('bignumber.js');
 
 const config = {
     tokenUri: {
@@ -20,11 +21,11 @@ const config = {
         matic: process.env.ALCHEMY_MATIC,
         maticdev: process.env.ALCHEMY_MATIC_DEV
     },
-    custodian: {
-        bsc: '0x427119f5080320Da94B78BB55d75fb48B708346e'
+    admin: {
+        bsc: '0x782A6a9Bc11Fb6e8320b92f2217AfD80f813Bd05'
     },
     hashPerToken: {
-        btc: 1000000000000,
+        btc: new BigNumber('1e+12'),
     },
     antpool: {
         api: 'https://antpool.com/api/',

@@ -7,13 +7,17 @@ import "@openzeppelin/contracts/interfaces/IERC1155.sol";
 import "@openzeppelin/contracts/interfaces/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract CustodianProxy is IERC1155Receiver, Ownable {
+contract Custodian is IERC1155Receiver, Ownable {
     constructor(address custodian) {
-        transferOwnership(custodian);
+        _transferOwnership(custodian);
     }
 
-    function custody(address nft) onlyOwner external {
-        IERC1155(nft).setApprovalForAll(owner(), true);
+    function custody(
+        address nft,
+        address operator,
+        bool approved
+    ) onlyOwner external {
+        IERC1155(nft).setApprovalForAll(operator, approved);
     }
 
     function onERC1155Received(

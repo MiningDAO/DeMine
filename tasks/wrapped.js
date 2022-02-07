@@ -30,17 +30,19 @@ task("wrapped-clone", "clone wrapped token")
         }
 
         const config = localConfig.wrapped[args.coin];
-        const initArgs = await diamond.genInitArgs(
-            hre,
+        const iface = new hre.ethers.utils.Interface([
+            'function init(string name, string name, uint8 decimals)'
+        ]);
+        const initArgs = [
             admin.address,
+            await diamond.genInterfaces(hre, [
+                '@solidstate/contracts/token/ERC20/IERC20.sol:IERC20',
+            ]),
             fallback.address,
-            ethers.utils.defaultAbiCoder.encode(
-                ["string", "string", "uint8"],
-                [config.name, config.symbol, config.decimals]
-            ),
-            [],
-            ['@solidstate/contracts/token/ERC20/IERC20.sol:IERC20']
-        );
+            iface.encodeFunctionData('init', [
+                config.name, config.symbol, config.decimals
+            ]),
+        ];
         console.log('Will clone DeMineERC20 from ' + base.address + ' with: ');
         console.log(JSON.stringify({
             source: base.address,
