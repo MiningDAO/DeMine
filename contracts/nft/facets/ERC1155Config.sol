@@ -69,4 +69,27 @@ abstract contract ERC1155Config is
         }
         return res;
     }
+
+    function earning(uint tokenId) external view returns(uint) {
+        uint128 start = uint128(tokenId >> 128);
+        uint128 end = uint128(tokenId);
+        return _earning(start, end);
+    }
+
+    function _earning(uint128 start, uint128 end)
+        private
+        view
+        returns(uint value)
+    {
+        // daily token
+        if (end - start == 86400) {
+            value = s.daily[end];
+        // weekly token
+        } else if (end - start == 604800) {
+            value = s.weekly[end];
+        // biweekly token
+        } else if (end - start == 1209600) {
+            value = s.weekly[end] + s.weekly[end - 604800];
+        }
+    }
 }

@@ -65,6 +65,34 @@ task("wrapped-clone", "clone wrapped token")
             function(e) { return e.event === 'Clone'; }
         );
         logger.info('Cloned DeMineERC20 at ' + cloned);
+
+        const erc20 = await ethers.getContractAt('ERC20Facet', cloned);
+        const supply = ethers.BigNumber.from(10).pow(c.decimals).mul(1000);
+        common.print({
+            operator: admin.address,
+            to: admin.address,
+            supply: supply.toString()
+        });
+        logger.info('Minting supply to admin with following info');
+        if (admin.signer) {
+            await common.run(hre, async function() {
+                return await erc20.connect(
+                    admin.signer
+                ).mint(admin.address, 10000000000);
+            });
+        } else {
+            const calldata = erc20.interface.encodeFunctionData(
+                'mint',
+                [admin.address, 10000000000]
+            );
+            logger.info('Not signer, call with following calldata');
+            common.print({
+                operator: admin.address,
+                contract: erc20.address,
+                calldata
+            });
+        }
+
         state.updateContract(
             hre, args.coin, {
                 'wrapped': {

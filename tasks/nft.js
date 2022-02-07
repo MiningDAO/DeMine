@@ -27,8 +27,8 @@ task('nft-clone', 'Deploy clone of demine nft')
             contracts.nft.source == base.address &&
             contracts.nft.fallback == erc1155Facet.address
         ) {
-            logger.warn("Nothing changed, exiting");
-            return;
+            logger.warn("Nothing changed.");
+            return contracts.nft.target;
         }
 
         const wrappedConfig = localConfig.wrapped[network.name] || {};
@@ -84,13 +84,20 @@ task('nft-clone', 'Deploy clone of demine nft')
         );
         logger.info('Cloned contract DeMineNFT at ' + cloned);
 
+        logger.info('Setting up custody with follow info');
+        const custodian = await config.getDeployment(hre, 'ERC1155Custodian');
+        common.print({
+            nft: cloned,
+            admin: admin.address,
+            approved: true
+        });
         if (admin.signer) {
-              logger.info('Setting up custody');
-              const custodian = await config.getDeployment(hre, 'ERC1155Custodian');
-              await custodian.connect(
-                  admin.signer
-              ).custody(cloned, admin.address, true);
-              logger.info('Custody setup done');
+            await common.run(hre, async function() {
+                await custodian.connect(
+                    admin.signer
+                ).custody(cloned, admin.address, true)
+            });
+            logger.info('Custody setup done');
         } else {
             logger.info('Not signer, please call manually with following info');
             const calldata = custodian.interface.encodeFunctionData(

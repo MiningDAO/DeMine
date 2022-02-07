@@ -66,12 +66,6 @@ contract ERC1155Facet is
         emit Finalize(endOfDay, earningPerTPerDay);
     }
 
-    function earning(uint tokenId) external view returns(uint) {
-        uint128 start = uint128(tokenId >> 128);
-        uint128 end = uint128(tokenId);
-        return _earning(start, end);
-    }
-
     function _beforeTokenTransfer(
         address operator,
         address from,
@@ -103,7 +97,7 @@ contract ERC1155Facet is
             uint lastFinalized = s.finalized;
             for (uint i; i < ids.length; i++) {
                 uint128 end = uint128(ids[i]);
-                if (end <= lastFinalized) {
+                if (end <= lastFinalized) { // already finalized
                     uint128 start = uint128(ids[i] >> 128);
                     totalEarning += amounts[i] * _earning(start, end);
                 }
@@ -112,23 +106,6 @@ contract ERC1155Facet is
                 IERC20(s.earningToken).safeTransfer(from, totalEarning);
                 emit Alchemy(from, totalEarning);
             }
-        }
-    }
-
-    function _earning(uint128 start, uint128 end)
-        private
-        view
-        returns(uint value)
-    {
-        // daily token
-        if (end - start == 86400) {
-            value = s.daily[end];
-        // weekly token
-        } else if (end - start == 604800) {
-            value = s.weekly[end];
-        // biweekly token
-        } else if (end - start == 1209600) {
-            value = s.weekly[end] + s.weekly[end - 604800];
         }
     }
 }
