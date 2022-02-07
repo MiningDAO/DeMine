@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/interfaces/IERC1155.sol";
 import "@openzeppelin/contracts/interfaces/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Custodian is IERC1155Receiver, Ownable {
+contract ERC1155Custodian is IERC1155Receiver, Ownable {
     constructor(address custodian) {
         _transferOwnership(custodian);
     }

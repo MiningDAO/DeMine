@@ -46,7 +46,8 @@ contract ERC1155Facet is
     function finalize(
         uint128 endOfDay,
         uint earningPerTPerDay,
-        uint effectiveHashratePerDay
+        address custodian,
+        uint totalEarning
     ) external onlyOwner {
         require(
             endOfDay > s.finalized && endOfDay % 86400 == 0,
@@ -58,9 +59,9 @@ contract ERC1155Facet is
             s.weekly[endOfDay + i * 86400] += earningPerTPerDay;
         }
         IERC20(s.earningToken).safeTransferFrom(
-            _custodian,
+            custodian,
             address(this),
-            effectiveHashratePerDay * earningPerTPerDay
+            totalEarning
         );
         emit Finalize(endOfDay, earningPerTPerDay);
     }
@@ -80,8 +81,23 @@ contract ERC1155Facet is
         bytes memory data
     ) internal virtual override(ERC1155BaseInternal) {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
-        // alchemize
-        if (to == _custodian) {
+        // mint
+        if (from == address(0)) {
+            for (uint i = 0; i < ids.length; i++) {
+                s.supply[ids[i]] += amounts[i];
+            }
+        // release
+        } else if (from == _custodian) {
+            uint lastFinalized = s.finalized;
+            for (uint i = 0; i < ids.length; i++) {
+                uint128 start = uint128(ids[i] >> 128);
+                require(
+                    start >= lastFinalized,
+                    'DeMineNFT: token finalized or in finalization'
+                );
+            }
+        // alchemize or burn
+        } else if (to == _custodian) {
             require(!LibPausable.layout().paused, 'Pausable: paused');
             uint totalEarning;
             uint lastFinalized = s.finalized;
@@ -95,20 +111,6 @@ contract ERC1155Facet is
             if (totalEarning > 0) {
                 IERC20(s.earningToken).safeTransfer(from, totalEarning);
                 emit Alchemy(from, totalEarning);
-            }
-        }
-        // mint
-        if (from == address(0)) {
-            for (uint i = 0; i < ids.length; i++) {
-                s.supply[ids[i]] += amounts[i];
-            }
-        }
-        // release
-        if (from == _custodian) {
-            uint lastFinalized = s.finalized;
-            for (uint i = 0; i < ids.length; i++) {
-                uint128 start = uint128(ids[i] >> 128);
-                require(start > lastFinalized, 'DeMineNFT: token is finalized');
             }
         }
     }

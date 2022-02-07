@@ -86,7 +86,7 @@ task('nft-clone', 'Deploy clone of demine nft')
 
         if (admin.signer) {
               logger.info('Setting up custody');
-              const custodian = await config.getDeployment(hre, 'Custodian');
+              const custodian = await config.getDeployment(hre, 'ERC1155Custodian');
               await custodian.connect(
                   admin.signer
               ).custody(cloned, admin.address, true);

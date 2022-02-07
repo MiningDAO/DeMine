@@ -41,7 +41,7 @@ describe("DeMineNFT", function () {
         admin = signers.admin;
         await hre.deployments.fixture(['NFT']);
         nft = await hre.run('nft-clone', {coin: coin});
-        custodian = await config.getDeployment(hre, 'Custodian');
+        custodian = await config.getDeployment(hre, 'ERC1155Custodian');
     });
 
     it("TokenId", async function() {
@@ -121,14 +121,14 @@ describe("DeMineNFT", function () {
             custodian.address, admin.address, encoded, [49, 49], []
         );
 
-        // transfer to alchemist paused
-        await erc1155.connect(admin).finalize(tokenIds[1].endTs, 0, 0),
+        // transfer to custodian paused
+        await erc1155.connect(admin).finalize(tokenIds[1].endTs, 0, admin.address, 0);
         await expect(
             erc1155.connect(
                 admin
             ).safeBatchTransferFrom(
                 admin.address,
-                await erc1155.alchemist(),
+                await erc1155.custodian(),
                 encoded,
                 [50, 50],
                 []
@@ -183,59 +183,62 @@ describe("DeMineNFT", function () {
         expect(facetAddress).to.be.equal(erc20.address);
     });
 
-    it.only("IERC1155", async function () {
+    it("IERC1155", async function () {
         const facet = await hre.ethers.getContractAt('ERC1155Facet', nft);
-        const ids = [1, 2, 3];
+        const ids = genTokenIds('2022-02-02', '2022-02-04', 'daily');
+        const [id1, id2, id3] = encoded = token.encode(hre.ethers, ids);
         const amounts = [100, 100, 100];
 
         // mint
-        await facet.connect(admin).mint(ids, amounts, []);
+        await facet.connect(admin).mint(encoded, amounts, []);
         const accounts = Array(3).fill(custodian.address);
-        common.compareArray(await facet.balanceOfBatch(accounts, ids), amounts);
-
+        common.compareArray(
+            await facet.balanceOfBatch(accounts, encoded),
+            amounts
+        );
         // transfer and batch transfer
         await facet.connect(admin).safeTransferFrom(
-            custodian.address, admin.address, 1, 50, []
+            custodian.address, deployer.address, id1, 50, []
         );
-        expect(await facet.balanceOf(custodian.address, 1)).to.equal(50);
-        expect(await facet.balanceOf(admin.address, 1)).to.equal(50);
+        expect(await facet.balanceOf(custodian.address, id1)).to.equal(50);
+        expect(await facet.balanceOf(deployer.address, id1)).to.equal(50);
 
         await facet.connect(admin).safeBatchTransferFrom(
-            custodian.address, admin.address, [2, 3], [20, 20], []
+            custodian.address, deployer.address, [id2, id3], [20, 20], []
         );
-        expect(await facet.balanceOf(custodian.address, 2)).to.equal(80);
-        expect(await facet.balanceOf(custodian.address, 3)).to.equal(80);
-        expect(await facet.balanceOf(admin.address, 2)).to.equal(20);
-        expect(await facet.balanceOf(admin.address, 3)).to.equal(20);
+        expect(await facet.balanceOf(custodian.address, id2)).to.equal(80);
+        expect(await facet.balanceOf(custodian.address, id3)).to.equal(80);
+        expect(await facet.balanceOf(deployer.address, id2)).to.equal(20);
+        expect(await facet.balanceOf(deployer.address, id3)).to.equal(20);
 
         // isApprovedForAll and setApprovedForAll
         expect(await facet.isApprovedForAll(deployer.address, admin.address)).to.be.false;
         await expect(
             facet.connect(admin).safeTransferFrom(
-                deployer.address, admin.address, 1, 50, []
+                deployer.address, admin.address, id1, 50, []
             )
         ).to.be.revertedWith('ERC1155: caller is not owner nor approved');
         await expect(
             facet.connect(admin).safeBatchTransferFrom(
-                deployer.address, admin.address, [2, 3], [20, 20], []
+                deployer.address, admin.address, [id2, id3], [20, 20], []
             )
         ).to.be.revertedWith('ERC1155: caller is not owner nor approved');
 
         await facet.connect(deployer).setApprovalForAll(admin.address, true);
         expect(await facet.isApprovedForAll(deployer.address, admin.address)).to.be.true;
         await facet.connect(admin).safeTransferFrom(
-            deployer.address, admin.address, 1, 50, []
+            deployer.address, admin.address, id1, 50, []
         );
-        expect(await facet.balanceOf(deployer.address, 1)).to.equal(0);
-        expect(await facet.balanceOf(admin.address, 1)).to.equal(100);
+        expect(await facet.balanceOf(deployer.address, id1)).to.equal(0);
+        expect(await facet.balanceOf(admin.address, id1)).to.equal(50);
 
         await facet.connect(admin).safeBatchTransferFrom(
-            deployer.address, admin.address, [2, 3], [20, 20], []
+            deployer.address, admin.address, [id2, id3], [20, 20], []
         );
-        expect(await facet.balanceOf(deployer.address, 2)).to.equal(60);
-        expect(await facet.balanceOf(deployer.address, 3)).to.equal(60);
-        expect(await facet.balanceOf(admin.address, 2)).to.equal(40);
-        expect(await facet.balanceOf(admin.address, 3)).to.equal(40);
+        expect(await facet.balanceOf(deployer.address, id2)).to.equal(0);
+        expect(await facet.balanceOf(deployer.address, id3)).to.equal(0);
+        expect(await facet.balanceOf(admin.address, id2)).to.equal(20);
+        expect(await facet.balanceOf(admin.address, id3)).to.equal(20);
 
         await facet.connect(deployer).setApprovalForAll(admin.address, false);
         expect(await facet.isApprovedForAll(deployer.address, admin.address)).to.be.false;
@@ -315,7 +318,7 @@ describe("DeMineNFT", function () {
             token.encode(ethers, daily), dailyAmounts, []
         );
 
-        const weekly = genTokenIds('2022-02-02', '2022-12-02', 'weekly');
+        const weekly = genTokenIds('2022-02-02', '2022-11-29', 'weekly');
         const weeks = function(start, end) {
             return Math.floor(
                 (
@@ -329,7 +332,7 @@ describe("DeMineNFT", function () {
             token.encode(ethers, weekly), weeklyAmounts, []
         );
 
-        const biweekly = genTokenIds('2022-02-02', '2022-12-02', 'biweekly');
+        const biweekly = genTokenIds('2022-02-02', '2022-11-22', 'biweekly');
         const biweeks = function(start, end) {
             return Math.floor(
                 (
@@ -343,12 +346,29 @@ describe("DeMineNFT", function () {
             token.encode(ethers, biweekly), biweeklyAmounts, []
         );
 
+        // release
+        await erc1155.connect(admin).safeBatchTransferFrom(
+            custodian.address,
+            deployer.address,
+            [
+                token.encodeOne(ethers, daily[13]),
+                token.encodeOne(ethers, daily[14]),
+                token.encodeOne(ethers, weekly[0]),
+                token.encodeOne(ethers, weekly[1]),
+                token.encodeOne(ethers, biweekly[0])
+            ],
+            [100, 100, 100, 100, 100],
+            []
+        );
+
         // finalize
         const finalize = async function(date, reward) {
             const prev = await income.balanceOf(nft);
             const finalized = time.toEpoch(new Date(date));
             checkEvent(
-                await erc1155.connect(admin).finalize(finalized, reward, 600),
+                await erc1155.connect(admin).finalize(
+                    finalized, reward, admin.address, reward * 600
+                ),
                 nft,
                 'Finalize',
                 [finalized, reward]
@@ -362,6 +382,7 @@ describe("DeMineNFT", function () {
             erc1155.connect(admin).finalize(
                 time.toEpoch(new Date('2022-02-02T12:00:00Z')),
                 1,
+                admin.address,
                 600
             )
         ).to.be.revertedWith('DeMineNFT: invalid timestamp')
@@ -373,11 +394,29 @@ describe("DeMineNFT", function () {
         expect(await earning(daily[0])).to.equal(1);
         expect(await earning(weekly[0])).to.equal(1);
         expect(await earning(biweekly[0])).to.equal(1);
+
+        // finalize already finalized
         await expect(
             erc1155.connect(admin).finalize(
-                time.toEpoch(new Date('2022-02-02')), 1
+                time.toEpoch(new Date('2022-02-02')), 1, admin.address, 600
             )
         ).to.be.revertedWith('DeMineNFT: invalid timestamp')
+        // release already finalized
+        await expect(
+            erc1155.connect(admin).safeBatchTransferFrom(
+                custodian.address,
+                deployer.address,
+                [
+                    token.encodeOne(ethers, daily[13]),
+                    token.encodeOne(ethers, daily[14]),
+                    token.encodeOne(ethers, weekly[0]),
+                    token.encodeOne(ethers, weekly[1]),
+                    token.encodeOne(ethers, biweekly[0])
+                ],
+                [100, 100, 100, 100, 100],
+                []
+            )
+        ).to.be.revertedWith("DeMineNFT: token finalized or in finalization");
 
         await finalize('2022-02-09', 2);
         expect(await earning(daily[0])).to.equal(1);
@@ -410,35 +449,10 @@ describe("DeMineNFT", function () {
         expect(await earning(biweekly[1])).to.equal(5);
 
         // alchemize
-        const alchemist = await erc1155.alchemist();
-        await expect(
-            erc1155.connect(admin).safeBatchTransferFrom(
-                custodian.address,
-                alchemist,
-                token.encode(ethers, daily.slice(13, 16)),
-                [1, 1, 1],
-                []
-            )
-        ).to.be.revertedWith('DeMineNFT: token not finalized yet')
-
-        const signer = new ethers.Wallet(
-            "0x65789150d0cb0485988f6488122eae027af2a116e202c65bff207d2b605b57cb",
-            ethers.provider
-        );
-        await admin.sendTransaction(
-            {to: signer.address, value: ethers.utils.parseEther("1.0")}
-        );
-        expect(alchemist, signer.address);
-        await expect(
-            erc1155.connect(signer).safeTransferFrom(
-                alchemist, admin.address, [1, 2], [100, 200], []
-            )
-        ).to.be.revertedWith('DeMineNFT: from alchemist');
-
         checkEvent(
-            await erc1155.connect(admin).safeBatchTransferFrom(
+            await erc1155.connect(deployer).safeBatchTransferFrom(
+                deployer.address,
                 custodian.address,
-                alchemist,
                 [
                     token.encodeOne(ethers, daily[13]),
                     token.encodeOne(ethers, daily[14]),
@@ -451,16 +465,16 @@ describe("DeMineNFT", function () {
             ),
             nft,
             'Alchemy',
-            [custodian.address, 2900]
+            [deployer.address, 2900]
         );
         const balanceOf = async function(address, id) {
             return await erc1155.balanceOf(address, token.encodeOne(ethers, id));
         };
         expect(await income.balanceOf(nft)).to.equal(6100);
-        expect(await balanceOf(custodian.address, daily[13])).to.equal(0);
-        expect(await balanceOf(custodian.address, daily[14])).to.equal(0);
-        expect(await balanceOf(custodian.address, weekly[0])).to.equal(100);
-        expect(await balanceOf(custodian.address, weekly[1])).to.equal(100);
-        expect(await balanceOf(custodian.address, biweekly[0])).to.equal(200);
+        expect(await balanceOf(deployer.address, daily[13])).to.equal(0);
+        expect(await balanceOf(deployer.address, daily[14])).to.equal(0);
+        expect(await balanceOf(deployer.address, weekly[0])).to.equal(0);
+        expect(await balanceOf(deployer.address, weekly[1])).to.equal(0);
+        expect(await balanceOf(deployer.address, biweekly[0])).to.equal(0);
     });
 });

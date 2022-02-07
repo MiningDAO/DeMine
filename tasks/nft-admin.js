@@ -179,7 +179,7 @@ task('nft-admin-release', 'transfer demine nft tokens')
         const nft = state.loadNFTClone(hre, args.coin);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
         const amounts = args.amounts.split(',').map(i => parseInt(i));
-        const custodian = await config.getDeployment(hre, 'Custodian');
+        const custodian = await config.getDeployment(hre, 'ERC1155Custodian');
         const info = {
             contract: nft.target,
             operator: admin.address,
