@@ -16,14 +16,11 @@ abstract contract ERC1155Config is
     IERC1155Rewardable,
     ERC1155Metadata
 {
-    address constant _alchemist = address(
-        0x1A811678eEEDF16a1D0dF4b12e290F78a61A28F9
-    );
-    address public immutable custodian;
+    address immutable _custodian;
     AppStorage internal s;
 
-    constructor(address _custodian) {
-        custodian = _custodian;
+    constructor(address c) {
+        _custodian = c;
     }
 
     event TokenRoyaltyBpsSet(uint16);
@@ -51,8 +48,8 @@ abstract contract ERC1155Config is
         return s.earningToken;
     }
 
-    function alchemist() external override pure returns(address) {
-        return _alchemist;
+    function custodian() external override view returns(address) {
+        return _custodian;
     }
 
     function finalized() external view returns(uint128) {

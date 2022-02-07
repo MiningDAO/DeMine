@@ -1,6 +1,6 @@
 const nft = require("../lib/nft.js");
-const { types } = require("hardhat/config");
 const logger = require('npmlog');
+const { types } = require("hardhat/config");
 const common = require("../lib/common.js");
 const state = require("../lib/state.js");
 const token = require("../lib/token.js");
@@ -70,17 +70,17 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
         );
         const amountToDeposit = tokenValue.mul(supply.toString());
         const adminBalance = new BigNumber(
-            (await rewardToken.balanceOf(admin)).toString()
+            (await rewardToken.balanceOf(admin.address)).toString()
         ).div(base);
         assert(
             amountToDeposit.lte(adminBalance.toString()),
             'Error: Insufficient balance from admin'
         );
 
-        console.log('Summary: ');
+        logger.info('Summary: ');
         common.print({
-            source: nft.source,
             address: nft.target,
+            operator: admin.address,
             finalized: formatTs(finalized.toNumber()),
             antpool: poolStats,
             financial: {
@@ -97,7 +97,7 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
         });
 
         if (admin.signer) {
-            await common.run(async function() {
+            await common.run(hre, async function() {
                 return await erc1155Facet.connect(
                     admin.signer
                 ).finalize(finalizing, tokenValue);
@@ -108,7 +108,11 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
                 [finalizing, canonicalizedTokenValue, supply]
             );
             logger.info('Not signer, call with following calldata');
-            common.print({admin: admin.address, calldata});
+            common.print({
+                operator: admin.address,
+                contract: erc1155Facet.address,
+                calldata
+            });
         }
     });
 
@@ -119,8 +123,8 @@ task('nft-admin-mint', 'mint new demine nft tokens')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
         nftLib.validateCommon(args, hre);
 
+        const admin = await config.admin(hre);
         const ids = nftLib.parseTokenIds(args.tokens);
-        const { admin } = await ethers.getNamedSigners();
         const nft = state.loadNFTClone(hre, args.coin);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
 
@@ -130,10 +134,10 @@ task('nft-admin-mint', 'mint new demine nft tokens')
         }
         const encodedIds = token.encode(ethers, ids);
         const info = {
-            source: nft.source,
-            contract: nft.target,
+            address: nft.target,
+            operator: admin.address,
             numTokenTypes: ids.length,
-            amountPerToken: amount;
+            amountPerToken: args.amount,
             idsAsDate: token.readableIds(ids),
             ids: encodeIds.map(t => t.toHexString()),
             amounts: amounts.join(',')
@@ -141,20 +145,23 @@ task('nft-admin-mint', 'mint new demine nft tokens')
         logger.info('Will mint nft with following info:');
         common.print(JSON.stringify(info, null, 2));
 
-        const admin = await config.admin(hre);
         if (admin.signer) {
-            await common.run(async function() {
+            await common.run(hre, async function() {
                 return await erc1155Facet.mint(
                     admin.signer
                 ).mint(encodedIds, amounts, []);
             });
         } else {
-            logger.info('Not signer, call manually with following info');
+            logger.info('Not signer, please call manually with following info');
             const calldata = erc1155Facet.interface.encodeFunctionData(
                 'mint',
                 [encodedIds, amounts, []]
             );
-            common.print({admin: admin.address, calldata});
+            common.print({
+                operator: admin.address,
+                contract: erc1155Facet.address,
+                calldata
+            });
         }
     });
 
@@ -166,15 +173,14 @@ task('nft-admin-release', 'transfer demine nft tokens')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
         nftLib.validateCommon(args, hre);
 
-        const { admin } = await config.admin(hre);
+        const admin = config.admin(hre);
         const ids = nftLib.parseTokenIds(args.tokens);
         const to = ethers.utils.getAddress(args.to);
         const nft = state.loadNFTClone(hre, args.coin);
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
         const amounts = args.amounts.split(',').map(i => parseInt(i));
-        const custodian = await common.getDeployment(hre, 'Custodian');
+        const custodian = await config.getDeployment(hre, 'Custodian');
         const info = {
-            source: nft.source,
             contract: nft.target,
             operator: admin.address,
             from: custodian.address,
@@ -183,22 +189,27 @@ task('nft-admin-release', 'transfer demine nft tokens')
             id: ids.map(id => id.startDate.split('T')[0]).join(','),
             amount: amounts.join(',')
         };
-        console.log('Will transfer nft with following info:');
-        console.log(JSON.stringify(info, null, 2));
+        logger.info('Will transfer nft with following info:');
+        logger.info(JSON.stringify(info, null, 2));
 
-        const admin = config.admin(hre);
         if (admin.signer) {
-            return await erc1155Facet.connect(
-                admin.signer
-            ).safeBatchTransferFrom(
-                custodian.address, to, token.encode(ethers, ids), amounts, []
-            );
+            await common.run(hre, async function() {
+                return await erc1155Facet.connect(
+                    admin.signer
+                ).safeBatchTransferFrom(
+                    custodian.address, to, token.encode(ethers, ids), amounts, []
+                )
+            });
         } else {
-            logger.info('Not signer, call with following calldata');
+            logger.info('Not signer, please call manually with following info');
             const calldata = erc1155Facet.interface.encodeFunctionData(
                 'safeBatchTransferFrom',
                 [custodian.address, to, token.encode(ethers, ids), amounts, []]
             );
-            common.print({admin: admin.address, calldata});
+            common.print({
+                operator: admin.address,
+                contract: erc1155Facet.address,
+                calldata
+            });
         }
     });

@@ -16,7 +16,7 @@ function parseToken(input) {
 task('nft-clone', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        nftLib.validateCommon(args, hre);
+        config.validateCoin(args.coin);
 
         const base = await config.getDeployment(hre, 'Diamond');
         const erc1155Facet = await config.getDeployment(hre, 'ERC1155Facet');
@@ -31,7 +31,8 @@ task('nft-clone', 'Deploy clone of demine nft')
             return;
         }
 
-        const wrapped = localConfig.wrapped[network.name][args.coin.toLowerCase()]
+        const wrappedConfig = localConfig.wrapped[network.name] || {};
+        const wrapped = wrappedConfig[args.coin.toLowerCase()]
             || (contracts.wrapped && contracts.wrapped.target)
             || await hre.run('wrapped-clone', { coin: args.coin });
         const reward = await ethers.getContractAt(
@@ -73,6 +74,7 @@ task('nft-clone', 'Deploy clone of demine nft')
             }
         });
         const { events } = receipt = await common.run(
+            hre,
             async function() {
                 return await base.create(initArgs);
             }
@@ -81,9 +83,26 @@ task('nft-clone', 'Deploy clone of demine nft')
             function(e) { return e.event === 'Clone'; }
         );
         logger.info('Cloned contract DeMineNFT at ' + cloned);
-        const custodian = await common.getDeployment(hre, 'Custodian');
-        await custodian.connect(admin).custody(cloned, admin.address, true);
-        logger.info('Custody setup done');
+
+        if (admin.signer) {
+              logger.info('Setting up custody');
+              const custodian = await config.getDeployment(hre, 'Custodian');
+              await custodian.connect(
+                  admin.signer
+              ).custody(cloned, admin.address, true);
+              logger.info('Custody setup done');
+        } else {
+            logger.info('Not signer, please call manually with following info');
+            const calldata = custodian.interface.encodeFunctionData(
+                'custody',
+                [cloned, admin.address, true]
+            );
+            common.print({
+                operator: admin.address,
+                contract: custodian.address,
+                calldata
+            });
+        }
         state.updateContract(
             hre, args.coin, {
                 'nft': {

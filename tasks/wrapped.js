@@ -1,5 +1,7 @@
 const assert = require("assert");
+const logger = require('npmlog');
 const common = require("../lib/common.js");
+const config = require("../lib/config.js");
 const diamond = require("../lib/diamond.js");
 const state = require("../lib/state.js");
 
@@ -12,12 +14,11 @@ function getWrapped(hre, coin) {
 task("wrapped-clone", "clone wrapped token")
     .addParam('coin', 'coin type')
     .setAction(async function(args, { ethers, network, localConfig } = hre) {
-        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-        args.coin == 'usd' || common.validateCoin(args.coin);
+        args.coin == 'usd' || config.validateCoin(args.coin);
 
-        const { admin } = await ethers.getNamedSigners();
-        const base = await common.getDeployment(hre, 'Diamond');
-        const fallback = await common.getDeployment(hre, 'ERC20Facet');
+        const admin = await config.admin(hre);
+        const base = await config.getDeployment(hre, 'Diamond');
+        const fallback = await config.getDeployment(hre, 'ERC20Facet');
         const wrapped = state.tryLoadWrappedClone(hre, args.coin);
         if (
             wrapped &&
@@ -25,14 +26,14 @@ task("wrapped-clone", "clone wrapped token")
             wrapped.source == base.address &&
             wrapped.fallback == fallback.address
         ) {
-            console.log("Nothing changed, skipping");
+            logger.info("Nothing changed, skipping");
             return;
         }
 
-        const config = localConfig.wrapped[args.coin];
         const iface = new hre.ethers.utils.Interface([
             'function init(string name, string name, uint8 decimals)'
         ]);
+        const c = localConfig.wrapped[args.coin];
         const initArgs = [
             admin.address,
             await diamond.genInterfaces(hre, [
@@ -40,21 +41,22 @@ task("wrapped-clone", "clone wrapped token")
             ]),
             fallback.address,
             iface.encodeFunctionData('init', [
-                config.name, config.symbol, config.decimals
+                c.name, c.symbol, c.decimals
             ]),
         ];
-        console.log('Will clone DeMineERC20 from ' + base.address + ' with: ');
-        console.log(JSON.stringify({
+        logger.info('Will clone DeMineERC20 from ' + base.address + ' with: ');
+        logger.info(JSON.stringify({
             source: base.address,
             owner: admin.address,
             fallback: fallback.address,
             fallbackInitArgs: {
-                name: config.name,
-                symbol: config.symbol,
-                decimals: config.decimals
+                name: c.name,
+                symbol: c.symbol,
+                decimals: c.decimals
             }
         }, null, 2));
         const { events } = receipt = await common.run(
+            hre,
             async function() {
                 return await base.create(initArgs);
             }
@@ -62,7 +64,7 @@ task("wrapped-clone", "clone wrapped token")
         const { args: [_from, cloned] } = events.find(
             function(e) { return e.event === 'Clone'; }
         );
-        console.log('Cloned DeMineERC20 at ' + cloned);
+        logger.info('Cloned DeMineERC20 at ' + cloned);
         state.updateContract(
             hre, args.coin, {
                 'wrapped': {
@@ -80,7 +82,7 @@ task('wrapped-inspect', 'Inspect state of DeMineERC20 contract')
     .addParam('coin', 'Coin to check')
     .setAction(async (args, { ethers, network, localConfig }) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-        common.validateCoin(args.coin);
+        config.validateCoin(args.coin);
 
         const wrapped = getWrapped(hre, args.coin);
         const diamond = await ethers.getContractAt('Diamond', wrapped.target);
@@ -94,7 +96,7 @@ task('wrapped-inspect', 'Inspect state of DeMineERC20 contract')
             symbol: await erc20.symbol(),
             decimals: await erc20.decimals()
         }
-        console.log(JSON.stringify(result, null, 2));
+        logger.info(JSON.stringify(result, null, 2));
         return result;
     });
 
@@ -121,10 +123,9 @@ task('wrapped-mint', 'mint new nft tokens')
     .addParam('coin', 'wrapped token type, btc/eth/fil')
     .addParam('amount', 'amount to mint', undefined, types.int)
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        const { admin } = await ethers.getNamedSigners();
-        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-        common.validateCoin(args.coin);
+        config.validateCoin(args.coin);
 
+        const admin = await config.admin(hre);
         const wrapped = getWrapped(hre, args.coin);
         const erc20 = await ethers.getContractAt('ERC20Facet', wrapped.target);
         const balance = await erc20.balanceOf(admin.address);
@@ -135,23 +136,34 @@ task('wrapped-mint', 'mint new nft tokens')
             currentBalance: balance.toNumber(),
             toMint: args.amount
         };
-        console.log('Will mint wrapped coin ' + args.coin + ' with following info:');
-        console.log(JSON.stringify(info, null, 2));
-        await common.run(async function() {
-            return await erc20.connect(admin).mint(
-                admin.address, args.amount
+        logger.info('Will mint wrapped coin ' + args.coin + ' with following info:');
+        logger.info(JSON.stringify(info, null, 2));
+        if (admin.signer) {
+            await common.run(hre, async function() {
+                return await erc20.connect(admin.signer).mint(
+                    admin.address, args.amount
+                );
+            })
+        } else {
+            logger.info('Not signer, call with following calldata');
+            const calldata = erc20.interface.encodeFunctionData(
+                'mint', [admin.address, args.amount]
             );
-        });
+            common.print({
+                operator: admin.address,
+                contract: erc20.address,
+                calldata
+            });
+        }
     });
 
 task('wrapped-burn', 'burn wrapped tokens')
     .addParam('coin', 'wrapped token type, usd/btc/eth/fil')
     .addParam('amount', 'amount to burn', undefined, types.int)
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        const { admin } = await ethers.getNamedSigners();
-        assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-        common.validateCoin(args.coin);
+        config.validateCoin(args.coin);
 
+        const admin = await config.admin(hre);
         const wrapped = getWrapped(hre, args.coin);
         const erc20 = await ethers.getContractAt('ERC20Facet', wrapped.target);
         const balance = await erc20.balanceOf(admin.address);
@@ -163,9 +175,21 @@ task('wrapped-burn', 'burn wrapped tokens')
             currentBalance: balance.toNumber(),
             toBurn: args.amount
         };
-        console.log('Will burn wrapped coin ' + args.coin + ' with following info:');
-        console.log(JSON.stringify(info, null, 2));
-        await common.run(async function() {
-            return await erc20.connect(admin).burn(args.amount);
-        });
+        logger.info('Will burn wrapped coin ' + args.coin + ' with following info:');
+        logger.info(JSON.stringify(info, null, 2));
+        if (admin.signer) {
+            await common.run(hre, async function() {
+                return await erc20.connect(admin.signer).burn(args.amount);
+            });
+        } else {
+            logger.info('Not signer, call with following calldata');
+            const calldata = erc20.interface.encodeFunctionData(
+                'burn', [args.amount]
+            );
+            common.print({
+                operator: admin.address,
+                contract: erc20.address,
+                calldata
+            });
+        }
     });

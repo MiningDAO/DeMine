@@ -3,6 +3,7 @@
 pragma solidity 0.8.4;
 pragma experimental ABIEncoderV2;
 
+import '@solidstate/contracts/access/OwnableStorage.sol';
 import '@solidstate/contracts/introspection/ERC165.sol';
 import '@solidstate/contracts/token/ERC1155/IERC1155.sol';
 import '@solidstate/contracts/token/ERC1155/base/ERC1155Base.sol';
@@ -27,7 +28,9 @@ contract ERC1155Facet is
 
     function init(address _earningToken) external onlyInitializing {
         s.earningToken = _earningToken;
-        s.royalty = RoyaltyInfo(owner(), 100);
+        s.royalty = RoyaltyInfo(
+            OwnableStorage.layout().owner, 100
+        );
     }
 
     constructor(address custodian) ERC1155Config(custodian) {}
@@ -37,7 +40,7 @@ contract ERC1155Facet is
         uint[] calldata amounts,
         bytes memory data
     ) external onlyOwner {
-        _safeMintBatch(custodian, ids, amounts, data);
+        _safeMintBatch(_custodian, ids, amounts, data);
     }
 
     function finalize(
@@ -55,7 +58,7 @@ contract ERC1155Facet is
             s.weekly[endOfDay + i * 86400] += earningPerTPerDay;
         }
         IERC20(s.earningToken).safeTransferFrom(
-            custodian,
+            _custodian,
             address(this),
             effectiveHashratePerDay * earningPerTPerDay
         );
@@ -77,21 +80,22 @@ contract ERC1155Facet is
         bytes memory data
     ) internal virtual override(ERC1155BaseInternal) {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
-        require(from != _alchemist, 'DeMineNFT: from alchemist');
         // alchemize
-        if (to == _alchemist) {
-            require(from != custodian, 'DeMineNFT: from custodian');
+        if (to == _custodian) {
             require(!LibPausable.layout().paused, 'Pausable: paused');
             uint totalEarning;
             uint lastFinalized = s.finalized;
             for (uint i; i < ids.length; i++) {
                 uint128 end = uint128(ids[i]);
-                require(end <= lastFinalized, 'DeMineNFT: token not finalized yet');
-                uint128 start = uint128(ids[i] >> 128);
-                totalEarning += amounts[i] * _earning(start, end);
+                if (end <= lastFinalized) {
+                    uint128 start = uint128(ids[i] >> 128);
+                    totalEarning += amounts[i] * _earning(start, end);
+                }
             }
-            IERC20(s.earningToken).safeTransfer(from, totalEarning);
-            emit Alchemy(from, totalEarning);
+            if (totalEarning > 0) {
+                IERC20(s.earningToken).safeTransfer(from, totalEarning);
+                emit Alchemy(from, totalEarning);
+            }
         }
         // mint
         if (from == address(0)) {
@@ -100,7 +104,7 @@ contract ERC1155Facet is
             }
         }
         // release
-        if (from == custodian) {
+        if (from == _custodian) {
             uint lastFinalized = s.finalized;
             for (uint i = 0; i < ids.length; i++) {
                 uint128 start = uint128(ids[i] >> 128);

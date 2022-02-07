@@ -7,6 +7,9 @@ const config = require("../lib/config.js");
 const hre = require("hardhat");
 const address0 = hre.ethers.constants.AddressZero;
 
+const logger = require('npmlog');
+logger.level = 'warn';
+
 async function facetAddress(name) {
     const facet = await hre.deployments.get(name);
     return facet.address;
@@ -38,8 +41,7 @@ describe("DeMineNFT", function () {
         admin = signers.admin;
         await hre.deployments.fixture(['NFT']);
         nft = await hre.run('nft-clone', {coin: coin});
-        custodian = await config.getDeployment(hre, 'CustodianProxy');
-        await custodian.connect(admin).custody(nft, admin.address, true);
+        custodian = await config.getDeployment(hre, 'Custodian');
     });
 
     it("TokenId", async function() {
@@ -75,13 +77,13 @@ describe("DeMineNFT", function () {
 
         // transfer
         await erc1155.connect(admin).safeTransferFrom(
-            custodian.address, custodian.address, encoded[0], 50, []
+            custodian.address, admin.address, encoded[0], 50, []
         );
         expect(await erc1155.balanceOf(custodian.address, encoded[0])).to.equal(0);
         expect(await erc1155.balanceOf(admin.address, encoded[0])).to.equal(50);
 
         await expect(
-            custodian.connect(deployer).custody(nft, admin, false)
+            custodian.connect(deployer).custody(nft, admin.address, false)
         ).to.be.revertedWith('Ownable: caller is not the owner');
         await custodian.connect(admin).custody(nft, admin.address, false);
     });
@@ -160,7 +162,7 @@ describe("DeMineNFT", function () {
             ]
         );
         await expect(
-            contract.connect(custodian).diamondCut(
+            contract.connect(deployer).diamondCut(
                 [facetCut], address0, []
             )
         ).to.be.revertedWith('Ownable: sender must be owner');
@@ -181,12 +183,12 @@ describe("DeMineNFT", function () {
         expect(facetAddress).to.be.equal(erc20.address);
     });
 
-    it("IERC1155", async function () {
+    it.only("IERC1155", async function () {
         const facet = await hre.ethers.getContractAt('ERC1155Facet', nft);
         const ids = [1, 2, 3];
         const amounts = [100, 100, 100];
 
-        // mint and burn
+        // mint
         await facet.connect(admin).mint(ids, amounts, []);
         const accounts = Array(3).fill(custodian.address);
         common.compareArray(await facet.balanceOfBatch(accounts, ids), amounts);
@@ -246,7 +248,7 @@ describe("DeMineNFT", function () {
 
         const newBaseUri = 'https://www.tokeninfo.com/token/';
         await expect(
-            facet.connect(custodian).setURI(newBaseUri)
+            facet.connect(deployer).setURI(newBaseUri)
         ).to.be.revertedWith('Ownable: sender must be owner');
         await facet.connect(admin).setURI(newBaseUri);
         expect(await facet.uri(1)).to.equal(newBaseUri + '1');
@@ -271,7 +273,7 @@ describe("DeMineNFT", function () {
 
         expect(await base.supportsInterface(iface)).to.be.false;
         await expect(
-            base.connect(custodian).setSupportedInterface(iface, true)
+            base.connect(deployer).setSupportedInterface(iface, true)
         ).to.be.revertedWith('Ownable: sender must be owner');
         await base.connect(admin).setSupportedInterface(iface, true);
 
@@ -283,7 +285,7 @@ describe("DeMineNFT", function () {
 
         common.compareArray(await facet.royaltyInfo(1, 1000), [admin.address, 10]);
         await expect(
-            facet.connect(custodian).setRoyaltyInfo(admin.address, 1000)
+            facet.connect(deployer).setRoyaltyInfo(admin.address, 1000)
         ).to.be.revertedWith('Ownable: sender must be owner');
         await facet.connect(admin).setRoyaltyInfo(admin.address, 1000);
         common.compareArray(await facet.royaltyInfo(1, 1000), [admin.address, 100]);
@@ -295,8 +297,8 @@ describe("DeMineNFT", function () {
         const incomeAddr = await erc1155.earningToken();
         expect(incomeAddr).to.be.not.equal(address0);
         const income = await hre.ethers.getContractAt('ERC20Facet', incomeAddr);
-        await income.connect(admin).mint(custodian.address, 10000000);
-        await income.connect(custodian).approve(nft, 10000000);
+        await income.connect(admin).mint(admin.address, 10000000);
+        await income.connect(admin).approve(nft, 10000000);
 
         // mint
         const daily = genTokenIds('2022-02-02', '2022-12-02', 'daily');
@@ -410,7 +412,7 @@ describe("DeMineNFT", function () {
         // alchemize
         const alchemist = await erc1155.alchemist();
         await expect(
-            erc1155.connect(custodian).safeBatchTransferFrom(
+            erc1155.connect(admin).safeBatchTransferFrom(
                 custodian.address,
                 alchemist,
                 token.encode(ethers, daily.slice(13, 16)),
@@ -434,7 +436,7 @@ describe("DeMineNFT", function () {
         ).to.be.revertedWith('DeMineNFT: from alchemist');
 
         checkEvent(
-            await erc1155.connect(custodian).safeBatchTransferFrom(
+            await erc1155.connect(admin).safeBatchTransferFrom(
                 custodian.address,
                 alchemist,
                 [
