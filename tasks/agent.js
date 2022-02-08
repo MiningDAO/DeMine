@@ -1,5 +1,6 @@
 const assert = require("assert");
 const { types } = require("hardhat/config");
+const logger = require('../lib/logger.js');
 const common = require("../lib/common.js");
 
 task('agent-clone', 'Deploy clone of demine agent')
@@ -39,7 +40,7 @@ task('agent-clone', 'Deploy clone of demine agent')
         const { args: [from, cloned] } = events.find(
             function(e) { return e.event === 'Clone'; }
         );
-        console.log(
+        logger.log(
             'Cloning contract DeMineAgent at ' + cloned +
             ' with ' + common.gas(txReceipt) + ' gas'
         );

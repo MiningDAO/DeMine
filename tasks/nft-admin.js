@@ -1,5 +1,5 @@
 const nft = require("../lib/nft.js");
-const logger = require('npmlog');
+const logger = require('../lib/logger');
 const { types } = require("hardhat/config");
 const common = require("../lib/common.js");
 const state = require("../lib/state.js");
@@ -78,7 +78,7 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
         );
 
         logger.info('Summary: ');
-        common.print({
+        logger.info(JSON.stringify({
             address: nft.target,
             operator: admin.address,
             finalized: formatTs(finalized.toNumber()),
@@ -94,7 +94,7 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
                 'tokenValue(canonicalized)': canonicalizedTokenValue,
                 supply: supply.toString()
             },
-        });
+        }, null, 2));
 
         if (admin.signer) {
             await common.run(hre, async function() {
@@ -108,11 +108,11 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
                 [finalizing, canonicalizedTokenValue, supply]
             );
             logger.info('Not signer, call with following calldata');
-            common.print({
+            logger.info(JSON.stringify({
                 operator: admin.address,
                 contract: erc1155Facet.address,
                 calldata
-            });
+            }, null, 2));
         }
     });
 
@@ -133,7 +133,8 @@ task('nft-admin-mint', 'mint new demine nft tokens')
             amounts.push(args.amount);
         }
         const encodedIds = token.encode(ethers, ids);
-        const info = {
+        logger.info('Will mint nft with following info:');
+        logger.info(JSON.stringify({
             address: nft.target,
             operator: admin.address,
             numTokenTypes: ids.length,
@@ -141,9 +142,7 @@ task('nft-admin-mint', 'mint new demine nft tokens')
             idsAsDate: token.readableIds(ids),
             ids: encodeIds.map(t => t.toHexString()),
             amounts: amounts.join(',')
-        };
-        logger.info('Will mint nft with following info:');
-        common.print(JSON.stringify(info, null, 2));
+        }, null, 2));
 
         if (admin.signer) {
             await common.run(hre, async function() {
@@ -157,11 +156,11 @@ task('nft-admin-mint', 'mint new demine nft tokens')
                 'mint',
                 [encodedIds, amounts, []]
             );
-            common.print({
+            logger.info(JSON.stringify({
                 operator: admin.address,
                 contract: erc1155Facet.address,
                 calldata
-            });
+            }, null, 2));
         }
     });
 
@@ -206,10 +205,10 @@ task('nft-admin-release', 'transfer demine nft tokens')
                 'safeBatchTransferFrom',
                 [custodian.address, to, token.encode(ethers, ids), amounts, []]
             );
-            common.print({
+            logger.info(JSON.stringify({
                 operator: admin.address,
                 contract: erc1155Facet.address,
                 calldata
-            });
+            }, null, 2));
         }
     });

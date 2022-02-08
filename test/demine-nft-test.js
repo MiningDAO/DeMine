@@ -7,7 +7,7 @@ const config = require("../lib/config.js");
 const hre = require("hardhat");
 const address0 = hre.ethers.constants.AddressZero;
 
-const logger = require('npmlog');
+const logger = require('../lib/logger')(module);
 logger.level = 'warn';
 
 async function facetAddress(name) {

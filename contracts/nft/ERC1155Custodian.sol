@@ -8,16 +8,16 @@ import "@openzeppelin/contracts/interfaces/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract ERC1155Custodian is IERC1155Receiver, Ownable {
-    constructor(address custodian) {
-        _transferOwnership(custodian);
+    constructor(address owner) {
+        _transferOwnership(owner);
     }
 
     function custody(
         address nft,
-        address operator,
+        address admin,
         bool approved
     ) onlyOwner external {
-        IERC1155(nft).setApprovalForAll(operator, approved);
+        IERC1155(nft).setApprovalForAll(admin, approved);
     }
 
     function onERC1155Received(

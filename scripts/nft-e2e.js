@@ -1,12 +1,12 @@
-const hre = require("hardhat");
-const ethers = hre.ethers;
+const { ethers, run } = require("hardhat");
 
 async function main() {
-    const nft = await hre.run('nft-clone', {coin: 'btc'});
-    const erc1155 = await ethers.getContractAt('ERC1155Facet', nft.target);
+    await run('deploy', {tags: 'NFT'});
+    const nft = await run('nft-clone', {coin: 'btc'});
+    const erc1155 = await ethers.getContractAt('ERC1155Facet', nft);
     const earningToken = await ethers.getContractAt(
         '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
-        await erc1155Facet.earningToken()
+        await erc1155.earningToken()
     );
 }
 

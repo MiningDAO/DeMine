@@ -1,5 +1,5 @@
 const assert = require("assert");
-const logger = require('npmlog');
+const logger = require('../lib/logger.js');
 const common = require("../lib/common.js");
 const config = require("../lib/config.js");
 const diamond = require("../lib/diamond.js");
@@ -68,11 +68,11 @@ task("wrapped-clone", "clone wrapped token")
 
         const erc20 = await ethers.getContractAt('ERC20Facet', cloned);
         const supply = ethers.BigNumber.from(10).pow(c.decimals).mul(1000);
-        common.print({
+        logger.info(JSON.stringify({
             operator: admin.address,
             to: admin.address,
             supply: supply.toString()
-        });
+        }, null, 2));
         logger.info('Minting supply to admin with following info');
         if (admin.signer) {
             await common.run(hre, async function() {
@@ -86,11 +86,11 @@ task("wrapped-clone", "clone wrapped token")
                 [admin.address, 10000000000]
             );
             logger.info('Not signer, call with following calldata');
-            common.print({
+            logger.info(JSON.stringify({
                 operator: admin.address,
                 contract: erc20.address,
                 calldata
-            });
+            }, null, 2));
         }
 
         state.updateContract(
@@ -137,12 +137,12 @@ task("wrapped-balance", "check balance")
         const wrapped = getWrapped(hre, args.coin);
         const erc20 = await ethers.getContractAt('ERC20Facet', wrapped.target);
         const balance = await erc20.balanceOf(args.who);
-        common.print({
+        logger.info(JSON.stringify({
             source: wrapped.source,
             erc20: wrapped.target,
             account: args.who,
             balance: balance.toString()
-        });
+        }, null, 2));
         return balance;
     });
 
@@ -177,11 +177,11 @@ task('wrapped-mint', 'mint new nft tokens')
             const calldata = erc20.interface.encodeFunctionData(
                 'mint', [admin.address, args.amount]
             );
-            common.print({
+            logger.info(JSON.stringify({
                 operator: admin.address,
                 contract: erc20.address,
                 calldata
-            });
+            }, null, 2));
         }
     });
 
@@ -214,10 +214,10 @@ task('wrapped-burn', 'burn wrapped tokens')
             const calldata = erc20.interface.encodeFunctionData(
                 'burn', [args.amount]
             );
-            common.print({
+            logger.info(JSON.stringify({
                 operator: admin.address,
                 contract: erc20.address,
                 calldata
-            });
+            }, null, 2));
         }
     });

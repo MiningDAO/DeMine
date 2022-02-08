@@ -1,5 +1,5 @@
 const { types } = require("hardhat/config");
-const logger = require('npmlog');
+const logger = require('../lib/logger.js');
 const common = require("../lib/common.js");
 const state = require("../lib/state.js");
 const diamond = require("../lib/diamond.js");
@@ -56,7 +56,7 @@ task('nft-clone', 'Deploy clone of demine nft')
             iface.encodeFunctionData('init', [reward.address])
         ];
         logger.info('Cloning DeMineNFT');
-        common.print({
+        logger.info(JSON.stringify({
             network: network.name,
             source: base.address,
             owner: admin.address,
@@ -72,7 +72,7 @@ task('nft-clone', 'Deploy clone of demine nft')
                 royaltyBps: royaltyBps,
                 baseUri: uri
             }
-        });
+        }, null, 2));
         const { events } = receipt = await common.run(
             hre,
             async function() {
@@ -86,11 +86,11 @@ task('nft-clone', 'Deploy clone of demine nft')
 
         logger.info('Setting up custody with follow info');
         const custodian = await config.getDeployment(hre, 'ERC1155Custodian');
-        common.print({
+        logger.info(JSON.stringify({
             nft: cloned,
             admin: admin.address,
             approved: true
-        });
+        }, null, 2));
         if (admin.signer) {
             await common.run(hre, async function() {
                 return await custodian.connect(
@@ -104,11 +104,11 @@ task('nft-clone', 'Deploy clone of demine nft')
                 'custody',
                 [cloned, admin.address, true]
             );
-            common.print({
+            logger.info(JSON.stringify({
                 operator: admin.address,
                 contract: custodian.address,
                 calldata
-            });
+            }, null, 2));
         }
         state.updateContract(
             hre, args.coin, {
@@ -130,7 +130,7 @@ task('nft-list-token', 'list tokens give date range')
         nftLib.validateCommon(args, hre);
         const nft = state.loadNFTClone(hre, args.coin);
         const ids = nftLib.parseTokenIds(args.tokens);
-        console.log(JSON.stringify({
+        logger.info(JSON.stringify({
             source: nft.source,
             contract: nft.target,
             numTokenTypes: ids.length,
@@ -151,7 +151,7 @@ task('nft-token', 'check earning for token starting with date specified')
         const finalized = (await erc1155Facet.finalized()).toNumber();
         const earning = await erc1155Facet.earning(token.encodeOne(ethers, id));
         const supply = await erc1155Facet.supplyOf(token.encodeOne(ethers, id));
-        console.log(JSON.stringify({
+        logger.info(JSON.stringify({
             token: id,
             contract: nft.target,
             earning: result.toString(),
@@ -175,7 +175,7 @@ task('nft-balance', 'check DeMineNFT balance for user')
             ethers.utils.getAddress(args.who),
             token.encodeOne(ethers, id)
         );
-        console.log(JSON.stringify({
+        logger.info(JSON.stringify({
             token: id,
             balance: balance.toNumber(),
         }, null, 2));
@@ -230,7 +230,7 @@ task('nft-inspect', 'Inspect state of DeMineNFT contract')
             balance: (await reward.balanceOf(nft.target)).toString()
         };
         logger.info('Generating summary...');
-        common.print({
+        logger.info(JSON.stringify({
             source: nft.source,
             address: nft.target,
             ownership,
@@ -242,5 +242,5 @@ task('nft-inspect', 'Inspect state of DeMineNFT contract')
                 recipient: royaltyInfo[0],
                 bps: royaltyInfo[1].toNumber(),
             }
-        });
+        }, null, 2));
     });
