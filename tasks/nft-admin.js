@@ -1,31 +1,40 @@
+const { types } = require("hardhat/config");
+const BigNumber = require("bignumber.js");
+const assert = require("assert");
 const nft = require("../lib/nft.js");
 const logger = require('../lib/logger');
-const { types } = require("hardhat/config");
 const common = require("../lib/common.js");
 const state = require("../lib/state.js");
+const time = require("../lib/time.js");
 const token = require("../lib/token.js");
 const antpool = require("../lib/antpool.js");
 const binance = require("../lib/binance.js");
-const nftLib = require("../lib/nft.js");
+const config = require("../lib/config.js");
 
 task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'Coin of DeMineNFT')
     .addOptionalParam('date', 'Date to finalize, format: YYYY-MM-DD')
+    .addOptionalParam('nft', 'nft contract address')
     .addFlag('enforce', 'enforce to set even the hashrate is smaller than supply')
     .setAction(async (args, { ethers, network } = hre) => {
-        nftLib.validateCommon(args, hre);
-        assert(args.date && time.validateDate(args.date), 'invalid date');
+        logger.info("=========== nft-admin-finalize start ===========");
+        config.validateCoin(args.coin);
+        assert(
+            args.date == undefined || time.validateDate(args.date),
+            'invalid date'
+        );
 
         // step1: withdraw balance to admin
-        logger.info("Step1: Withdraw balance from binance to admin");
-        const admin = config.admin(hre);
+        const admin = await config.admin(hre);
         if (hre.network.name == 'bsc') {
+            logger.info("Will withdraw balance from binance to admin");
             await binance.withdrawAll(hre, args.coin, admin.address);
         }
 
-        const nft = state.loadNFTClone(hre, args.coin);
-        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
-        logger.info(`NFT ${nft.target} loaded`);
+        // step2: finalize
+        const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
+        logger.info(`NFT contract ${nft} loaded`);
         const rewardToken = await ethers.getContractAt(
             '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
             await erc1155Facet.earningToken()
@@ -40,7 +49,7 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
 
         const finalizing = args.date
             ? time.toEpoch(new Date(args.date)) + 86400
-            : finalized + 86400; // move timestamp to end of day
+            : finalized.add(86400).toNumber(); // move timestamp to end of day
         logger.info(`Finalizing ${formatTs(finalizing)}`);
         assert(finalizing > finalized, `Error: already finalized`);
         const now = time.toEpoch(new Date());
@@ -50,48 +59,51 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
             ? await antpool.statsYesterday(localConfig.antpool, args.coin)
             : await antpool.stats(localConfig.antpool, args.coin, finalizing);
         const hashPerToken = localConfig.hashPerToken[args.coin.toLowerCase()];
-        poolStats.hashrate = poolStats.hashrate.div(hashPerToken);
-        logger.info(`AntPool stats loaded: ${JSON.stringify(poolStats)}`);
+        poolStats.canonicalizedHashrate = poolStats.hashrate.div(hashPerToken);
+        logger.info('AntPool stats loaded: ' + JSON.stringify(poolStats, null, 2));
 
         const supply = await token.supplyOf(hre.ethers, erc1155Facet, finalizing);
-        logger.info(`Hashrate supply is ${supply}`);
-        if (hashrate.lt(supply.toString())) {
+        logger.info(`Token supply is ${supply}`);
+        if (poolStats.canonicalizedHashrate.lt(supply.toString())) {
             const errMsg = "Effective hashrate is lower than token supply!"
             assert(args.enforce, "Error: " + errMsg);
             logger.warn(errMsg);
         }
 
         const decimals = await rewardToken.decimals();
-        const tokenValue = poolStats.totalEarned.div(hashrate).toFixed(decimals, 1);
-
         const base = new BigNumber(10).pow(decimals);
+
+        const tokenValue = poolStats.totalEarned.div(
+            poolStats.canonicalizedHashrate
+        ).toFixed(decimals, 1);
         const canonicalizedTokenValue = ethers.BigNumber.from(
             new BigNumber(tokenValue).times(base).integerValue().toString()
         );
-        const amountToDeposit = tokenValue.mul(supply.toString());
-        const adminBalance = new BigNumber(
-            (await rewardToken.balanceOf(admin.address)).toString()
-        ).div(base);
+
+        const amountToDeposit = new BigNumber(tokenValue).times(supply.toString());
+        const canonicalizedAmountToDeposit = canonicalizedTokenValue.mul(supply);
+        const canonicalizedAdminBalance = await rewardToken.balanceOf(admin.address);
+        const adminBalance = new BigNumber(canonicalizedAdminBalance.toString()).div(base);
         assert(
             amountToDeposit.lte(adminBalance.toString()),
             'Error: Insufficient balance from admin'
         );
 
-        logger.info('Summary: ');
-        logger.info(JSON.stringify({
-            address: nft.target,
+        logger.info('Summary: ' + JSON.stringify({
+            address: nft,
             operator: admin.address,
             finalized: formatTs(finalized.toNumber()),
             antpool: poolStats,
-            financial: {
+            earning: {
                 totalEarned: poolStats.totalEarned,
-                amountToDeposit: amountToDeposit.div(base),
-                amountToReserve: totalEarned.minus(amountToDeposit)
+                amountToDeposit: amountToDeposit,
+                'amountToDeposit(canonicalized)': canonicalizedAmountToDeposit.toString(),
+                amountToReserve: poolStats.totalEarned.minus(amountToDeposit)
             },
             finalizing: {
                 timestamp: formatTs(finalizing),
-                tokenValue: tokenValue,
-                'tokenValue(canonicalized)': canonicalizedTokenValue,
+                tokenValue: tokenValue.toString,
+                'tokenValue(canonicalized)': canonicalizedTokenValue.toString(),
                 supply: supply.toString()
             },
         }, null, 2));
@@ -100,115 +112,126 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
             await common.run(hre, async function() {
                 return await erc1155Facet.connect(
                     admin.signer
-                ).finalize(finalizing, tokenValue);
+                ).finalize(
+                    finalizing,
+                    canonicalizedTokenValue,
+                    admin.address,
+                    canonicalizedAmountToDeposit
+                );
             });
         } else {
             const calldata = erc1155Facet.interface.encodeFunctionData(
                 'finalize',
-                [finalizing, canonicalizedTokenValue, supply]
+                [
+                    finalizing,
+                    canonicalizedTokenValue,
+                    admin.address,
+                    canonicalizedAmountToDeposit
+                ]
             );
-            logger.info('Not signer, call with following calldata');
-            logger.info(JSON.stringify({
+            logger.info('Not signer, calling info:' + JSON.stringify({
                 operator: admin.address,
                 contract: erc1155Facet.address,
                 calldata
             }, null, 2));
         }
+        logger.info("=========== nft-admin-finalize End ===========");
     });
 
 task('nft-admin-mint', 'mint new demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
     .addParam('tokens', 'date range and token type, format: 2022-02-02,2022-02-10,daily')
     .addParam('amount', 'amount per token', undefined, types.int)
+    .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
-        nftLib.validateCommon(args, hre);
+        logger.info("=========== nft-admin-mint start ===========");
+        config.validateCoin(args.coin);
 
         const admin = await config.admin(hre);
-        const ids = nftLib.parseTokenIds(args.tokens);
-        const nft = state.loadNFTClone(hre, args.coin);
-        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
-
-        var amounts = [];
-        for (let i = 0; i < ids.length; i++) {
-            amounts.push(args.amount);
-        }
+        const ids = token.parseTokenIds(args.tokens);
         const encodedIds = token.encode(ethers, ids);
-        logger.info('Will mint nft with following info:');
-        logger.info(JSON.stringify({
-            address: nft.target,
+        const amounts = Array(ids.length).fill(args.amount);
+        const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
+
+        logger.info('Will mint nft with following info:' + JSON.stringify({
+            address: nft,
             operator: admin.address,
             numTokenTypes: ids.length,
             amountPerToken: args.amount,
             idsAsDate: token.readableIds(ids),
-            ids: encodeIds.map(t => t.toHexString()),
+            ids: encodedIds.map(t => t.toHexString()),
             amounts: amounts.join(',')
         }, null, 2));
 
         if (admin.signer) {
             await common.run(hre, async function() {
-                return await erc1155Facet.mint(
+                return await erc1155Facet.connect(
                     admin.signer
                 ).mint(encodedIds, amounts, []);
             });
         } else {
-            logger.info('Not signer, please call manually with following info');
             const calldata = erc1155Facet.interface.encodeFunctionData(
                 'mint',
                 [encodedIds, amounts, []]
             );
-            logger.info(JSON.stringify({
+            logger.info('Not signer, calling info: ' + JSON.stringify({
                 operator: admin.address,
                 contract: erc1155Facet.address,
                 calldata
             }, null, 2));
         }
+        logger.info("=========== nft-admin-mint end ===========");
     });
 
 task('nft-admin-release', 'transfer demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
     .addParam('to', 'address of recipient')
     .addParam('tokens', 'date range and token type, format: 2022-02-02,2022-02-10,daily')
-    .addParam('amounts', 'amount to transfer')
+    .addParam('amount', 'amount to release per token', undefined, types.int)
+    .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
-        nftLib.validateCommon(args, hre);
+        logger.info("=========== nft-admin-release start ===========");
+        config.validateCoin(args.coin);
 
-        const admin = config.admin(hre);
-        const ids = nftLib.parseTokenIds(args.tokens);
+        const admin = await config.admin(hre);
+        const ids = token.parseTokenIds(args.tokens);
+        const encodedIds = token.encode(ethers, ids);
+        const amounts = Array(ids.length).fill(args.amount);
         const to = ethers.utils.getAddress(args.to);
-        const nft = state.loadNFTClone(hre, args.coin);
-        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft.target);
-        const amounts = args.amounts.split(',').map(i => parseInt(i));
+        const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
         const custodian = await config.getDeployment(hre, 'ERC1155Custodian');
-        const info = {
-            contract: nft.target,
+        logger.info('Will release nft with following info: ' + JSON.stringify({
+            contract: nft,
             operator: admin.address,
             from: custodian.address,
             to: to,
+            amountPerToken: args.amount,
             numTokenTypes: ids.length,
-            id: ids.map(id => id.startDate.split('T')[0]).join(','),
+            idsAsDate: token.readableIds(ids),
+            ids: encodedIds.map(t => t.toHexString()),
             amount: amounts.join(',')
-        };
-        logger.info('Will transfer nft with following info:');
-        logger.info(JSON.stringify(info, null, 2));
+        }, null, 2));
 
         if (admin.signer) {
             await common.run(hre, async function() {
                 return await erc1155Facet.connect(
                     admin.signer
                 ).safeBatchTransferFrom(
-                    custodian.address, to, token.encode(ethers, ids), amounts, []
+                    custodian.address, to, encodedIds, amounts, []
                 )
             });
         } else {
-            logger.info('Not signer, please call manually with following info');
             const calldata = erc1155Facet.interface.encodeFunctionData(
                 'safeBatchTransferFrom',
-                [custodian.address, to, token.encode(ethers, ids), amounts, []]
+                [custodian.address, to, encodedIds, amounts, []]
             );
-            logger.info(JSON.stringify({
+            logger.info('Not signer, calling info: ' + JSON.stringify({
                 operator: admin.address,
                 contract: erc1155Facet.address,
                 calldata
             }, null, 2));
         }
+        logger.info("=========== nft-admin-release end ===========");
     });

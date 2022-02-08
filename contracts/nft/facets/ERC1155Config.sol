@@ -16,14 +16,24 @@ abstract contract ERC1155Config is
     IERC1155Rewardable,
     ERC1155Metadata
 {
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
     address immutable _custodian;
     AppStorage internal s;
 
     constructor(address c) {
         _custodian = c;
+        s.status = _NOT_ENTERED;
     }
 
     event TokenRoyaltyBpsSet(uint16);
+
+    modifier nonReentrant() {
+        require(s.status != _ENTERED, "ReentrancyGuard: reentrant call");
+        s.status = _ENTERED;
+        _;
+        s.status = _NOT_ENTERED;
+    }
 
     function setURI(string memory baseURI) external onlyOwner {
         _setBaseURI(baseURI);

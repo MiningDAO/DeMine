@@ -10,6 +10,7 @@ struct RoyaltyInfo {
 struct AppStorage {
     RoyaltyInfo royalty;
     address earningToken;
+    uint256 status;
 
     // Oracle
     uint128 finalized;

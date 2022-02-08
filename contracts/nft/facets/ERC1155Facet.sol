@@ -73,22 +73,12 @@ contract ERC1155Facet is
         uint[] memory ids,
         uint[] memory amounts,
         bytes memory data
-    ) internal virtual override(ERC1155BaseInternal) {
+    ) internal nonReentrant virtual override(ERC1155BaseInternal) {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
         // mint
         if (from == address(0)) {
             for (uint i = 0; i < ids.length; i++) {
                 s.supply[ids[i]] += amounts[i];
-            }
-        // release
-        } else if (from == _custodian) {
-            uint lastFinalized = s.finalized;
-            for (uint i = 0; i < ids.length; i++) {
-                uint128 start = uint128(ids[i] >> 128);
-                require(
-                    start >= lastFinalized,
-                    'DeMineNFT: token finalized or in finalization'
-                );
             }
         // alchemize or burn
         } else if (to == _custodian) {

@@ -28,7 +28,7 @@ const config = {
         btc: new BigNumber('1e+12'),
     },
     antpool: {
-        api: 'https://antpool.com/api/',
+        api: 'https://v3.antpool.com/api/',
         userId: process.env.ANTPOOL_SIGN_ID,
         key: process.env.ANTPOOL_KEY,
         secret: process.env.ANTPOOL_SECRET,

@@ -7,8 +7,11 @@ const config = require("../lib/config.js");
 const hre = require("hardhat");
 const address0 = hre.ethers.constants.AddressZero;
 
-const logger = require('../lib/logger')(module);
-logger.level = 'warn';
+const logger = require('../lib/logger.js');
+const console = logger.rawLogger.transports.find(
+    t => t.name == 'console'
+);
+console.level = 'warn';
 
 async function facetAddress(name) {
     const facet = await hre.deployments.get(name);
@@ -49,15 +52,15 @@ describe("DeMineNFT", function () {
         var tokenIds = genTokenIds('2022-02-02', '2022-02-05', 'daily');
         expect(tokenIds.length).to.equal(4);
 
-        tokenIds = genTokenIds('2022-02-05', '2022-02-18', 'weekly');
+        tokenIds = genTokenIds('2022-02-03', '2022-02-18', 'weekly');
         expect(tokenIds.length).to.equal(2);
-        tokenIds = genTokenIds('2022-02-05', '2022-02-17', 'weekly');
+        tokenIds = genTokenIds('2022-02-04', '2022-02-17', 'weekly');
         expect(tokenIds.length).to.equal(1);
 
-        tokenIds = genTokenIds('2022-02-11', '2022-03-09', 'biweekly');
-        expect(tokenIds.length).to.equal(1);
-        tokenIds = genTokenIds('2022-02-11', '2022-03-10', 'biweekly');
+        tokenIds = genTokenIds('2022-02-03', '2022-03-10', 'biweekly');
         expect(tokenIds.length).to.equal(2);
+        tokenIds = genTokenIds('2022-02-04', '2022-03-10', 'biweekly');
+        expect(tokenIds.length).to.equal(1);
     });
 
     it("Custody", async function() {
@@ -322,11 +325,11 @@ describe("DeMineNFT", function () {
         const weeks = function(start, end) {
             return Math.floor(
                 (
-                    new Date(end).getTime() + 86400000- new Date(start).getTime()
+                    new Date(end).getTime() + 86400000 - new Date(start).getTime()
                 ) / (86400000 * 7)
             );
         };
-        expect(weekly.length).to.equal(weeks('2022-02-02', '2022-12-02'));
+        expect(weekly.length).to.equal(weeks('2022-02-03', '2022-11-29'));
         const weeklyAmounts = Array(weekly.length).fill(200);
         await erc1155.connect(admin).mint(
             token.encode(ethers, weekly), weeklyAmounts, []
@@ -340,7 +343,7 @@ describe("DeMineNFT", function () {
                 ) / (86400000 * 7 * 2)
             );
         };
-        expect(biweekly.length).to.equal(biweeks('2022-02-02', '2022-12-02'));
+        expect(biweekly.length).to.equal(biweeks('2022-02-03', '2022-11-22'));
         const biweeklyAmounts = Array(biweekly.length).fill(300);
         await erc1155.connect(admin).mint(
             token.encode(ethers, biweekly), biweeklyAmounts, []
@@ -392,8 +395,8 @@ describe("DeMineNFT", function () {
         };
         await finalize('2022-02-03', 1);
         expect(await earning(daily[0])).to.equal(1);
-        expect(await earning(weekly[0])).to.equal(1);
-        expect(await earning(biweekly[0])).to.equal(1);
+        expect(await earning(weekly[0])).to.equal(0);
+        expect(await earning(biweekly[0])).to.equal(0);
 
         // finalize already finalized
         await expect(
@@ -401,6 +404,12 @@ describe("DeMineNFT", function () {
                 time.toEpoch(new Date('2022-02-02')), 1, admin.address, 600
             )
         ).to.be.revertedWith('DeMineNFT: invalid timestamp')
+
+        await finalize('2022-02-09', 2);
+        expect(await earning(daily[6])).to.equal(2);
+        expect(await earning(weekly[0])).to.equal(2);
+        expect(await earning(biweekly[0])).to.equal(2);
+
         // release already finalized
         await expect(
             erc1155.connect(admin).safeBatchTransferFrom(
@@ -418,35 +427,25 @@ describe("DeMineNFT", function () {
             )
         ).to.be.revertedWith("DeMineNFT: token finalized or in finalization");
 
-        await finalize('2022-02-09', 2);
-        expect(await earning(daily[0])).to.equal(1);
-        expect(await earning(daily[6])).to.equal(2);
-        expect(await earning(weekly[0])).to.equal(3);
-        expect(await earning(weekly[1])).to.equal(0);
-        expect(await earning(biweekly[0])).to.equal(3);
-
         await finalize('2022-02-10', 3);
-        expect(await earning(daily[6])).to.equal(2);
         expect(await earning(daily[7])).to.equal(3);
-        expect(await earning(weekly[0])).to.equal(3);
-        expect(await earning(weekly[1])).to.equal(3);
-        expect(await earning(biweekly[0])).to.equal(6);
+        expect(await earning(weekly[0])).to.equal(5);
+        expect(await earning(biweekly[0])).to.equal(5);
 
         await finalize('2022-02-16', 4);
-        expect(await earning(daily[7])).to.equal(3);
         expect(await earning(daily[13])).to.equal(4);
-        expect(await earning(weekly[1])).to.equal(7);
-        expect(await earning(weekly[2])).to.equal(0);
-        expect(await earning(biweekly[0])).to.equal(10);
-        expect(await earning(biweekly[1])).to.equal(0);
+        expect(await earning(weekly[1])).to.equal(4);
+        expect(await earning(biweekly[0])).to.equal(9);
 
         await finalize('2022-02-17', 5);
-        expect(await earning(daily[13])).to.equal(4);
         expect(await earning(daily[14])).to.equal(5);
-        expect(await earning(weekly[1])).to.equal(7);
-        expect(await earning(weekly[2])).to.equal(5);
-        expect(await earning(biweekly[0])).to.equal(10);
-        expect(await earning(biweekly[1])).to.equal(5);
+        expect(await earning(weekly[1])).to.equal(9);
+        expect(await earning(biweekly[0])).to.equal(14);
+
+        await finalize('2022-02-18', 6);
+        expect(await earning(daily[15])).to.equal(6);
+        expect(await earning(weekly[2])).to.equal(6);
+        expect(await earning(biweekly[1])).to.equal(6);
 
         // alchemize
         checkEvent(
@@ -465,12 +464,12 @@ describe("DeMineNFT", function () {
             ),
             nft,
             'Alchemy',
-            [deployer.address, 2900]
+            [deployer.address, 3700]
         );
         const balanceOf = async function(address, id) {
             return await erc1155.balanceOf(address, token.encodeOne(ethers, id));
         };
-        expect(await income.balanceOf(nft)).to.equal(6100);
+        expect(await income.balanceOf(nft)).to.equal(8900);
         expect(await balanceOf(deployer.address, daily[13])).to.equal(0);
         expect(await balanceOf(deployer.address, daily[14])).to.equal(0);
         expect(await balanceOf(deployer.address, weekly[0])).to.equal(0);
