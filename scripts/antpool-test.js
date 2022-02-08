@@ -6,7 +6,7 @@ const logger = require('../lib/logger.js');
 const console = logger.rawLogger.transports.find(
     t => t.name == 'console'
 );
-console.level = 'debug';
+console.level = 'info';
 
 async function main() {
     const coin = 'btc';
@@ -14,10 +14,13 @@ async function main() {
         await antpool.statsYesterday(localConfig.antpool, coin)
     );
 
-    const finalizing = time.toEpoch(new Date('2022-02-08'));
-    logger.info(
-        await antpool.stats(localConfig.antpool, coin, finalizing)
-    );
+    const startDate = time.toEpoch(new Date('2022-02-02'));
+    const today = time.startOfDay(new Date());
+    for (let i = startDate; i <= today; i += 86400) {
+        logger.info(
+            await antpool.stats(localConfig.antpool, coin, i)
+        );
+    }
 }
 
 main()

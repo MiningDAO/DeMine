@@ -80,7 +80,6 @@ async function main() {
             date: '2022-02-01'
         }
     );
-
     await run(
         'nft-admin-finalize',
         {
