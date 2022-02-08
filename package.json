@@ -3,6 +3,7 @@
     "@openzeppelin/contracts": "^4.4.0",
     "@openzeppelin/contracts-upgradeable": "^4.4.1",
     "app-root-path": "^3.0.0",
+    "axios-retry": "^3.2.4",
     "bignumber.js": "^9.0.2",
     "install": "^0.13.0",
     "lodash": "^4.17.21",
