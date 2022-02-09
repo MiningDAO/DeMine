@@ -32,13 +32,13 @@ task('nft-clone', 'Deploy clone of demine nft')
             return contracts.nft.target;
         }
 
-        const wrappedConfig = localConfig.wrapped[network.name] || {};
-        const wrapped = wrappedConfig[args.coin.toLowerCase()]
+        const earningTokenConfig = localConfig.earningToken[network.name] || {};
+        const earningTokenAddr = earningTokenConfig[args.coin.toLowerCase()]
             || (contracts.wrapped && contracts.wrapped.target)
             || await hre.run('wrapped-clone', { coin: args.coin });
-        const reward = await ethers.getContractAt(
+        const earningToken = await ethers.getContractAt(
             '@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol:IERC20Metadata',
-            wrapped
+            earningTokenAddr
         );
 
         const admin = await config.admin(hre);
@@ -54,7 +54,7 @@ task('nft-clone', 'Deploy clone of demine nft')
                 ['@solidstate/contracts/token/ERC1155/IERC1155.sol:IERC1155']
             ),
             erc1155Facet.address,
-            iface.encodeFunctionData('init', [reward.address])
+            iface.encodeFunctionData('init', [earningToken.address])
         ];
         logger.info('Cloning DeMineNFT: ' + JSON.stringify({
             network: network.name,
@@ -62,11 +62,11 @@ task('nft-clone', 'Deploy clone of demine nft')
             owner: admin.address,
             fallback: erc1155Facet.address,
             fallbackInitArgs: {
-                reward: {
-                    address: reward.address,
-                    name: await reward.name(),
-                    symbol: await reward.symbol(),
-                    decimals: await reward.decimals()
+                earningToken: {
+                    address: earningToken.address,
+                    name: await earningToken.name(),
+                    symbol: await earningToken.symbol(),
+                    decimals: await earningToken.decimals()
                 },
                 royaltyRecipient: admin.address,
                 royaltyBps: royaltyBps,
@@ -229,6 +229,7 @@ task('nft-inspect-contract', 'Inspect state of DeMineNFT contract')
             '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
             await erc1155Facet.earningToken()
         );
+        const custodian = await erc1155Facet.custodian();
         const earningToken = {
             address: reward.address,
             name: await reward.name(),
@@ -241,6 +242,7 @@ task('nft-inspect-contract', 'Inspect state of DeMineNFT contract')
             address: nft.target,
             ownership,
             earningToken,
+            custodian,
             paused: await base.paused(),
             finalized: { finalized, history,},
             uri: await erc1155Facet.uri(0),

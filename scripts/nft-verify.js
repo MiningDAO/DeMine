@@ -7,7 +7,7 @@ async function main() {
     const custodian = await config.getDeployment(hre, 'ERC1155Custodian');
     logger.info('Verifying ERC1155Custodian');
     await run(
-        'verify:verify',
+        'verify',
         {
             address: custodian.address,
             constructorArgsParams: [admin.address]
@@ -17,7 +17,7 @@ async function main() {
     const diamond = await config.getDeployment(hre, 'Diamond');
     logger.info('Verifying Diamond');
     await run(
-        'verify:verify',
+        'verify',
         {
             address: diamond.address,
             constructorArgsParams: []
@@ -27,7 +27,7 @@ async function main() {
     const erc1155Facet = await config.getDeployment(hre, 'ERC1155Facet');
     logger.info('Verifying ERC1155Facet');
     await run(
-        'verify:verify',
+        'verify',
         {
             address: erc1155Facet.address,
             constructorArgsParams: [custodian.address]
@@ -37,7 +37,7 @@ async function main() {
     const erc20Facet = await config.getDeployment(hre, 'ERC20Facet');
     logger.info('Verifying ERC20Facet');
     await run(
-        'verify:verify',
+        'verify',
         {
             address: erc20Facet.address,
             constructorArgsParams: []

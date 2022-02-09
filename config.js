@@ -32,7 +32,7 @@ const config = {
         secret: process.env.ANTPOOL_SECRET,
         feePercent: 0.005,
     },
-    wrapped: {
+    earningToken: {
         bsc: {
             btc: '0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c'
         }
