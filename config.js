@@ -70,7 +70,7 @@ const config = {
         btc: {
             name: 'DeMine Wrapped BTC',
             symbol: 'DBTC',
-            decimals: 8
+            decimals: 18
         },
         eth: {
             name: 'DeMine Wrapped ETH',

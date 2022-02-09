@@ -13,16 +13,17 @@ const config = require("../lib/config.js");
 
 task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'Coin of DeMineNFT')
-    .addOptionalParam('date', 'Date to finalize, format: YYYY-MM-DD')
+    .addOptionalParam(
+        'timestamp',
+        'all tokens ends before timestamp will be finalized',
+        undefined,
+        types.int
+    )
     .addOptionalParam('nft', 'nft contract address')
     .addFlag('enforce', 'enforce to set even the hashrate is smaller than supply')
     .setAction(async (args, { ethers, network } = hre) => {
         logger.info("=========== nft-admin-finalize start ===========");
         config.validateCoin(args.coin);
-        assert(
-            args.date == undefined || time.validateDate(args.date),
-            'invalid date'
-        );
 
         // step1: withdraw balance to admin
         const admin = await config.admin(hre);
@@ -47,10 +48,12 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
         const finalized = await erc1155Facet.finalized();
         logger.info(`Latest finalized is ${formatTs(finalized)}`);
 
-        const finalizing = args.date
-            ? time.toEpoch(new Date(args.date)) + 86400
-            : finalized.add(86400).toNumber(); // move timestamp to end of day
+        const finalizing = args.timestamp || finalized.add(86400).toNumber();
         logger.info(`Finalizing ${formatTs(finalizing)}`);
+        assert(
+            finalizing % 86400 == 0,
+            `Error: timestamp to finalize should be start of day`
+        );
         assert(finalizing > finalized, `Error: already finalized`);
         const now = time.toEpoch(new Date());
         assert(finalizing < now, `Error: cannot finalize future tokens`);

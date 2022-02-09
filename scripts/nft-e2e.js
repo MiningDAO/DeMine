@@ -1,6 +1,8 @@
 const { ethers, run } = hre = require("hardhat");
 const BigNumber = require("bignumber.js");
 const config = require("../lib/config.js");
+const logger = require("../lib/logger.js");
+const time = require("../lib/time.js");
 
 async function main() {
     const admin = await config.admin(hre);
@@ -27,7 +29,7 @@ async function main() {
         {
             coin: coin,
             nft: nft,
-            tokens: "2022-02-01,2022-03-01,daily",
+            tokens: "2022-02-02,2022-02-20,daily",
             amount: 100000000
         }
     );
@@ -36,7 +38,7 @@ async function main() {
         {
             coin: coin,
             nft: nft,
-            tokens: "2022-02-01,2023-02-01,weekly",
+            tokens: "2022-01-01,2023-01-01,weekly",
             amount: 100000000
         }
     );
@@ -46,47 +48,42 @@ async function main() {
         {
             coin: coin,
             nft: nft,
-            tokens: "2022-02-01,2022-02-01,daily",
+            tokens: "2022-02-02,2022-02-20,daily",
+            amount: 40,
+            to: "0x633Da015e60F63b7de56817e9680D532aAa20016"
+        }
+    );
+    await run(
+        'nft-admin-release',
+        {
+            coin: coin,
+            nft: nft,
+            tokens: "2022-01-01,2023-01-01,weekly",
             amount: 60,
             to: "0x633Da015e60F63b7de56817e9680D532aAa20016"
         }
     );
+
+    const startTs = time.toEpoch(new Date('2022-02-02'));
     await run(
-        'nft-admin-release',
+        'nft-admin-finalize',
         {
             coin: coin,
             nft: nft,
-            tokens: "2022-02-02,2022-02-23,daily",
-            amount: 100,
-            to: "0x633Da015e60F63b7de56817e9680D532aAa20016"
-        }
-    );
-    await run(
-        'nft-admin-release',
-        {
-            coin: coin,
-            nft: nft,
-            tokens: "2022-02-24,2023-02-01,weekly",
-            amount: 100,
-            to: "0x633Da015e60F63b7de56817e9680D532aAa20016"
+            timestamp: startTs
         }
     );
 
-    await run(
-        'nft-admin-finalize',
-        {
-            coin: coin,
-            nft: nft,
-            date: '2022-02-01'
-        }
-    );
-    await run(
-        'nft-admin-finalize',
-        {
-            coin: coin,
-            nft: nft
-        }
-    );
+    const endTs = time.startOfDay(new Date());
+    for (let i = startTs + 86400; i <= endTs; i += 86400) {
+        await run(
+            'nft-admin-finalize',
+            {
+                coin: coin,
+                nft: nft
+            }
+        );
+    }
 }
 
 main()

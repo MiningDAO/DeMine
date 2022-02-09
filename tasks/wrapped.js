@@ -79,12 +79,12 @@ task("wrapped-clone", "clone wrapped token")
             await common.run(hre, async function() {
                 return await erc20.connect(
                     admin.signer
-                ).mint(admin.address, 10000000000);
+                ).mint(admin.address, supply);
             });
         } else {
             const calldata = erc20.interface.encodeFunctionData(
                 'mint',
-                [admin.address, 10000000000]
+                [admin.address, supply]
             );
             logger.info('Not signer, calling info: ' + JSON.stringify({
                 operator: admin.address,

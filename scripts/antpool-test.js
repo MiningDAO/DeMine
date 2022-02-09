@@ -2,12 +2,6 @@ const { localConfig } = require("hardhat");
 const time = require("../lib/time.js");
 const antpool = require("../lib/antpool.js");
 
-const logger = require('../lib/logger.js');
-const console = logger.rawLogger.transports.find(
-    t => t.name == 'console'
-);
-console.level = 'info';
-
 async function main() {
     const coin = 'btc';
     logger.info(
@@ -21,6 +15,12 @@ async function main() {
             await antpool.stats(localConfig.antpool, coin, i)
         );
     }
+}
+
+function sleep(ms) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
 }
 
 main()

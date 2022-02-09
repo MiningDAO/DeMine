@@ -125,7 +125,9 @@ describe("DeMineNFT", function () {
         );
 
         // transfer to custodian paused
-        await erc1155.connect(admin).finalize(tokenIds[1].endTs, 0, admin.address, 0);
+        await erc1155.connect(admin).finalize(
+            tokenIds[1].endTs, 0, admin.address, 0
+        );
         await expect(
             erc1155.connect(
                 admin
@@ -409,23 +411,6 @@ describe("DeMineNFT", function () {
         expect(await earning(daily[6])).to.equal(2);
         expect(await earning(weekly[0])).to.equal(2);
         expect(await earning(biweekly[0])).to.equal(2);
-
-        // release already finalized
-        await expect(
-            erc1155.connect(admin).safeBatchTransferFrom(
-                custodian.address,
-                deployer.address,
-                [
-                    token.encodeOne(ethers, daily[13]),
-                    token.encodeOne(ethers, daily[14]),
-                    token.encodeOne(ethers, weekly[0]),
-                    token.encodeOne(ethers, weekly[1]),
-                    token.encodeOne(ethers, biweekly[0])
-                ],
-                [100, 100, 100, 100, 100],
-                []
-            )
-        ).to.be.revertedWith("DeMineNFT: token finalized or in finalization");
 
         await finalize('2022-02-10', 3);
         expect(await earning(daily[7])).to.equal(3);
