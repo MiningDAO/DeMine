@@ -13,9 +13,6 @@ async function main() {
         await run('binance-withdraw', {coin: coin});
     }
 
-    const nft = state.loadNFTClone(hre, coin).target;
-    const erc1155 = await ethers.getContractAt('ERC1155Facet', nft);
-    const finalized = (await erc1155.finalized()).toNumber();
     const endOfYesterday = time.startOfDay(new Date());
     await run(
         'nft-admin-finalize',
