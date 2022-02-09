@@ -85,8 +85,8 @@ async function main() {
     }
 
     const startTs = time.startOfDay(new Date('2022-02-02'));
-    var finalized = await erc1155.finalized();
-    if (finalized.eq(0)) {
+    var finalized = (await erc1155.finalized()).toNumber();
+    if (finalized == 0) {
         await run(
             'nft-admin-finalize',
             {
@@ -99,7 +99,7 @@ async function main() {
     }
 
     const endTs = time.startOfDay(new Date());
-    for (let i = finalized.toNumber() + 86400; i <= endTs; i += 86400) {
+    for (let i = finalized + 86400; i <= endTs; i += 86400) {
         await run(
             'nft-admin-finalize',
             {
