@@ -11,6 +11,16 @@ const antpool = require("../lib/antpool.js");
 const binance = require("../lib/binance.js");
 const config = require("../lib/config.js");
 
+task('binance-withdraw', 'withdraw fund from binance to admin account')
+    .addParam('coin', 'Coin of DeMineNFT')
+    .setAction(async (args, { ethers, network } = hre) => {
+        const admin = await config.admin(hre);
+        if (hre.network.name == 'bsc') {
+            logger.info("Will withdraw balance from binance to admin");
+            await binance.withdrawAll(hre, args.coin, admin.address);
+        }
+    });
+
 task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'Coin of DeMineNFT')
     .addOptionalParam(
@@ -25,14 +35,7 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
         logger.info("=========== nft-admin-finalize start ===========");
         config.validateCoin(args.coin);
 
-        // step1: withdraw balance to admin
         const admin = await config.admin(hre);
-        if (hre.network.name == 'bsc') {
-            logger.info("Will withdraw balance from binance to admin");
-            await binance.withdrawAll(hre, args.coin, admin.address);
-        }
-
-        // step2: finalize
         const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
         logger.info(`NFT contract ${nft} loaded`);
