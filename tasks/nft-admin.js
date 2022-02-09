@@ -1,7 +1,6 @@
 const { types } = require("hardhat/config");
 const BigNumber = require("bignumber.js");
 const assert = require("assert");
-const nft = require("../lib/nft.js");
 const logger = require('../lib/logger');
 const common = require("../lib/common.js");
 const state = require("../lib/state.js");
@@ -61,9 +60,7 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
         const now = time.toEpoch(new Date());
         assert(finalizing < now, `Error: cannot finalize future tokens`);
 
-        const poolStats = (finalizing == time.startOfDay(new Date()))
-            ? await antpool.statsYesterday(localConfig.antpool, args.coin)
-            : await antpool.stats(localConfig.antpool, args.coin, finalizing);
+        const poolStats = await antpool.stats(localConfig.antpool, args.coin, finalizing);
         const hashPerToken = localConfig.hashPerToken[args.coin.toLowerCase()];
         poolStats.canonicalizedHashrate = poolStats.hashrate.div(hashPerToken);
         logger.info('AntPool stats loaded: ' + JSON.stringify(poolStats, null, 2));

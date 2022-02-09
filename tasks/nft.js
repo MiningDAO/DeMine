@@ -6,12 +6,6 @@ const diamond = require("../lib/diamond.js");
 const token = require("../lib/token.js");
 const config = require("../lib/config.js");
 
-function parseToken(input) {
-    const [start, type] = input.split(',');
-    const startTs = token.parseTs(start);
-    return token.genTokenId(startTs, type);
-}
-
 task('nft-clone', 'Deploy clone of demine nft')
     .addParam('coin', 'Coin to deploy')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
@@ -140,20 +134,20 @@ task('nft-tokens', 'list tokens give date range')
 
 task('nft-inspect-token', 'check earning for token starting with date specified')
     .addParam('coin', 'Coin to check')
-    .addParam('token', 'token id, format: start,type')
+    .addParam('id', 'token id')
     .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers, network } = hre) => {
         logger.info("=========== nft-token start ===========");
         config.validateCoin(args.coin);
 
-        const id = parseToken(args.token);
+        const id = ethers.BigNumber.from(id);
         const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
         const finalized = (await erc1155Facet.finalized()).toNumber();
-        const earning = await erc1155Facet.earning(token.encodeOne(ethers, id));
-        const supply = await erc1155Facet.supplyOf(token.encodeOne(ethers, id));
+        const earning = await erc1155Facet.earning(id);
+        const supply = await erc1155Facet.supplyOf(id);
         logger.info(JSON.stringify({
-            token: id,
+            token: id.toHexString(),
             contract: nft,
             earning: result.toString(),
             supply: supply.toString(),
@@ -166,21 +160,20 @@ task('nft-inspect-token', 'check earning for token starting with date specified'
 task('nft-balance', 'check DeMineNFT balance for user')
     .addParam('coin', 'Coin to check')
     .addParam('who', 'account address')
-    .addParam('token', 'token id, format: start,type')
+    .addParam('id', 'token id')
     .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers, network }) => {
         logger.info("=========== nft-balance start ===========");
         config.validateCoin(args.coin);
 
-        const id = parseToken(args.token);
+        const id = ethers.BigNumber.from(id);
         const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
         const balance = await erc1155Facet.balanceOf(
-            ethers.utils.getAddress(args.who),
-            token.encodeOne(ethers, id)
+            ethers.utils.getAddress(args.who), id
         );
         logger.info(JSON.stringify({
-            token: id,
+            token: id.toHexString(),
             balance: balance.toNumber(),
         }, null, 2));
         logger.info("=========== nft-balance end ===========");
