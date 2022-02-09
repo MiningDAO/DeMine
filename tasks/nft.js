@@ -28,6 +28,7 @@ task('nft-clone', 'Deploy clone of demine nft')
             contracts.nft.fallback == erc1155Facet.address
         ) {
             logger.warn("Nothing changed.");
+            logger.info("=========== nft-clone skipped ===========");
             return contracts.nft.target;
         }
 
@@ -123,23 +124,21 @@ task('nft-clone', 'Deploy clone of demine nft')
         return cloned;
     });
 
-task('nft-list-token', 'list tokens give date range')
-    .addParam('coin', 'Coin of DeMineNFT')
+task('nft-tokens', 'list tokens give date range')
     .addParam('tokens', 'date range and token type, format: 2022-02-02,2022-02-10,daily')
-    .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
-        config.validateCoin(args.coin);
-        const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
+        logger.info("=========== nft-tokens start ===========");
         const ids = token.parseTokenIds(args.tokens);
+        const encoded = token.encode(ethers, ids);
         logger.info(JSON.stringify({
-            contract: nft,
             numTokenTypes: ids.length,
-            id: ids.map(id => id.startDate.split('T')[0]).join(','),
+            id: token.readableIds(encoded),
         }, null, 2));
-        return ids;
+        logger.info("=========== nft-tokens end ===========");
+        return encoded;
     });
 
-task('nft-token', 'check earning for token starting with date specified')
+task('nft-inspect-token', 'check earning for token starting with date specified')
     .addParam('coin', 'Coin to check')
     .addParam('token', 'token id, format: start,type')
     .addOptionalParam('nft', 'nft contract address')
@@ -188,7 +187,7 @@ task('nft-balance', 'check DeMineNFT balance for user')
         return balance.toNumber();
     });
 
-task('nft-inspect', 'Inspect state of DeMineNFT contract')
+task('nft-inspect-contract', 'Inspect state of DeMineNFT contract')
     .addParam('coin', 'Coin to deploy')
     .addOptionalParam('nft', 'nft contract address')
     .addOptionalParam('history', 'Num of historical tokens to look back', 5, types.int)

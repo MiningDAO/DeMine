@@ -5,9 +5,7 @@ const BigNumber = require('bignumber.js');
 
 const config = {
     tokenUri: {
-        btc: 'https://www.demine.com/nft/btc/',
-        eth: 'https://www.demine.com/nft/eth/',
-        fil: 'https://www.demine.com/nft/fil/'
+        btc: '',
     },
     royaltyBps: 100,
     accounts: [

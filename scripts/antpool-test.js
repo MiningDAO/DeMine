@@ -1,6 +1,7 @@
 const { localConfig } = require("hardhat");
 const time = require("../lib/time.js");
 const antpool = require("../lib/antpool.js");
+const logger = require("../lib/logger.js");
 
 async function main() {
     const coin = 'btc';

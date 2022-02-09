@@ -143,17 +143,17 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
 
 task('nft-admin-mint', 'mint new demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
-    .addParam('tokens', 'date range and token type, format: 2022-02-02,2022-02-10,daily')
-    .addParam('amount', 'amount per token', undefined, types.int)
+    .addParam('ids', 'token id list, separated by comma')
+    .addParam('amounts', 'amount per token, separated by comma')
     .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
         logger.info("=========== nft-admin-mint start ===========");
         config.validateCoin(args.coin);
 
         const admin = await config.admin(hre);
-        const ids = token.parseTokenIds(args.tokens);
-        const encodedIds = token.encode(ethers, ids);
-        const amounts = Array(ids.length).fill(args.amount);
+        const ids = args.ids.split(',').map(i => ethers.BigNumber.from(i));
+        const amounts = args.amounts.split(',').map(a => parseInt(a));
+
         const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
 
@@ -161,22 +161,21 @@ task('nft-admin-mint', 'mint new demine nft tokens')
             address: nft,
             operator: admin.address,
             numTokenTypes: ids.length,
-            amountPerToken: args.amount,
             idsAsDate: token.readableIds(ids),
-            ids: encodedIds.map(t => t.toHexString()),
-            amounts: amounts.join(',')
+            ids: ids.map(i => i.toHexString()),
+            amounts: args.amounts
         }, null, 2));
 
         if (admin.signer) {
             await common.run(hre, async function() {
                 return await erc1155Facet.connect(
                     admin.signer
-                ).mint(encodedIds, amounts, []);
+                ).mint(ids, amounts, []);
             });
         } else {
             const calldata = erc1155Facet.interface.encodeFunctionData(
                 'mint',
-                [encodedIds, amounts, []]
+                [ids, amounts, []]
             );
             logger.info('Not signer, calling info: ' + JSON.stringify({
                 operator: admin.address,
@@ -190,17 +189,17 @@ task('nft-admin-mint', 'mint new demine nft tokens')
 task('nft-admin-release', 'transfer demine nft tokens')
     .addParam('coin', 'Coin of DeMineNFT')
     .addParam('to', 'address of recipient')
-    .addParam('tokens', 'date range and token type, format: 2022-02-02,2022-02-10,daily')
-    .addParam('amount', 'amount to release per token', undefined, types.int)
+    .addParam('ids', 'token id list, separated by comma')
+    .addParam('amounts', 'amount per token, separated by comma')
     .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
         logger.info("=========== nft-admin-release start ===========");
         config.validateCoin(args.coin);
 
         const admin = await config.admin(hre);
-        const ids = token.parseTokenIds(args.tokens);
-        const encodedIds = token.encode(ethers, ids);
-        const amounts = Array(ids.length).fill(args.amount);
+        const ids = args.ids.split(',').map(i => ethers.BigNumber.from(i));
+        const amounts = args.amounts.split(',').map(a => parseInt(a));
+
         const to = ethers.utils.getAddress(args.to);
         const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
@@ -210,11 +209,10 @@ task('nft-admin-release', 'transfer demine nft tokens')
             operator: admin.address,
             from: custodian.address,
             to: to,
-            amountPerToken: args.amount,
             numTokenTypes: ids.length,
             idsAsDate: token.readableIds(ids),
-            ids: encodedIds.map(t => t.toHexString()),
-            amount: amounts.join(',')
+            ids: ids.map(t => t.toHexString()),
+            amount: args.amounts
         }, null, 2));
 
         if (admin.signer) {
@@ -222,13 +220,13 @@ task('nft-admin-release', 'transfer demine nft tokens')
                 return await erc1155Facet.connect(
                     admin.signer
                 ).safeBatchTransferFrom(
-                    custodian.address, to, encodedIds, amounts, []
+                    custodian.address, to, ids, amounts, []
                 )
             });
         } else {
             const calldata = erc1155Facet.interface.encodeFunctionData(
                 'safeBatchTransferFrom',
-                [custodian.address, to, encodedIds, amounts, []]
+                [custodian.address, to, ids, amounts, []]
             );
             logger.info('Not signer, calling info: ' + JSON.stringify({
                 operator: admin.address,

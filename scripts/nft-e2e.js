@@ -22,60 +22,84 @@ async function main() {
     // set allowance
     const decimals = await earningToken.decimals();
     const allowance = ethers.BigNumber.from(10).pow(decimals).mul(100);
-    await earningToken.connect(admin.signer).approve(nft, allowance);
+    if ((await earningToken.allowance(nft, admin.address)).eq(0)) {
+        await earningToken.connect(admin.signer).approve(nft, allowance);
+    }
 
-    await run(
-        'nft-admin-mint',
-        {
-            coin: coin,
-            nft: nft,
-            tokens: "2022-02-02,2022-02-20,daily",
-            amount: 100000000
-        }
+    const custodian = await erc1155.custodian();
+    const daily = await run(
+        'nft-tokens',
+        {tokens: "2022-02-02,2022-02-20,daily"}
     );
-    await run(
-        'nft-admin-mint',
-        {
-            coin: coin,
-            nft: nft,
-            tokens: "2022-01-01,2023-01-01,weekly",
-            amount: 100000000
-        }
+    if ((await erc1155.balanceOf(custodian, daily[0])).eq(0)) {
+        await run(
+            'nft-admin-mint',
+            {
+                coin: coin,
+                nft: nft,
+                ids: daily.map(i => i.toHexString()).join(','),
+                amounts: Array(daily.length).fill(100000000).join(',')
+            }
+        );
+    }
+    const weekly = await run(
+        'nft-tokens',
+        {tokens: "2022-01-01,2023-01-01,weekly"}
     );
+    if ((await erc1155.balanceOf(custodian, weekly[0])).eq(0)) {
+        await run(
+            'nft-admin-mint',
+            {
+                coin: coin,
+                nft: nft,
+                ids: weekly.map(i => i.toHexString()).join(','),
+                amounts: Array(weekly.length).fill(100000000).join(',')
+            }
+        );
+    }
 
-    await run(
-        'nft-admin-release',
-        {
-            coin: coin,
-            nft: nft,
-            tokens: "2022-02-02,2022-02-20,daily",
-            amount: 40,
-            to: "0x633Da015e60F63b7de56817e9680D532aAa20016"
-        }
-    );
-    await run(
-        'nft-admin-release',
-        {
-            coin: coin,
-            nft: nft,
-            tokens: "2022-01-01,2023-01-01,weekly",
-            amount: 60,
-            to: "0x633Da015e60F63b7de56817e9680D532aAa20016"
-        }
-    );
+    const recipient = "0x633Da015e60F63b7de56817e9680D532aAa20016";
+    if ((await erc1155.balanceOf(recipient, daily[0])).eq(0)) {
+        await run(
+            'nft-admin-release',
+            {
+                coin: coin,
+                nft: nft,
+                ids: daily.map(i => i.toHexString()).join(','),
+                amounts: Array(daily.length).fill(40).join(','),
+                to: recipient
+            }
+        );
+    }
+    if ((await erc1155.balanceOf(recipient, weekly[0])).eq(0)) {
+        await run(
+            'nft-admin-release',
+            {
+                coin: coin,
+                nft: nft,
+                ids: weekly.map(i => i.toHexString()).join(','),
+                amounts: Array(weekly.length).fill(60).join(','),
+                to: recipient
+            }
+        );
+    }
 
-    const startTs = time.toEpoch(new Date('2022-02-02'));
-    await run(
-        'nft-admin-finalize',
-        {
-            coin: coin,
-            nft: nft,
-            timestamp: startTs
-        }
-    );
+    const startTs = time.startOfDay(new Date('2022-02-02'));
+    var finalized = await erc1155.finalized();
+    if (finalized.eq(0)) {
+        await run(
+            'nft-admin-finalize',
+            {
+                coin: coin,
+                nft: nft,
+                timestamp: startTs
+            }
+        );
+        finalized = startTs;
+    }
 
     const endTs = time.startOfDay(new Date());
-    for (let i = startTs + 86400; i <= endTs; i += 86400) {
+    for (let i = finalized.toNumber() + 86400; i <= endTs; i += 86400) {
         await run(
             'nft-admin-finalize',
             {
