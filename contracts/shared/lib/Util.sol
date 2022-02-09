@@ -15,7 +15,15 @@ library Util {
         return a > b ? a : b;
     }
 
+    function uint128max2(uint128 a, uint128 b) internal pure returns(uint128) {
+        return a > b ? a : b;
+    }
+
     function min2(uint a, uint b) internal pure returns(uint) {
+        return a < b ? a : b;
+    }
+
+    function uint128min2(uint128 a, uint128 b) internal pure returns(uint128) {
         return a < b ? a : b;
     }
 

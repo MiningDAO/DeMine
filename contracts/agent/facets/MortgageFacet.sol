@@ -62,7 +62,7 @@ contract MortgageFacet is
         uint tokenCost = s.tokenCost;
         uint128 finalizedEnd = s.finalizedEnd;
 
-        Account memory account = readAccount(msg.sender);
+        Account memory account = s.accounts[msg.sender];
         require(
             account.dailyTokenLockStart + 86400 > finalizedEnd,
             "DeMineAgent: Cannot redeem daily NFT if finalized daily NFTs have not being paid off.");
@@ -78,7 +78,7 @@ contract MortgageFacet is
             if (isDailyToken(ids[i])) {
                 totalCost += tokenCost * amounts[i];
             } else if (isWeeklyToken(ids[i])) {
-                totalCost += tokenCost * amounts[i] * daysInWeek;
+                totalCost += tokenCost * amounts[i] * daysInWeek();
             } else {
                 revert("One token is not daily or weekly");
             }
@@ -97,7 +97,7 @@ contract MortgageFacet is
      *         to prevent infinite loop
      */
     function correctAccount() external whenNotPaused {
-        Account memory current = readAccount(msg.sender);
+        Account memory current = s.accounts[msg.sender];
         Account memory update = Account(
             current.dailyTokenLockStart,
             current.dailyTokenLockEnd,
@@ -128,7 +128,7 @@ contract MortgageFacet is
         }
         lockedDailyToken = nextDailyTokenId(uint256(update.dailyTokenLockStart));
         while(tokenIdToEnd(lockedDailyToken) <= update.dailyTokenLockEnd) {
-            update.maxBalance = Util.max2(update.maxBalance, s.balances[id][msg.sender]);
+            update.maxBalance = Util.max2(update.maxBalance, s.balances[lockedDailyToken][msg.sender]);
             lockedDailyToken = nextDailyTokenId(lockedDailyToken);
         }
 
@@ -155,7 +155,7 @@ contract MortgageFacet is
         }
         lockedWeeklyToken = nextWeeklyTokenId(uint256(update.weeklyTokenLockStart));
         while(tokenIdToEnd(lockedWeeklyToken) <= update.weeklyTokenLockEnd) {
-            update.maxBalance = Util.max2(update.maxBalance, s.balances[id][msg.sender]);
+            update.maxBalance = Util.max2(update.maxBalance, s.balances[lockedWeeklyToken][msg.sender]);
             lockedWeeklyToken = nextWeeklyTokenId(lockedWeeklyToken);
         }
         updateAccount(msg.sender, current, update);
@@ -205,7 +205,7 @@ contract MortgageFacet is
             'DeMineAgent: only minted tokens from DeMineNFT allowed'
         );
         (address mortgager) = abi.decode(data, (address));
-        Account memory current = readAccount(mortgager);
+        Account memory current = s.accounts[mortgager];
         Account memory update = Account(
             current.dailyTokenLockStart,
             current.dailyTokenLockEnd,
@@ -217,11 +217,11 @@ contract MortgageFacet is
             s.balances[ids[i]][mortgager] = balance;
 
             if (isDailyToken(ids[i])) {
-                update.dailyTokenLockStart = Util.min2(tokenIdToStart(ids[i]), update.dailyTokenLockStart);
-                update.dailyTokenLockEnd = Util.max2(tokenIdToEnd(ids[i]), update.dailyTokenLockEnd);
+                update.dailyTokenLockStart = Util.uint128min2(tokenIdToStart(ids[i]), update.dailyTokenLockStart);
+                update.dailyTokenLockEnd = Util.uint128max2(tokenIdToEnd(ids[i]), update.dailyTokenLockEnd);
             } else if (isWeeklyToken(ids[i])) {
-                update.weeklyTokenLockStart = Util.min2(tokenIdToStart(ids[i]), update.weeklyTokenLockStart);
-                update.weeklyTokenLockEnd = Util.max2(tokenIdToEnd(ids[i]), update.weeklyTokenLockEnd);
+                update.weeklyTokenLockStart = Util.uint128min2(tokenIdToStart(ids[i]), update.weeklyTokenLockStart);
+                update.weeklyTokenLockEnd = Util.uint128max2(tokenIdToEnd(ids[i]), update.weeklyTokenLockEnd);
             } else {
                 revert("One token is not daily or weekly");
             }
@@ -239,7 +239,7 @@ contract MortgageFacet is
         uint income;
         uint debt;
         require(end % 86400 == 0, "DeMineAgent: invalid payoff end time");
-        Account memory account = readAccount(msg.sender);
+        Account memory account = s.accounts[msg.sender];
         require(end <= s.finalizedEnd, 'DeMineAgent: cannot payoff unfinalized NFTs');
 
         // Payoff daily token
@@ -247,10 +247,10 @@ contract MortgageFacet is
         do {
             uint balance = s.balances[lockedDailyToken][msg.sender];
             if (balance > 0) {
-                Statement memory st = s.statements[tokenIdToEnd(lockedDailyToken)];
-                income += st.income * balance / st.balance;
+                DailyStatement memory st = s.statements[tokenIdToEnd(lockedDailyToken)];
+                income += st.surplus * balance / st.balance;
                 debt += st.debt * balance / st.balance;
-                s.balances[id][msg.sender] = 0;
+                s.balances[lockedDailyToken][msg.sender] = 0;
             }
             lockedDailyToken = nextDailyTokenId(lockedDailyToken);
         }
@@ -263,13 +263,13 @@ contract MortgageFacet is
             uint balance = s.balances[lockedWeeklyToken][msg.sender];
             if (balance > 0) {
                 uint128 lastDayEnd = tokenIdToEnd(lockedWeeklyToken);
-                uint128 firstDayEnd = lastDayEnd - (daysInWeek() - 1) * 86400;
+                uint128 firstDayEnd = lastDayEnd - (uint128(daysInWeek()) - 1) * 86400;
                 for (uint128 dailyEnd = firstDayEnd; dailyEnd<= lastDayEnd; dailyEnd + 86400) {
-                    Statement memory st = s.statements[dailyEnd];
-                    income += st.income * balance / st.balance;
+                    DailyStatement memory st = s.statements[dailyEnd];
+                    income += st.surplus * balance / st.balance;
                     debt += st.debt * balance / st.balance;
                 }
-                s.balances[id][msg.sender] = 0;
+                s.balances[lockedWeeklyToken][msg.sender] = 0;
             }
             lockedWeeklyToken = nextWeeklyTokenId(lockedWeeklyToken);
         }
@@ -278,15 +278,7 @@ contract MortgageFacet is
 
         s.paymentToken.safeTransferFrom(s.payee, msg.sender, debt);
         s.deposit += debt;
-        s.income.safeTransfer(msg.sender, income);
-    }
-
-    function readAccount(
-        address account
-    ) private view returns(Account memory acc) {
-        acc = s.accounts[account];
-        acc.start = type(uint).max - acc.start;
-        return acc;
+        s.incomeToken.safeTransfer(msg.sender, income);
     }
 
     function updateAccount(
@@ -343,10 +335,12 @@ contract MortgageFacet is
         return uint256(uint256(tokenIdToStart(tokenId) - 86400) << 128 | (tokenIdToStart(tokenId)));
     }
 
+    // nextWeeklyTokenId assumes weekly tokens are created every 7 days.
     function nextWeeklyTokenId(uint256 tokenId) private pure returns(uint256) {
         return uint256(uint256(tokenIdToEnd(tokenId)) << 128 | (tokenIdToEnd(tokenId) + 604800));
     }
 
+    // previousWeeklyTokenId assumes weekly tokens are created every 7 days.
     function previousWeeklyTokenId(uint256 tokenId) private pure returns(uint256) {
         return uint256(uint256(tokenIdToStart(tokenId) - 604800) << 128 | (tokenIdToStart(tokenId)));
     }
