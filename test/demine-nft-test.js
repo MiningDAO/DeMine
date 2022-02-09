@@ -47,6 +47,28 @@ describe("DeMineNFT", function () {
         custodian = await config.getDeployment(hre, 'ERC1155Custodian');
     });
 
+    it("Initializable", async function() {
+        const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
+        const erc20Addr = await erc1155.earningToken();
+        const erc20 = await hre.ethers.getContractAt('Diamond', erc20Addr)
+
+        const iface = new hre.ethers.utils.Interface([
+            'function init(address earningToken)'
+        ]);
+        const fallback = await config.getDeployment(hre, 'ERC1155Facet');
+        await expect(
+          erc20.init([
+              admin.address,
+              await diamond.genInterfaces(
+                  hre,
+                  ['@solidstate/contracts/token/ERC1155/IERC1155.sol:IERC1155']
+              ),
+              fallback.address,
+              iface.encodeFunctionData('init', [erc20Addr])
+          ])
+        ).to.be.revertedWith("Initializable: contract is already initialized");
+    });
+
     it("TokenId", async function() {
         const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
         var tokenIds = genTokenIds('2022-02-02', '2022-02-05', 'daily');
