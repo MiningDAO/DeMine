@@ -116,12 +116,7 @@ describe("DeMineNFT", function () {
     it("DiamondAdmin", async function () {
         const main = await hre.ethers.getContractAt('Diamond', nft);
         const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
-
-        //set fallback address
-        const fallback = await config.getDeployment(hre, 'ERC1155Facet');
-        await expect(
-            await main.connect(deployer).getFallbackAddress()
-        ).to.equal(fallback.address);
+        const earningToken = await erc1155.earningToken();
 
         // Pausable
         expect(await main.paused()).to.be.false;
@@ -164,6 +159,19 @@ describe("DeMineNFT", function () {
 
         await main.connect(admin).unpause();
         expect(await main.paused()).to.be.false;
+
+        //set fallback address
+        const fallback = await config.getDeployment(hre, 'ERC1155Facet');
+        expect(
+            await main.connect(deployer).getFallbackAddress()
+        ).to.equal(fallback.address);
+        await expect(
+            main.connect(deployer).setFallbackAddress(earningToken)
+        ).to.be.revertedWith('Ownable: sender must be owner');
+        await main.connect(admin).setFallbackAddress(earningToken);
+        expect(
+            await main.connect(deployer).getFallbackAddress()
+        ).to.equal(earningToken);
 
         // SafeOwnable
         expect(await main.owner()).to.equal(admin.address);

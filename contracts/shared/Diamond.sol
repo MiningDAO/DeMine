@@ -60,13 +60,20 @@ contract Diamond is
         emit Clone(address(this), cloned);
     }
 
-    function getFallbackAddress() external view returns (address) {
-        return DiamondBaseStorage.layout().fallbackAddress;
-    }
-
-    function setSupportedInterface(bytes4 interfaceId, bool supported) onlyOwner external {
+    function setSupportedInterface(
+        bytes4 interfaceId,
+        bool supported
+    ) onlyOwner external {
         ERC165Storage.Layout storage erc165 = ERC165Storage.layout();
         erc165.setSupportedInterface(interfaceId, supported);
+    }
+
+    function setFallbackAddress(address fallbackAddr) onlyOwner external {
+        DiamondBaseStorage.layout().fallbackAddress = fallbackAddr;
+    }
+
+    function getFallbackAddress() external view returns (address) {
+        return DiamondBaseStorage.layout().fallbackAddress;
     }
 
     function supportsInterface(
