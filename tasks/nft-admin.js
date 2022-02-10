@@ -162,7 +162,7 @@ task('nft-admin-mint', 'mint new demine nft tokens')
             operator: admin.address,
             numTokenTypes: ids.length,
             idsAsDate: token.readableIds(ids),
-            ids: ids.map(i => i.toHexString()),
+            ids: ids.map(i => i.toString()).join(','),
             amounts: args.amounts
         }, null, 2));
 

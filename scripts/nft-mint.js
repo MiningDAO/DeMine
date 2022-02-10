@@ -5,7 +5,7 @@ async function main() {
     const coin = 'btc';
     const weekly = await run(
         'nft-tokens',
-        {tokens: "2022-02-03,2023-02-01,weekly"}
+        {tokens: "2022-02-01,2023-02-01,weekly"}
     );
     const ids = weekly.map(w => w.toString()).join(',');
     const amounts = Array(weekly.length).fill(1000000).join(',');
