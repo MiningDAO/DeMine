@@ -126,7 +126,8 @@ task('nft-tokens', 'list tokens give date range')
         const encoded = token.encode(ethers, ids);
         logger.info(JSON.stringify({
             numTokenTypes: ids.length,
-            id: token.readableIds(encoded),
+            idsAsDate: token.readableIds(encoded),
+            idsAsNumber: encoded.map(e => e.toString()).join(',')
         }, null, 2));
         logger.info("=========== nft-tokens end ===========");
         return encoded;
