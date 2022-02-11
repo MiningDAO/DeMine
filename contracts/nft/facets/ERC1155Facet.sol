@@ -77,8 +77,7 @@ contract ERC1155Facet is
                 s.supply[ids[i]] += amounts[i];
             }
         // alchemize or burn
-        } else if (to == _custodian) {
-            require(from != _custodian, 'NFT: custodian is not allowed');
+        } else if (to == _custodian && from != _custodian) {
             require(!LibPausable.layout().paused, 'Pausable: paused');
             uint totalEarning;
             uint lastFinalized = s.finalized;

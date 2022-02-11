@@ -478,16 +478,6 @@ describe("DeMineNFT", function () {
         );
 
         // alchemize
-        await expect(
-            erc1155.connect(admin).safeBatchTransferFrom(
-                custodian.address,
-                custodian.address,
-                [token.encodeOne(ethers, daily[13])],
-                [100],
-                []
-            )
-        ).to.be.revertedWith("NFT: custodian is not allowed");
-
         await erc1155.connect(deployer).safeBatchTransferFrom(
             deployer.address,
             custodian.address,
@@ -501,10 +491,26 @@ describe("DeMineNFT", function () {
             [100, 100, 100, 100, 100],
             []
         );
+        expect(await income.balanceOf(nft)).to.equal(8900);
+
+        await erc1155.connect(admin).safeBatchTransferFrom(
+            custodian.address,
+            custodian.address,
+            [
+                token.encodeOne(ethers, daily[13]),
+                token.encodeOne(ethers, daily[14]),
+                token.encodeOne(ethers, weekly[0]),
+                token.encodeOne(ethers, weekly[1]),
+                token.encodeOne(ethers, biweekly[0])
+            ],
+            [100, 100, 100, 100, 100],
+            []
+        );
+        expect(await income.balanceOf(nft)).to.equal(8900);
+
         const balanceOf = async function(address, id) {
             return await erc1155.balanceOf(address, token.encodeOne(ethers, id));
         };
-        expect(await income.balanceOf(nft)).to.equal(8900);
         expect(await balanceOf(deployer.address, daily[13])).to.equal(0);
         expect(await balanceOf(deployer.address, daily[14])).to.equal(0);
         expect(await balanceOf(deployer.address, weekly[0])).to.equal(0);
