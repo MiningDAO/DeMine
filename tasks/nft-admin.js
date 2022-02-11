@@ -65,10 +65,10 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
         poolStats.canonicalizedHashrate = poolStats.hashrate.div(hashPerToken);
         logger.info('AntPool stats loaded: ' + JSON.stringify(poolStats, null, 2));
 
-        const supply = await token.supplyOf(hre.ethers, erc1155Facet, finalizing);
-        logger.info(`Token supply is ${supply}`);
-        if (poolStats.canonicalizedHashrate.lt(supply.toString())) {
-            const errMsg = "Effective hashrate is lower than token supply!"
+        const {released, supply} = await token.supplyOf(hre.ethers, erc1155Facet, finalizing);
+        logger.info(`Token supply is ${supply} with ${released} released`);
+        if (poolStats.canonicalizedHashrate.lt(released.toString())) {
+            const errMsg = "Effective hashrate is lower than released!"
             assert(args.enforce, "Error: " + errMsg);
             logger.warn(errMsg);
         }
@@ -83,8 +83,8 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
             new BigNumber(tokenValue).times(base).integerValue().toString()
         );
 
-        const amountToDeposit = new BigNumber(tokenValue).times(supply.toString());
-        const canonicalizedAmountToDeposit = canonicalizedTokenValue.mul(supply);
+        const amountToDeposit = new BigNumber(tokenValue).times(released.toString());
+        const canonicalizedAmountToDeposit = canonicalizedTokenValue.mul(released);
         const canonicalizedAdminBalance = await rewardToken.balanceOf(admin.address);
         const adminBalance = new BigNumber(canonicalizedAdminBalance.toString()).div(base);
         assert(
@@ -107,7 +107,7 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
                 timestamp: formatTs(finalizing),
                 tokenValue: tokenValue.toString,
                 'tokenValue(canonicalized)': canonicalizedTokenValue.toString(),
-                supply: supply.toString()
+                released: released.toString()
             },
         }, null, 2));
 
