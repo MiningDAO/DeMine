@@ -26,8 +26,6 @@ abstract contract ERC1155Config is
         s.status = _NOT_ENTERED;
     }
 
-    event TokenRoyaltyBpsSet(uint16);
-
     modifier nonReentrant() {
         require(s.status != _ENTERED, "ReentrancyGuard: reentrant call");
         s.status = _ENTERED;
@@ -41,7 +39,6 @@ abstract contract ERC1155Config is
 
     function setRoyaltyInfo(address recipient, uint16 bps) external onlyOwner {
         s.royalty = RoyaltyInfo(recipient, bps);
-        emit TokenRoyaltyBpsSet(bps);
     }
 
     function royaltyInfo(uint256, uint256 value)
@@ -80,10 +77,20 @@ abstract contract ERC1155Config is
         return res;
     }
 
-    function earning(uint tokenId) external view returns(uint) {
+    function earningOf(uint tokenId) external view returns(uint) {
         uint128 start = uint128(tokenId >> 128);
         uint128 end = uint128(tokenId);
         return _earning(start, end);
+    }
+
+    function earningOfBatch(uint[] calldata ids) external view returns(uint) {
+        uint[] memory res = new uint[](ids.length);
+        for (uint i = 0; i < ids.length; i++) {
+            uint128 start = uint128(tokenId >> 128);
+            uint128 end = uint128(tokenId);
+            res[i] = _earning(start, end);
+        }
+        return res;
     }
 
     function _earning(uint128 start, uint128 end)

@@ -210,7 +210,7 @@ task('nft-inspect-contract', 'Inspect state of DeMineNFT contract')
         }
 
         logger.info('Checking owner...');
-        const base = await ethers.getContractAt('Diamond', nft.target);
+        const base = await ethers.getContractAt('Diamond', nft);
         const ownership = {
             owner: await base.owner(),
             nomineeOwner: await base.nomineeOwner(),
@@ -229,11 +229,10 @@ task('nft-inspect-contract', 'Inspect state of DeMineNFT contract')
             name: await reward.name(),
             symbol: await reward.symbol(),
             decimals: await reward.decimals(),
-            balance: (await reward.balanceOf(nft.target)).toString()
+            balance: (await reward.balanceOf(nft)).toString()
         };
         logger.info('Summary: ' + JSON.stringify({
-            source: nft.source,
-            address: nft.target,
+            address: nft,
             ownership,
             earningToken,
             custodian,

@@ -23,9 +23,6 @@ contract ERC1155Facet is
 {
     using SafeERC20 for IERC20;
 
-    event Finalize(uint128 indexed, uint indexed);
-    event Alchemy(address indexed account, uint totalEarning);
-
     function init(address _earningToken) external onlyInitializing {
         s.earningToken = _earningToken;
         s.royalty = RoyaltyInfo(
@@ -63,7 +60,6 @@ contract ERC1155Facet is
             address(this),
             totalEarning
         );
-        emit Finalize(endOfDay, earningPerTPerDay);
     }
 
     function _beforeTokenTransfer(
@@ -82,6 +78,7 @@ contract ERC1155Facet is
             }
         // alchemize or burn
         } else if (to == _custodian) {
+            require(from != _custodian, 'DeMineNFT: custodian is not allowed');
             require(!LibPausable.layout().paused, 'Pausable: paused');
             uint totalEarning;
             uint lastFinalized = s.finalized;
@@ -94,7 +91,6 @@ contract ERC1155Facet is
             }
             if (totalEarning > 0) {
                 IERC20(s.earningToken).safeTransfer(from, totalEarning);
-                emit Alchemy(from, totalEarning);
             }
         }
     }

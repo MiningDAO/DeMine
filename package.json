@@ -5,9 +5,11 @@
     "app-root-path": "^3.0.0",
     "axios-retry": "^3.2.4",
     "bignumber.js": "^9.0.2",
+    "express": "^4.17.2",
     "install": "^0.13.0",
     "lodash": "^4.17.21",
     "npm": "^8.2.0",
+    "redis": "^4.0.3",
     "winston": "^3.5.1"
   },
   "devDependencies": {

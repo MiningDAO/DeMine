@@ -1,5 +1,4 @@
 const { ethers, run } = hre = require("hardhat");
-const BigNumber = require("bignumber.js");
 const config = require("../lib/config.js");
 const logger = require("../lib/logger.js");
 const time = require("../lib/time.js");

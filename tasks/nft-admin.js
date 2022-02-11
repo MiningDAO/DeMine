@@ -30,7 +30,7 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
     )
     .addOptionalParam('nft', 'nft contract address')
     .addFlag('enforce', 'enforce to set even the hashrate is smaller than supply')
-    .setAction(async (args, { ethers, network } = hre) => {
+    .setAction(async (args, { ethers } = hre) => {
         logger.info("=========== nft-admin-finalize start ===========");
         config.validateCoin(args.coin);
 
@@ -146,7 +146,7 @@ task('nft-admin-mint', 'mint new demine nft tokens')
     .addParam('ids', 'token id list, separated by comma')
     .addParam('amounts', 'amount per token, separated by comma')
     .addOptionalParam('nft', 'nft contract address')
-    .setAction(async (args, { ethers, network, deployments } = hre) => {
+    .setAction(async (args, { ethers, deployments } = hre) => {
         logger.info("=========== nft-admin-mint start ===========");
         config.validateCoin(args.coin);
 
@@ -192,7 +192,7 @@ task('nft-admin-release', 'transfer demine nft tokens')
     .addParam('ids', 'token id list, separated by comma')
     .addParam('amounts', 'amount per token, separated by comma')
     .addOptionalParam('nft', 'nft contract address')
-    .setAction(async (args, { ethers, network, deployments } = hre) => {
+    .setAction(async (args, { ethers, deployments } = hre) => {
         logger.info("=========== nft-admin-release start ===========");
         config.validateCoin(args.coin);
 
@@ -235,4 +235,86 @@ task('nft-admin-release', 'transfer demine nft tokens')
             }, null, 2));
         }
         logger.info("=========== nft-admin-release end ===========");
+    });
+
+task('nft-admin-seturi', 'set uri for nft contract')
+    .addParam('coin', 'Coin of DeMineNFT')
+    .addOptionalParam('uri', 'uri to set')
+    .addOptionalParam('nft', 'nft contract address')
+    .setAction(async (args, { ethers, localConfig } = hre) => {
+        logger.info("=========== nft-admin-seturi start ===========");
+        config.validateCoin(args.coin);
+
+        const admin = await config.admin(hre);
+        const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
+        const uri = args.uri || localConfig.tokenUri[args.coin];
+
+        logger.info('Will set uri: ' + JSON.stringify({
+            contract: nft,
+            operator: admin.address,
+            currentUri: await erc1155Facet.uri(0),
+            newUri: uri
+        }, null, 2));
+
+        if (admin.signer) {
+            await common.run(hre, async function() {
+                return await erc1155Facet.connect(admin.signer).setURI(uri);
+            });
+        } else {
+            const calldata = erc1155Facet.interface.encodeFunctionData(
+                'setURI', [args.uri]
+            );
+            logger.info('Not signer, calling info: ' + JSON.stringify({
+                operator: admin.address,
+                contract: erc1155Facet.address,
+                calldata
+            }, null, 2));
+        }
+        logger.info("=========== nft-admin-seturi end ===========");
+    });
+
+task('nft-admin-setfallback', 'set fallback address for nft contract')
+    .addParam('coin', 'Coin of DeMineNFT')
+    .addOptionalParam('fallback', 'fallback to set')
+    .addOptionalParam('nft', 'nft contract address')
+    .setAction(async (args, { ethers, localConfig } = hre) => {
+        logger.info("=========== nft-admin-setfallback start ===========");
+        config.validateCoin(args.coin);
+
+        const admin = await config.admin(hre);
+        const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
+        const diamond = await ethers.getContractAt('Diamond', nft);
+        const curFallback = await diamond.getFallbackAddress();
+
+        const erc1155Facet = await config.getDeployment(hre, 'ERC1155Facet');
+        const fallback = ethers.getAddress(args.fallback) || erc1155Facet.address;
+        if (fallback != curFallback) {
+            logger.warn('fallback address not changed');
+        }
+
+        logger.info('Will set fallback address: ' + JSON.stringify({
+            contract: nft,
+            operator: admin.address,
+            currentFallback: curFallback,
+            newFallback: fallback
+        }, null, 2));
+
+        if (admin.signer) {
+            await common.run(hre, async function() {
+                return await erc1155Facet.connect(
+                    admin.signer
+                ).setFallbackAddress(fallback);
+            });
+        } else {
+            const calldata = erc1155Facet.interface.encodeFunctionData(
+                'setFallbackAddress', [fallback]
+            );
+            logger.info('Not signer, calling info: ' + JSON.stringify({
+                operator: admin.address,
+                contract: erc1155Facet.address,
+                calldata
+            }, null, 2));
+        }
+        logger.info("=========== nft-admin-setfallback end ===========");
     });
