@@ -48,7 +48,7 @@ contract ERC1155Facet is
     ) external onlyOwner {
         require(
             endOfDay > s.finalized && endOfDay % 86400 == 0,
-            'DeMineNFT: invalid timestamp'
+            'NFT: invalid timestamp'
         );
         s.finalized = endOfDay;
         s.daily[endOfDay] = earningPerTPerDay;
@@ -78,7 +78,7 @@ contract ERC1155Facet is
             }
         // alchemize or burn
         } else if (to == _custodian) {
-            require(from != _custodian, 'DeMineNFT: custodian is not allowed');
+            require(from != _custodian, 'NFT: custodian is not allowed');
             require(!LibPausable.layout().paused, 'Pausable: paused');
             uint totalEarning;
             uint lastFinalized = s.finalized;

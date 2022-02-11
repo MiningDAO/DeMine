@@ -83,11 +83,13 @@ abstract contract ERC1155Config is
         return _earning(start, end);
     }
 
-    function earningOfBatch(uint[] calldata ids) external view returns(uint) {
+    function earningOfBatch(
+        uint[] calldata ids
+    ) external view returns(uint[] memory) {
         uint[] memory res = new uint[](ids.length);
         for (uint i = 0; i < ids.length; i++) {
-            uint128 start = uint128(tokenId >> 128);
-            uint128 end = uint128(tokenId);
+            uint128 start = uint128(ids[i] >> 128);
+            uint128 end = uint128(ids[i]);
             res[i] = _earning(start, end);
         }
         return res;
