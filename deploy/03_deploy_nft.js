@@ -9,7 +9,11 @@ module.exports = async ({ ethers, deployments } = hre) => {
         'ERC1155Custodian',
         [admin.address]
     );
-    if (hre.network.name == 'hardhat' || hre.network.name.endsWith('dev')) {
+    if (
+        hre.network.name == 'hardhat' ||
+        hre.network.name.endsWith('dev') ||
+        hre.network.name == 'rinkeby'
+    ) {
         await common.confirmAndDeploy(hre, 'ERC20Facet', []);
     }
     const custodian = await config.getDeployment(hre, 'ERC1155Custodian');

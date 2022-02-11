@@ -63,7 +63,7 @@ task('nft-clone', 'Deploy clone of demine nft')
                 },
                 royaltyRecipient: admin.address,
                 royaltyBps: royaltyBps,
-                baseUri: token.uri(hre, coin)
+                baseUri: token.uri(hre, args.coin)
             }
         }, null, 2));
         const { events } = receipt = await common.run(
@@ -76,32 +76,6 @@ task('nft-clone', 'Deploy clone of demine nft')
             function(e) { return e.event === 'Clone'; }
         );
         logger.info('Cloned contract DeMineNFT at ' + cloned);
-
-        const custodian = await config.getDeployment(hre, 'ERC1155Custodian');
-        logger.info('Setting up custody: ' + JSON.stringify({
-            nft: cloned,
-            admin: admin.address,
-            approved: true
-        }, null, 2));
-        if (admin.signer) {
-            await common.run(hre, async function() {
-                return await custodian.connect(
-                    admin.signer
-                ).custody(cloned, admin.address, true)
-            });
-            logger.info('Custody setup done');
-        } else {
-            const calldata = custodian.interface.encodeFunctionData(
-                'custody',
-                [cloned, admin.address, true]
-            );
-            logger.info('Not signer, calling info: ' + JSON.stringify({
-                operator: admin.address,
-                contract: custodian.address,
-                calldata
-            }, null, 2));
-        }
-
         logger.info('Writing contract info to state file');
         state.updateContract(
             hre, args.coin, {

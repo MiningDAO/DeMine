@@ -49,7 +49,7 @@ task("wrapped-clone", "clone wrapped token")
             source: base.address,
             owner: admin.address,
             fallback: fallback.address,
-            fallbackInitArgs: {
+            earningTokenfallbackInitArgs: {
                 name: c.name,
                 symbol: c.symbol,
                 decimals: c.decimals
@@ -65,34 +65,6 @@ task("wrapped-clone", "clone wrapped token")
             function(e) { return e.event === 'Clone'; }
         );
         logger.info('Cloned DeMineERC20 at ' + cloned);
-
-        const erc20 = await ethers.getContractAt('ERC20Facet', cloned);
-        const supply = ethers.BigNumber.from(10).pow(c.decimals).mul(1000);
-        logger.info('Minting tokens: ' + JSON.stringify({
-            operator: admin.address,
-            address: erc20.address,
-            to: admin.address,
-            supply: supply.toString()
-        }, null, 2));
-
-        if (admin.signer) {
-            await common.run(hre, async function() {
-                return await erc20.connect(
-                    admin.signer
-                ).mint(admin.address, supply);
-            });
-        } else {
-            const calldata = erc20.interface.encodeFunctionData(
-                'mint',
-                [admin.address, supply]
-            );
-            logger.info('Not signer, calling info: ' + JSON.stringify({
-                operator: admin.address,
-                contract: erc20.address,
-                calldata
-            }, null, 2));
-        }
-
         logger.info('Writing contract info to state file');
         state.updateContract(
             hre, args.coin, {

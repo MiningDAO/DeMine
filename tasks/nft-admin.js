@@ -317,3 +317,40 @@ task('nft-admin-setfallback', 'set fallback address for nft contract')
         }
         logger.info("=========== nft-admin-setfallback end ===========");
     });
+
+task('nft-admin-custody', 'custody nft at custodian address')
+    .addParam('coin', 'Coin of DeMineNFT')
+    .addOptionalParam('nft', 'nft contract address')
+    .setAction(async (args, { ethers } = hre) => {
+        logger.info("=========== nft-admin-custody start ===========");
+        config.validateCoin(args.coin);
+
+        const admin = await config.admin(hre);
+        const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
+        const custodian = await config.getDeployment(hre, 'ERC1155Custodian');
+        logger.info('Setting up custody: ' + JSON.stringify({
+            nft: nft,
+            admin: admin.address,
+            approved: true
+        }, null, 2));
+
+        if (admin.signer) {
+            await common.run(hre, async function() {
+                return await custodian.connect(
+                    admin.signer
+                ).custody(nft, admin.address, true)
+            });
+            logger.info('Custody setup done');
+        } else {
+            const calldata = custodian.interface.encodeFunctionData(
+                'custody',
+                [nft, admin.address, true]
+            );
+            logger.info('Not signer, calling info: ' + JSON.stringify({
+                operator: admin.address,
+                contract: custodian.address,
+                calldata
+            }, null, 2));
+        }
+        logger.info("=========== nft-admin-custody end ===========");
+    });
