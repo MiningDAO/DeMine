@@ -408,10 +408,10 @@ describe("DeMineNFT", function () {
         ).to.be.revertedWith('NFT: invalid timestamp')
 
         const earning = async function(id) {
-            return await erc1155.earningOf(token.encodeOne(ethers, id));
+            return await erc1155.earning(token.encodeOne(ethers, id));
         };
         const earningBatch = async function(ids) {
-            return await erc1155.earningOfBatch(
+            return await erc1155.earningBatch(
                 token.encode(ethers, ids)
             );
         };
