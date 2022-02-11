@@ -23,7 +23,6 @@ router.get("/:network/:coin/:id", async (req, res) => {
     const network = req.params.network.toLowerCase();
     const id = ethers.BigNumber.from(req.params.id);
     const decoded = token.decodeOne(id);
-    const type = genType(decoded.startTs, decoded.endTs);
 
     const contractKey = key(network, coin, 'contract');
     const contractStored = await redis.get(contractKey);
@@ -42,17 +41,24 @@ router.get("/:network/:coin/:id", async (req, res) => {
         totalEarning = totalEarning.plus(new BigNumber(earning));
     }
 
+    var hex = id.toHexString().substr(2);
+    if (hex.length < 64) {
+        hex = '0x' + '0'.repeat(64 - hex.length) + hex.toLowerCase();
+    }
+
     res.json({
-        ok: true,
-        coin: coin,
-        id: {
-            hex: id.toHexString(),
-            ...decoded
-        },
-        type: type,
-        finalized: decoded.endTs <= contract.finalized,
-        earning: totalEarning.div(base).toFixed(8),
-        earningToken: contract.earningToken,
+        name: `DeMine${coin.toUpperCase()}`,
+        description: `Earning from ${decoded.startDate} to ${decoded.endDate}`,
+        properties: {
+            id: {
+                hex: hex,
+                type: genType(decoded.startTs, decoded.endTs),
+                ...decoded
+            },
+            earningToken: contract.earningToken,
+            finalized: decoded.endTs <= contract.finalized,
+            earning: totalEarning.div(base),
+        }
     });
 });
 

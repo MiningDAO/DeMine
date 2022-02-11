@@ -1,6 +1,11 @@
 require('dotenv').config();
 
+const certDir = `/etc/letsencrypt/live`;
+const domain = `api.hypertrons.com`;
+
+const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const express = require('express');
 const app = express();
 
@@ -12,7 +17,10 @@ const token = require("./routes/api/token");
 app.use("/api/v1/token", token);
 app.use('/static', express.static(path.join(__dirname, 'files')))
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Server up and running on port ${port} !`));
+const options = {
+    key: fs.readFileSync(`${certDir}/${domain}/privkey.pem`),
+    cert: fs.readFileSync(`${certDir}/${domain}/fullchain.pem`)
+};
+https.createServer(options, app).listen(443);
 
 module.exports=app;
