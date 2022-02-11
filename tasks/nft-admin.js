@@ -318,7 +318,7 @@ task('nft-admin-setfallback', 'set fallback address for nft contract')
         logger.info("=========== nft-admin-setfallback end ===========");
     });
 
-task('nft-admin-custody', 'custody nft at custodian address')
+task('nft-admin-custody', 'approve admin for custodian contract at nft contract')
     .addParam('coin', 'Coin of DeMineNFT')
     .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers } = hre) => {
@@ -353,4 +353,50 @@ task('nft-admin-custody', 'custody nft at custodian address')
             }, null, 2));
         }
         logger.info("=========== nft-admin-custody end ===========");
+    });
+
+task('nft-admin-setallowance', 'set allownace of admin for nft contract')
+    .addParam('coin', 'Coin of DeMineNFT')
+    .addParam('allowance', 'allowance to set, decimal')
+    .addOptionalParam('nft', 'nft contract address')
+    .setAction(async (args, { ethers } = hre) => {
+        logger.info("=========== nft-admin-setallowance start ===========");
+        config.validateCoin(args.coin);
+
+        const admin = await config.admin(hre);
+        const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
+        const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
+        const earningToken = await ethers.getContractAt(
+            '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
+            await erc1155Facet.earningToken()
+        );
+
+        const decimals = await earningToken.decimals();
+        const normalized = new BigNumber(10).pow(decimals).times(args.allowance);
+        const allowance = ethers.BigNumber.from(normalized.integerValue().toString());
+        logger.info('Setting allowance: ' + JSON.stringify({
+            contract: earningToken.address,
+            owner: admin.address,
+            spender: nft,
+            allowance: allowance.toString()
+        }, null, 2));
+
+        if (admin.signer) {
+            await common.run(hre, async function() {
+                return await earningToken.connect(
+                    admin.signer
+                ).approve(nft, allowance);
+            });
+        } else {
+            const calldata = earningToken.interface.encodeFunctionData(
+                'approve', [nft, allowance]
+            );
+            logger.info('Not signer, calling info:' + JSON.stringify({
+                operator: admin.address,
+                contract: earningToken.address,
+                calldata
+            }, null, 2));
+        }
+
+        logger.info("=========== nft-admin-setallowance end ===========");
     });

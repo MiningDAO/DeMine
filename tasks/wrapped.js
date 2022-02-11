@@ -1,4 +1,5 @@
 const assert = require("assert");
+const BigNumber = require('bignumber.js');
 const logger = require('../lib/logger.js');
 const common = require("../lib/common.js");
 const config = require("../lib/config.js");
@@ -133,7 +134,7 @@ task("wrapped-balance", "check balance")
 
 task('wrapped-mint', 'mint new nft tokens')
     .addParam('coin', 'wrapped token type, btc/eth/fil')
-    .addParam('amount', 'amount to mint', undefined, types.int)
+    .addParam('amount', 'amount to mint, decimal')
     .addOptionalParam('contract', 'wrapped contract address')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
         logger.info("=========== wrapped-mint start ===========");
@@ -143,26 +144,31 @@ task('wrapped-mint', 'mint new nft tokens')
         const wrapped = args.contract || getWrapped(hre, args.coin);
         const erc20 = await ethers.getContractAt('ERC20Facet', wrapped);
         const balance = await erc20.balanceOf(admin.address);
+
+        const decimals = await erc20.decimals();
+        const normalized = new BigNumber(10).pow(decimals).times(args.amount);
+        const amount = ethers.BigNumber.from(normalized.integerValue().toString());
+
         logger.info('Minting erc20 tokens: ' + JSON.stringify({
             contract: wrapped,
             metadata: {
                 name: await erc20.name(),
                 symbol: await erc20.symbol(),
-                decimals: await erc20.decimals()
+                decimals: decimals
             },
             to: admin.address,
             currentBalance: balance.toNumber(),
-            toMint: args.amount
+            toMint: amount
         }, null, 2));
         if (admin.signer) {
             await common.run(hre, async function() {
                 return await erc20.connect(admin.signer).mint(
-                    admin.address, args.amount
+                    admin.address, amount
                 );
             })
         } else {
             const calldata = erc20.interface.encodeFunctionData(
-                'mint', [admin.address, args.amount]
+                'mint', [admin.address, amount]
             );
             logger.info('Not signer, calling info: ' + JSON.stringify({
                 operator: admin.address,

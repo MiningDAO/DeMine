@@ -1,68 +1,9 @@
 const { ethers, localConfig, run } = hre = require("hardhat");
+const BigNumber = require('bignumber.js');
 const config = require("../lib/config.js");
 const logger = require("../lib/logger.js");
 const common = require("../lib/common.js");
 const time = require("../lib/time.js");
-
-async function setAllowance(earningToken, admin, nft) {
-    const decimals = await earningToken.decimals();
-    const allowance = ethers.BigNumber.from(10).pow(decimals).mul(100);
-    logger.info('Setting allowance: ' + JSON.stringify({
-        contract: earningToken.address,
-        owner: admin.address,
-        spender: nft,
-        allowance: allowance.toString()
-    }, null, 2));
-
-    if (admin.signer) {
-        await common.run(hre, async function() {
-            return await earningToken.connect(
-                admin.signer
-            ).approve(nft, allowance);
-        });
-    } else {
-        const calldata = earningToken.interface.encodeFunctionData(
-            'approve', [nft, allowance]
-        );
-        logger.info('Not signer, calling info:' + JSON.stringify({
-            operator: admin.address,
-            contract: earningToken.address,
-            calldata
-        }, null, 2));
-    }
-}
-
-async function mintEarningTokens(earningToken, admin) {
-    var earningToken = await ethers.getContractAt(
-        'ERC20Facet', earningToken.address
-    );
-    const decimals = await earningToken.decimals();
-    const supply = ethers.BigNumber.from(10).pow(decimals).mul(1000);
-    logger.info('Minting tokens: ' + JSON.stringify({
-        operator: admin.address,
-        address: earningToken.address,
-        to: admin.address,
-        supply: supply.toString()
-    }, null, 2));
-
-    if (admin.signer) {
-        await common.run(hre, async function() {
-            return await earningToken.connect(
-                admin.signer
-            ).mint(admin.address, supply);
-        });
-    } else {
-        const calldata = earningToken.interface.encodeFunctionData(
-            'mint',
-            [admin.address, supply]
-        );
-        logger.info('Not signer, calling info: ' + JSON.stringify({
-            operator: admin.address,
-            contract: earningToken.address,
-            calldata
-        }, null, 2));
-    }
-}
 
 async function main() {
     const admin = await config.admin(hre);
@@ -76,7 +17,11 @@ async function main() {
     );
 
     if ((await earningToken.allowance(admin.address, nft)).eq(0)) {
-        await setAllowance(earningToken, admin, nft);
+        await run('nft-admin-setallowance', {
+            coin: coin,
+            nft: nft,
+            allowance: '100.0'
+        });
     }
 
     if ((await earningToken.balanceOf(admin.address)).eq(0)) {
@@ -84,7 +29,11 @@ async function main() {
         // not pre-configured earning token, which means the
         // earning token is deployed by us
         if (!earningTokenConfig[coin.toLowerCase()]) {
-            await mintEarningTokens(earningToken, admin, nft);
+            await run('wrapped-mint', {
+                coin: 'btc',
+                amount: '100.0',
+                contract: earningToken.address
+            });
         }
     }
 
