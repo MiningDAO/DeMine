@@ -37,7 +37,6 @@ task('nft-clone', 'Deploy clone of demine nft')
 
         const admin = await config.admin(hre);
         const royaltyBps = 100;
-        const uri = localConfig.tokenUri[args.coin];
         const iface = new hre.ethers.utils.Interface([
             'function init(address earningToken)'
         ]);
@@ -64,7 +63,7 @@ task('nft-clone', 'Deploy clone of demine nft')
                 },
                 royaltyRecipient: admin.address,
                 royaltyBps: royaltyBps,
-                baseUri: uri
+                baseUri: token.uri(hre, coin)
             }
         }, null, 2));
         const { events } = receipt = await common.run(

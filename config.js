@@ -4,9 +4,7 @@ const path = require('path');
 const BigNumber = require('bignumber.js');
 
 const config = {
-    tokenUri: {
-        btc: 'https://www.hypertrons.com/api/v1/token/btc/',
-    },
+    tokenUriPrefix: 'https://www.hypertrons.com/api/v1/token',
     royaltyBps: 100,
     accounts: [
         process.env.DEPLOYER,

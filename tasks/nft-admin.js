@@ -30,7 +30,7 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
     )
     .addOptionalParam('nft', 'nft contract address')
     .addFlag('enforce', 'enforce to set even the hashrate is smaller than supply')
-    .setAction(async (args, { ethers } = hre) => {
+    .setAction(async (args, { ethers, localConfig } = hre) => {
         logger.info("=========== nft-admin-finalize start ===========");
         config.validateCoin(args.coin);
 
@@ -239,16 +239,15 @@ task('nft-admin-release', 'transfer demine nft tokens')
 
 task('nft-admin-seturi', 'set uri for nft contract')
     .addParam('coin', 'Coin of DeMineNFT')
-    .addOptionalParam('uri', 'uri to set')
     .addOptionalParam('nft', 'nft contract address')
-    .setAction(async (args, { ethers, localConfig } = hre) => {
+    .setAction(async (args, { ethers } = hre) => {
         logger.info("=========== nft-admin-seturi start ===========");
         config.validateCoin(args.coin);
 
         const admin = await config.admin(hre);
         const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
-        const uri = args.uri || localConfig.tokenUri[args.coin];
+        const uri = token.uri(hre, args.coin);
 
         logger.info('Will set uri: ' + JSON.stringify({
             contract: nft,
@@ -263,7 +262,7 @@ task('nft-admin-seturi', 'set uri for nft contract')
             });
         } else {
             const calldata = erc1155Facet.interface.encodeFunctionData(
-                'setURI', [args.uri]
+                'setURI', [uri]
             );
             logger.info('Not signer, calling info: ' + JSON.stringify({
                 operator: admin.address,
@@ -278,7 +277,7 @@ task('nft-admin-setfallback', 'set fallback address for nft contract')
     .addParam('coin', 'Coin of DeMineNFT')
     .addOptionalParam('fallback', 'fallback to set')
     .addOptionalParam('nft', 'nft contract address')
-    .setAction(async (args, { ethers, localConfig } = hre) => {
+    .setAction(async (args, { ethers } = hre) => {
         logger.info("=========== nft-admin-setfallback start ===========");
         config.validateCoin(args.coin);
 
