@@ -33,7 +33,7 @@ router.get("/:coin/:id", async (req, res) => {
     for (let i = decoded.startTs + 86400; i <= decoded.endTs; i += 86400) {
         const earningKey = key(hre.network.name, coin, 'earning', i);
         const earning = await redis.get(earningKey);
-        totalEarning.plus(new BigNumber(earning));
+        totalEarning = totalEarning.plus(new BigNumber(earning));
     }
 
     res.json({
