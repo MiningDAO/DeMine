@@ -13,10 +13,12 @@ const config = {
     statePath: path.join(__dirname, './state/'),
     alchemy: {
         matic: process.env.ALCHEMY_MATIC,
-        maticdev: process.env.ALCHEMY_MATIC_DEV
+        maticdev: process.env.ALCHEMY_MATIC_DEV,
+        rinkeby: process.env.ALCHEMY_RINKEBY
     },
     admin: {
-        bsc: '0x782A6a9Bc11Fb6e8320b92f2217AfD80f813Bd05'
+        bsc: '0x782A6a9Bc11Fb6e8320b92f2217AfD80f813Bd05',
+        rinkeby: '0xf24c00BafB6Cb10C5EA13Fa896526df604EE2B19',
     },
     hashPerToken: {
         btc: new BigNumber('1e+12'),

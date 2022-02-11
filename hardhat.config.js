@@ -33,6 +33,12 @@ task('abi', 'Prints abi of contract')
 module.exports = {
     solidity: '0.8.11',
     networks: {
+        rinkeby: {
+            live: true,
+            url: config.alchemy.rinkeby,
+            chainId: 4,
+            accounts: config.accounts
+        },
         matic: {
             live: true,
             url: config.alchemy.matic,
