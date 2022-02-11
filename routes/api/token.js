@@ -27,7 +27,9 @@ router.get("/:network/:coin/:id", async (req, res) => {
     const contractKey = key(network, coin, 'contract');
     const contractStored = await redis.get(contractKey);
     if (contractStored === null || contractStored === undefined) {
+        console.log(`invalid request ${network} for ${btc}`);
         res.json({ok: false, message: 'nft contract not found'});
+        return;
     }
 
     const contract = JSON.parse(contractStored);
@@ -46,6 +48,7 @@ router.get("/:network/:coin/:id", async (req, res) => {
         hex = '0x' + '0'.repeat(64 - hex.length) + hex.toLowerCase();
     }
 
+    console.log(`request from ${network} for ${coin}`);
     res.json({
         name: `DeMine${coin.toUpperCase()}`,
         description: `Earning from ${decoded.startDate} to ${decoded.endDate}`,
