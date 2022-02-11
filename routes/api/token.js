@@ -1,3 +1,4 @@
+const { ethers } = require("ethers");
 const express = require("express");
 const router = express.Router();
 const BigNumber = require("bignumber.js");
@@ -26,17 +27,17 @@ router.get("/:network/:coin/:id", async (req, res) => {
 
     const contractKey = key(network, coin, 'contract');
     const contractStored = await redis.get(contractKey);
-    if (contractStored == null or contractStored == undefined) {
+    if (contractStored === null || contractStored === undefined) {
         res.json({ok: false, message: 'nft contract not found'});
     }
 
-    const contract = JSON.parse();
+    const contract = JSON.parse(contractStored);
     const decimals = contract.earningToken.decimals;
     const base = new BigNumber(10).pow(decimals);
 
     var totalEarning = new BigNumber(0);
     for (let i = decoded.startTs + 86400; i <= decoded.endTs; i += 86400) {
-        const earningKey = key(hre.network.name, coin, 'earning', i);
+        const earningKey = key(network, coin, 'earning', i);
         const earning = await redis.get(earningKey);
         totalEarning = totalEarning.plus(new BigNumber(earning));
     }
