@@ -211,7 +211,7 @@ task('nft-admin-release', 'transfer demine nft tokens')
             to: to,
             numTokenTypes: ids.length,
             idsAsDate: token.readableIds(ids),
-            ids: ids.map(t => t.toHexString()),
+            ids: ids.map(t => t.toString()).join(','),
             amount: args.amounts
         }, null, 2));
 

@@ -13,9 +13,9 @@ async function main() {
         await run('binance-withdraw', {coin: coin});
     }
 
-    const nft = state.loadNFTClone(hre, args.coin).target;
+    const nft = state.loadNFTClone(hre, coin).target;
     const erc1155 = await ethers.getContractAt('ERC1155Facet', nft);
-    var finalized = (await erc1155.finalized()).toNumber();
+    const finalized = (await erc1155.finalized()).toNumber();
     const startTs = time.startOfDay(new Date('2022-02-02'));
     if (finalized == 0) {
         await run(
@@ -25,15 +25,14 @@ async function main() {
                 timestamp: startTs
             }
         );
-        finalized = startTs;
-    }
-
-    const endTs = time.startOfDay(new Date());
-    for (let i = finalized + 86400; i <= endTs; i += 86400) {
-        await run(
-            'nft-admin-finalize',
-            { coin: coin }
-        );
+    } else {
+        const endTs = time.startOfDay(new Date());
+        for (let i = finalized + 86400; i <= endTs; i += 86400) {
+            await run(
+                'nft-admin-finalize',
+                { coin: coin, timestamp: i }
+            );
+        }
     }
 }
 
