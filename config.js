@@ -10,9 +10,7 @@ const config = {
     royaltyBps: 100,
     accounts: [
         process.env.DEPLOYER,
-        process.env.ADMIN,
-        process.env.CUSTODIAN,
-        process.env.ALCHEMIST
+        process.env.ADMIN
     ],
     statePath: path.join(__dirname, './state/'),
     alchemy: {

@@ -70,12 +70,6 @@ module.exports = {
         },
         admin: {
             default: 1
-        },
-        custodian: {
-            default: 2
-        },
-        alchemist: {
-            default: 3
         }
     },
     gasReporter: {
