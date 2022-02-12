@@ -5,6 +5,7 @@ require('hardhat-deploy');
 require("@nomiclabs/hardhat-etherscan");
 require('hardhat-deploy-ethers');
 require('./tasks/wrapped.js');
+require('./tasks/wrapped-admin.js');
 require('./tasks/nft.js');
 require('./tasks/nft-admin.js');
 require('./tasks/e2e.js');

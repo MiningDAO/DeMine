@@ -23,7 +23,7 @@ task('nft-finalize-e2e', 'withdraw and finalize')
             var finalized = (await erc1155.finalized()).toNumber();
             localConfig.gnosisSafe.skipPrompts = args.skipPrompts;
             if (finalized == 0) {
-                await run(
+                const request = await run(
                     'nft-admin-finalize',
                     {
                         coin: args.coin,
@@ -40,11 +40,31 @@ task('nft-finalize-e2e', 'withdraw and finalize')
                     { coin: args.coin, timestamp: i }
                 );
             }
+
+            await courier.notifyGnosis(
+                hre,
+                args.coin,
+                request,
+                {
+                    operation: 'finalizeNFT',
+                    functionToCall: 'finalize',
+                    finalizing,
+                    finalizingAsDate: formatTs(finalizing),
+                    earningPerToken,
+                    earningPerTokenDecimal,
+                    totalEarning,
+                    totalEarningDecimal,
+                    withdrawFrom: admin.address,
+                },
+                {
+                    [earningToken.address]: await earningToken.symbol(),
+                    [nft]: 'DeMineNFT',
+                    [admin.address]: 'DeMineAdmin(Gnosis Safe)',
+                    [admin.signer.address]: 'DeMineAdmin(EOA)',
+                }
+            );
         } catch(err) {
-            console.log('catch');
-            console.log(err);
-            return;
-            await courier.notifyFailure(
+            await courier.notifyE2EFailure(
                 hre,
                 args.coin,
                 'NFT Finalize e2e workflow failed',

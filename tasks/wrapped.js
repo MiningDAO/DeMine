@@ -1,11 +1,9 @@
 const assert = require("assert");
-const BigNumber = require('bignumber.js');
 const logger = require('../lib/logger.js');
 const common = require("../lib/common.js");
 const config = require("../lib/config.js");
 const diamond = require("../lib/diamond.js");
 const state = require("../lib/state.js");
-const gnosis = require('../lib/gnosis.js');
 
 function getWrapped(hre, coin) {
     const wrapped = state.tryLoadWrappedClone(hre, coin);
@@ -57,7 +55,7 @@ task("wrapped-clone", "clone wrapped token")
                 decimals: c.decimals
             }
         }, null, 2));
-        const { events } = receipt = await common.run(
+        const { events } = receipt = await common.execTx(
             hre,
             async function() {
                 return await base.create(initArgs);
@@ -130,92 +128,4 @@ task("wrapped-balance", "check balance")
         }, null, 2));
         logger.info("=========== wrapped-balance end ===========");
         return balance;
-    });
-
-
-task('wrapped-mint', 'mint new nft tokens')
-    .addParam('coin', 'wrapped token type, btc/eth/fil')
-    .addParam('amount', 'amount to mint, decimal')
-    .addOptionalParam('contract', 'wrapped contract address')
-    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        logger.info("=========== wrapped-mint start ===========");
-        config.validateCoin(args.coin);
-
-        const admin = await config.admin(hre);
-        const wrapped = args.contract || getWrapped(hre, args.coin);
-        const erc20 = await ethers.getContractAt('ERC20Facet', wrapped);
-        const balance = await erc20.balanceOf(admin.address);
-
-        const decimals = await erc20.decimals();
-        const normalized = new BigNumber(10).pow(decimals).times(args.amount);
-        const amount = ethers.BigNumber.from(normalized.integerValue().toString());
-
-        logger.info('Minting erc20 tokens: ' + JSON.stringify({
-            contract: wrapped,
-            metadata: {
-                name: await erc20.name(),
-                symbol: await erc20.symbol(),
-                decimals: decimals
-            },
-            to: admin.address,
-            currentBalance: balance.toString(),
-            toMint: amount.toString()
-        }, null, 2));
-
-        if (admin.type == 'GNOSIS') {
-            const calldata = erc20.interface.encodeFunctionData(
-                'mint', [admin.address, amount]
-            );
-            const safe = await gnosis.getSafe(hre, admin);
-            await gnosis.propose(hre, safe, erc20.address, calldata);
-        } else {
-            await common.run(hre, async function() {
-                return await erc20.connect(admin.signer).mint(
-                    admin.address, amount
-                );
-            });
-        }
-        logger.info("=========== wrapped-mint end ===========");
-    });
-
-task('wrapped-burn', 'burn wrapped tokens')
-    .addParam('coin', 'wrapped token type, usd/btc/eth/fil')
-    .addParam('amount', 'amount to burn', undefined, types.int)
-    .addOptionalParam('contract', 'wrapped contract address')
-    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        logger.info("=========== wrapped-burn start ===========");
-        config.validateCoin(args.coin);
-
-        const admin = await config.admin(hre);
-        const wrapped = args.contract || getWrapped(hre, args.coin);
-        const erc20 = await ethers.getContractAt('ERC20Facet', wrapped);
-        const balance = await erc20.balanceOf(admin.address);
-        assert(
-            new BigNumber(balance.toString()).lt(args.amount),
-            'insufficient balance to burn'
-        );
-        logger.info('Burning ERC20: ' + JSON.stringify({
-            address: wrapped,
-            metadata: {
-                name: await erc20.name(),
-                symbol: await erc20.symbol(),
-                decimals: await erc20.decimals()
-            },
-            from: admin.address,
-            currentBalance: balance.toString(),
-            toBurn: args.amount
-        }, null, 2));
-
-        if (admin.type == 'GNOSIS') {
-            const calldata = erc20.interface.encodeFunctionData(
-                'burn', [args.amount]
-            );
-            const safe = await gnosis.getSafe(hre, admin);
-            await gnosis.propose(hre, safe, erc20.address, calldata);
-        } else {
-            await common.run(hre, async function() {
-                return await erc20.connect(admin.signer).burn(args.amount);
-            });
-        }
-        logger.info("=========== wrapped-burn end ===========");
     });

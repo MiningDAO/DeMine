@@ -9,8 +9,6 @@ const token = require("../lib/token.js");
 const antpool = require("../lib/antpool.js");
 const binance = require("../lib/binance.js");
 const config = require("../lib/config.js");
-const gnosis = require('../lib/gnosis.js');
-const courier = require('../lib/courier.js');
 
 const formatTs = function(ts) {
     return `${ts}(${new Date(ts * 1000).toISOString()})`;
@@ -105,6 +103,7 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
         types.int
     )
     .addOptionalParam('nft', 'nft contract address')
+    .addFlag('dryrun', 'do not run but just simulate the process')
     .addFlag('enforce', 'enforce to set even the hashrate is smaller than supply')
     .setAction(async (args, { ethers, localConfig } = hre) => {
         logger.info("=========== nft-admin-finalize start ===========");
@@ -139,55 +138,20 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
             totalEarning: totalEarning.toString()
         }, null, 2));
 
-        if (admin.type == 'GNOSIS') {
-            const calldata = erc1155Facet.interface.encodeFunctionData(
-                'finalize',
-                [
-                    finalizing,
-                    earningPerToken,
-                    admin.address,
-                    totalEarning
-                ]
-            );
-            const safe = await gnosis.getSafe(hre, admin);
-            const request = await gnosis.propose(
-                hre, safe, erc1155Facet.address, calldata
-            );
-            await courier.notifyGnosis(
-                hre,
-                args.coin,
-                request,
-                {
-                    operation: 'finalizeNFT',
-                    functionToCall: 'finalize',
-                    finalizing,
-                    finalizingAsDate: formatTs(finalizing),
-                    earningPerToken,
-                    earningPerTokenDecimal,
-                    totalEarning,
-                    totalEarningDecimal,
-                    withdrawFrom: admin.address,
-                },
-                {
-                    [earningToken.address]: await earningToken.symbol(),
-                    [nft]: 'DeMineNFT',
-                    [admin.address]: 'DeMineAdmin(Gnosis Safe)',
-                    [admin.signer.address]: 'DeMineAdmin(EOA)',
-                }
-            );
-        } else {
-            await common.run(hre, async function() {
-                return await erc1155Facet.connect(
-                    admin.signer
-                ).finalize(
-                    finalizing,
-                    earningPerToken,
-                    admin.address,
-                    totalEarning,
-                );
-            });
-        }
+        const result = await common.run(
+            hre,
+            admin,
+            erc1155Facet,
+            'finalize',
+            [
+                finalizing,
+                earningPerToken,
+                admin.address,
+                totalEarning,
+            ]
+        );
         logger.info("=========== nft-admin-finalize End ===========");
+        return result;
     });
 
 task('nft-admin-mint', 'mint new demine nft tokens')
@@ -214,22 +178,15 @@ task('nft-admin-mint', 'mint new demine nft tokens')
             ids: ids.map(i => i.toString()).join(','),
             amounts: args.amounts
         }, null, 2));
-
-        if (admin.type == 'GNOSIS') {
-            const calldata = erc1155Facet.interface.encodeFunctionData(
-                'mint',
-                [ids, amounts, []]
-            );
-            const safe = await gnosis.getSafe(hre, admin);
-            await gnosis.propose(hre, safe, erc1155Facet.address, calldata);
-        } else {
-            await common.run(hre, async function() {
-                return await erc1155Facet.connect(
-                    admin.signer
-                ).mint(ids, amounts, []);
-            });
-        }
+        const result = await common.run(
+            hre,
+            admin,
+            erc1155Facet,
+            'mint',
+            [ids, amounts, []]
+        );
         logger.info("=========== nft-admin-mint end ===========");
+        return result;
     });
 
 task('nft-admin-release', 'transfer demine nft tokens')
@@ -260,24 +217,15 @@ task('nft-admin-release', 'transfer demine nft tokens')
             ids: ids.map(t => t.toString()).join(','),
             amount: args.amounts
         }, null, 2));
-
-        if (admin.type == 'GNOSIS') {
-            const calldata = erc1155Facet.interface.encodeFunctionData(
-                'safeBatchTransferFrom',
-                [custodian.address, to, ids, amounts, []]
-            );
-            const safe = await gnosis.getSafe(hre, admin);
-            await gnosis.propose(hre, safe, erc1155Facet.address, calldata);
-        } else {
-            await common.run(hre, async function() {
-                return await erc1155Facet.connect(
-                    admin.signer
-                ).safeBatchTransferFrom(
-                    custodian.address, to, ids, amounts, []
-                )
-            });
-        }
+        const result = await common.run(
+            hre,
+            admin,
+            erc1155Facet,
+            'safeBatchTransferFrom',
+            [custodian.address, to, ids, amounts, []]
+        );
         logger.info("=========== nft-admin-release end ===========");
+        return result;
     });
 
 task('nft-admin-seturi', 'set uri for nft contract')
@@ -299,18 +247,15 @@ task('nft-admin-seturi', 'set uri for nft contract')
             newUri: uri
         }, null, 2));
 
-        if (admin.type == 'GNOSIS') {
-            const calldata = erc1155Facet.interface.encodeFunctionData(
-                'setURI', [uri]
-            );
-            const safe = await gnosis.getSafe(hre, admin);
-            await gnosis.propose(hre, safe, erc1155Facet.address, calldata);
-        } else {
-            await common.run(hre, async function() {
-                return await erc1155Facet.connect(admin.signer).setURI(uri);
-            });
-        }
+        const result = await common.run(
+            hre,
+            admin,
+            erc1155Facet,
+            'setURI',
+            [uri]
+        );
         logger.info("=========== nft-admin-seturi end ===========");
+        return result;
     });
 
 task('nft-admin-setfallback', 'set fallback address for nft contract')
@@ -338,21 +283,15 @@ task('nft-admin-setfallback', 'set fallback address for nft contract')
             currentFallback: curFallback,
             newFallback: fallback
         }, null, 2));
-
-        if (admin.type == 'GNOSIS') {
-            const calldata = erc1155Facet.interface.encodeFunctionData(
-                'setFallbackAddress', [fallback]
-            );
-            const safe = await gnosis.getSafe(hre, admin);
-            await gnosis.propose(hre, safe, erc1155Facet.address, calldata);
-        } else {
-            await common.run(hre, async function() {
-                return await erc1155Facet.connect(
-                    admin.signer
-                ).setFallbackAddress(fallback);
-            });
-        }
+        const result = await common.run(
+            hre,
+            admin,
+            erc1155Facet,
+            'setFallbackAddress',
+            [fallback]
+        );
         logger.info("=========== nft-admin-setfallback end ===========");
+        return result;
     });
 
 task('nft-admin-custody', 'approve admin for custodian contract at nft contract')
@@ -370,22 +309,15 @@ task('nft-admin-custody', 'approve admin for custodian contract at nft contract'
             admin: admin.address,
             approved: true
         }, null, 2));
-
-        if (admin.type == 'GNOSIS') {
-            const calldata = custodian.interface.encodeFunctionData(
-                'custody',
-                [nft, admin.address, true]
-            );
-            const safe = await gnosis.getSafe(hre, admin);
-            await gnosis.propose(hre, safe, custodian.address, calldata);
-        } else {
-            await common.run(hre, async function() {
-                return await custodian.connect(
-                    admin.signer
-                ).custody(nft, admin.address, true)
-            });
-        }
+        const result = await common.run(
+            hre,
+            admin,
+            erc1155Facet,
+            'custody',
+            [nft, admin.address, true]
+        );
         logger.info("=========== nft-admin-custody end ===========");
+        return result;
     });
 
 task('nft-admin-setallowance', 'set allownace of admin for nft contract')
@@ -414,21 +346,9 @@ task('nft-admin-setallowance', 'set allownace of admin for nft contract')
             spender: nft,
             allowance: allowance.toString()
         }, null, 2));
-
-        if (admin.type == 'GNOSIS') {
-            const calldata = earningToken.interface.encodeFunctionData(
-                'approve', [nft, allowance]
-            );
-            const safe = await gnosis.getSafe(hre, admin);
-            await gnosis.propose(
-                hre, safe, earningToken.address, calldata
-            );
-        } else {
-            await common.run(hre, async function() {
-                return await earningToken.connect(
-                    admin.signer
-                ).approve(nft, allowance);
-            });
-        }
+        const result = await common.run(
+            hre, admin, earningToken, 'approve', [nft, allowance]
+        );
         logger.info("=========== nft-admin-setallowance end ===========");
+        return result;
     });
