@@ -212,11 +212,8 @@ task('wrapped-burn', 'burn wrapped tokens')
             const calldata = erc20.interface.encodeFunctionData(
                 'burn', [args.amount]
             );
-            logger.info('Not signer, calling info' + JSON.stringify({
-                operator: admin.address,
-                contract: erc20.address,
-                calldata
-            }, null, 2));
+            const safe = await gnosis.getSafe(hre);
+            await gnosis.propose(safe, erc20.address, calldata);
         }
         logger.info("=========== wrapped-burn end ===========");
     });

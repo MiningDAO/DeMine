@@ -132,11 +132,8 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
                     canonicalizedAmountToDeposit
                 ]
             );
-            logger.info('Not signer, calling info:' + JSON.stringify({
-                operator: admin.address,
-                contract: erc1155Facet.address,
-                calldata
-            }, null, 2));
+            const safe = await gnosis.getSafe(hre);
+            await gnosis.propose(safe, erc1155Facet.address, calldata);
         }
         logger.info("=========== nft-admin-finalize End ===========");
     });
@@ -177,11 +174,8 @@ task('nft-admin-mint', 'mint new demine nft tokens')
                 'mint',
                 [ids, amounts, []]
             );
-            logger.info('Not signer, calling info: ' + JSON.stringify({
-                operator: admin.address,
-                contract: erc1155Facet.address,
-                calldata
-            }, null, 2));
+            const safe = await gnosis.getSafe(hre);
+            await gnosis.propose(safe, erc1155Facet.address, calldata);
         }
         logger.info("=========== nft-admin-mint end ===========");
     });
@@ -228,11 +222,8 @@ task('nft-admin-release', 'transfer demine nft tokens')
                 'safeBatchTransferFrom',
                 [custodian.address, to, ids, amounts, []]
             );
-            logger.info('Not signer, calling info: ' + JSON.stringify({
-                operator: admin.address,
-                contract: erc1155Facet.address,
-                calldata
-            }, null, 2));
+            const safe = await gnosis.getSafe(hre);
+            await gnosis.propose(safe, erc1155Facet.address, calldata);
         }
         logger.info("=========== nft-admin-release end ===========");
     });
@@ -264,11 +255,8 @@ task('nft-admin-seturi', 'set uri for nft contract')
             const calldata = erc1155Facet.interface.encodeFunctionData(
                 'setURI', [uri]
             );
-            logger.info('Not signer, calling info: ' + JSON.stringify({
-                operator: admin.address,
-                contract: erc1155Facet.address,
-                calldata
-            }, null, 2));
+            const safe = await gnosis.getSafe(hre);
+            await gnosis.propose(safe, erc1155Facet.address, calldata);
         }
         logger.info("=========== nft-admin-seturi end ===========");
     });
@@ -309,11 +297,8 @@ task('nft-admin-setfallback', 'set fallback address for nft contract')
             const calldata = erc1155Facet.interface.encodeFunctionData(
                 'setFallbackAddress', [fallback]
             );
-            logger.info('Not signer, calling info: ' + JSON.stringify({
-                operator: admin.address,
-                contract: erc1155Facet.address,
-                calldata
-            }, null, 2));
+            const safe = await gnosis.getSafe(hre);
+            await gnosis.propose(safe, erc1155Facet.address, calldata);
         }
         logger.info("=========== nft-admin-setfallback end ===========");
     });
@@ -346,11 +331,8 @@ task('nft-admin-custody', 'approve admin for custodian contract at nft contract'
                 'custody',
                 [nft, admin.address, true]
             );
-            logger.info('Not signer, calling info: ' + JSON.stringify({
-                operator: admin.address,
-                contract: custodian.address,
-                calldata
-            }, null, 2));
+            const safe = await gnosis.getSafe(hre);
+            await gnosis.propose(safe, custodian.address, calldata);
         }
         logger.info("=========== nft-admin-custody end ===========");
     });
@@ -391,12 +373,8 @@ task('nft-admin-setallowance', 'set allownace of admin for nft contract')
             const calldata = earningToken.interface.encodeFunctionData(
                 'approve', [nft, allowance]
             );
-            logger.info('Not signer, calling info:' + JSON.stringify({
-                operator: admin.address,
-                contract: earningToken.address,
-                calldata
-            }, null, 2));
+            const safe = await gnosis.getSafe(hre);
+            await gnosis.propose(safe, earningToken.address, calldata);
         }
-
         logger.info("=========== nft-admin-setallowance end ===========");
     });
