@@ -46,7 +46,7 @@ async function main() {
         });
     }
 
-    // mint
+    // mint NFT
     const weekly = await run(
         'nft-tokens',
         {tokens: `2022-02-01,2023-02-01,weekly`}
@@ -63,6 +63,7 @@ async function main() {
         );
     }
 
+    // finalize NFT
     const startTs = time.startOfDay(new Date('2022-02-02'));
     var finalized = (await erc1155.finalized()).toNumber();
     if (finalized == 0) {

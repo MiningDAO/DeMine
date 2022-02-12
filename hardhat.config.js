@@ -76,6 +76,9 @@ module.exports = {
         },
         admin: {
             default: 1
+        },
+        gnosis: {
+            default: 1
         }
     },
     gasReporter: {

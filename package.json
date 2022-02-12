@@ -1,5 +1,8 @@
 {
   "dependencies": {
+    "@gnosis.pm/safe-core-sdk": "^2.0.0",
+    "@gnosis.pm/safe-ethers-lib": "^1.0.0",
+    "@gnosis.pm/safe-service-client": "^1.1.1",
     "@openzeppelin/contracts": "^4.4.0",
     "@openzeppelin/contracts-upgradeable": "^4.4.1",
     "app-root-path": "^3.0.0",

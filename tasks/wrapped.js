@@ -5,6 +5,7 @@ const common = require("../lib/common.js");
 const config = require("../lib/config.js");
 const diamond = require("../lib/diamond.js");
 const state = require("../lib/state.js");
+const gnosis = require('../lib/gnosis.js');
 
 function getWrapped(hre, coin) {
     const wrapped = state.tryLoadWrappedClone(hre, coin);
@@ -157,24 +158,21 @@ task('wrapped-mint', 'mint new nft tokens')
                 decimals: decimals
             },
             to: admin.address,
-            currentBalance: balance.toNumber(),
-            toMint: amount
+            currentBalance: balance.toString(),
+            toMint: amount.toString()
         }, null, 2));
         if (admin.signer) {
             await common.run(hre, async function() {
                 return await erc20.connect(admin.signer).mint(
                     admin.address, amount
                 );
-            })
+            });
         } else {
             const calldata = erc20.interface.encodeFunctionData(
                 'mint', [admin.address, amount]
             );
-            logger.info('Not signer, calling info: ' + JSON.stringify({
-                operator: admin.address,
-                contract: erc20.address,
-                calldata
-            }, null, 2));
+            const safe = await gnosis.getSafe(hre);
+            await gnosis.propose(safe, erc20.address, calldata);
         }
         logger.info("=========== wrapped-mint end ===========");
     });
@@ -191,7 +189,10 @@ task('wrapped-burn', 'burn wrapped tokens')
         const wrapped = args.contract || getWrapped(hre, args.coin);
         const erc20 = await ethers.getContractAt('ERC20Facet', wrapped);
         const balance = await erc20.balanceOf(admin.address);
-        assert(balance.toNumber() >= args.amount, 'insufficient balance to bunr');
+        assert(
+            new BigNumber(balance.toString()).lt(args.amount),
+            'insufficient balance to burn'
+        );
         logger.info('Burning ERC20: ' + JSON.stringify({
             address: wrapped,
             metadata: {
@@ -200,7 +201,7 @@ task('wrapped-burn', 'burn wrapped tokens')
                 decimals: await erc20.decimals()
             },
             from: admin.address,
-            currentBalance: balance.toNumber(),
+            currentBalance: balance.toString(),
             toBurn: args.amount
         }, null, 2));
         if (admin.signer) {
