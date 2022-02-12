@@ -12,15 +12,89 @@ const config = require("../lib/config.js");
 const gnosis = require('../lib/gnosis.js');
 const courier = require('../lib/courier.js');
 
-task('binance-withdraw', 'withdraw fund from binance to admin account')
-    .addParam('coin', 'Coin of DeMineNFT')
-    .setAction(async (args, { ethers, network } = hre) => {
-        const admin = await config.admin(hre);
-        if (hre.network.name == 'bsc') {
-            logger.info("Will withdraw balance from binance to admin");
-            await binance.withdrawAll(hre, args.coin, admin.address);
+const formatTs = function(ts) {
+    return `${ts}(${new Date(ts * 1000).toISOString()})`;
+}
+
+async function getFinalizing(erc1155Facet, args) {
+    const finalized = await erc1155Facet.finalized();
+    logger.info(`Latest finalized is ${formatTs(finalized)}`);
+
+    const finalizing = args.timestamp || finalized.add(86400).toNumber();
+    logger.info(`Finalizing ${formatTs(finalizing)}`);
+    if (finalizing % 86400 != 0) {
+        throw `Error: timestamp to finalize should be start `
+            + `of day, finalizing=${formatTs(finalizing)}`;
+    }
+    if (finalizing <= finalized) {
+        throw `Error: already finalized, finalizing=`
+            + `${formatTs(finalizing)}, finalized=${formatTs(finalized)}`;
+    };
+    const now = time.toEpoch(new Date());
+    if (finalizing > now) {
+        throw `Error: cannot finalize future tokens, finalizing=`
+            + `${formatTs(finalizing)}, now=${formatTs(now)}`;
+    }
+    return finalizing;
+}
+
+async function getPoolStatsAndTokenRelease(hre, args, erc1155Facet, finalizing) {
+    const poolStats = await antpool.stats(hre.localConfig.antpool, args.coin, finalizing);
+    const hashPerToken = hre.localConfig.hashPerToken[args.coin];
+    poolStats.hashrateDecimal = poolStats.hashrate.div(hashPerToken);
+    logger.info('AntPool stats loaded: ' + JSON.stringify(poolStats, null, 2));
+
+    const {released, supply} = await token.supplyOf(hre.ethers, erc1155Facet, finalizing);
+    logger.info(`Token supply is ${supply} with ${released} released`);
+
+    if (poolStats.hashrateDecimal.lt(released.toString())) {
+        const errMsg = "Effective hashrate is lower than token released!"
+        if (!args.enforce) {
+            throw `Error: ${errMsg} poolStats=${poolStats},`
+                + `released=${released.toString()}`;
+        } else {
+            logger.warn(errMsg);
         }
-    });
+    }
+    return {poolStats, released};
+}
+
+async function earning(admin, poolStats, released, earningToken) {
+    const decimals = await earningToken.decimals();
+    const base = new BigNumber(10).pow(decimals);
+    const earningPerTokenDecimal = poolStats.totalEarned.div(
+        poolStats.hashrateDecimal
+    ).toFixed(decimals, 1);
+    const earningPerToken = ethers.BigNumber.from(
+        new BigNumber(earningPerTokenDecimal).times(base).integerValue().toString()
+    );
+    const totalEarningDecimal = new BigNumber(
+        earningPerTokenDecimal
+    ).times(released.toString());
+    const totalEarning = earningPerToken.mul(released);
+
+    logger.info('Earning summary: ' + JSON.stringify({
+        earningPerToken: earningPerToken.toString(),
+        totalEarning: totalEarning.toString(),
+        totalEarnedDecimal: poolStats.totalEarned,
+        totalEarningDecimal: totalEarningDecimal,
+        amountToReserveDecimal: poolStats.totalEarned.minus(totalEarningDecimal),
+        earningPerTokenDecimal: earningPerTokenDecimal,
+    }, null, 2));
+
+    const adminBalance = await earningToken.balanceOf(admin.address);
+    const adminBalanceDecimal = new BigNumber(adminBalance.toString()).div(base);
+    if (totalEarningDecimal.gt(adminBalanceDecimal.toString())) {
+        throw `Error: Insufficient balance of admin to deposit` +
+            `, required=${totalEarningAsDecimal}, balance=${adminBalanceDecimal}`
+    }
+    return {
+        earningPerToken,
+        earningPerTokenDecimal,
+        totalEarning,
+        totalEarningDecimal,
+    };
+}
 
 task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'Coin of DeMineNFT')
@@ -40,77 +114,29 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
         const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
         const erc1155Facet = await ethers.getContractAt('ERC1155Facet', nft);
         logger.info(`NFT contract ${nft} loaded`);
+
         const earningToken = await ethers.getContractAt(
             '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
             await erc1155Facet.earningToken()
         );
         logger.info(`Reward token ${earningToken.address} loaded`);
 
-        const formatTs = function(ts) {
-            return `${ts}(${new Date(ts * 1000).toISOString()})`;
-        }
-        const finalized = await erc1155Facet.finalized();
-        logger.info(`Latest finalized is ${formatTs(finalized)}`);
-
-        const finalizing = args.timestamp || finalized.add(86400).toNumber();
-        logger.info(`Finalizing ${formatTs(finalizing)}`);
-        assert(
-            finalizing % 86400 == 0,
-            `Error: timestamp to finalize should be start of day`
+        const finalizing = await getFinalizing(erc1155Facet, args);
+        const {poolStats, released} = await getPoolStatsAndTokenRelease(
+            hre, args, erc1155Facet, finalizing
         );
-        assert(finalizing > finalized, `Error: already finalized`);
-        const now = time.toEpoch(new Date());
-        assert(finalizing < now, `Error: cannot finalize future tokens`);
+        const {
+            earningPerToken,
+            earningPerTokenDecimal,
+            totalEarning,
+            totalEarningDecimal,
+        } = await earning(admin, poolStats, released, earningToken);
 
-        const poolStats = await antpool.stats(localConfig.antpool, args.coin, finalizing);
-        const hashPerToken = localConfig.hashPerToken[args.coin.toLowerCase()];
-        poolStats.canonicalizedHashrate = poolStats.hashrate.div(hashPerToken);
-        logger.info('AntPool stats loaded: ' + JSON.stringify(poolStats, null, 2));
-
-        const {released, supply} = await token.supplyOf(hre.ethers, erc1155Facet, finalizing);
-        logger.info(`Token supply is ${supply} with ${released} released`);
-        if (poolStats.canonicalizedHashrate.lt(released.toString())) {
-            const errMsg = "Effective hashrate is lower than released!"
-            assert(args.enforce, "Error: " + errMsg);
-            logger.warn(errMsg);
-        }
-
-        const decimals = await earningToken.decimals();
-        const base = new BigNumber(10).pow(decimals);
-
-        const tokenValue = poolStats.totalEarned.div(
-            poolStats.canonicalizedHashrate
-        ).toFixed(decimals, 1);
-        const canonicalizedTokenValue = ethers.BigNumber.from(
-            new BigNumber(tokenValue).times(base).integerValue().toString()
-        );
-
-        const amountToDeposit = new BigNumber(tokenValue).times(released.toString());
-        const canonicalizedAmountToDeposit = canonicalizedTokenValue.mul(released);
-        const canonicalizedAdminBalance = await earningToken.balanceOf(admin.address);
-        const adminBalance = new BigNumber(canonicalizedAdminBalance.toString()).div(base);
-        assert(
-            amountToDeposit.lte(adminBalance.toString()),
-            'Error: Insufficient balance from admin'
-        );
-
-        logger.info('Summary: ' + JSON.stringify({
-            address: nft,
-            operator: admin.address,
-            finalized: formatTs(finalized.toNumber()),
-            antpool: poolStats,
-            earning: {
-                totalEarned: poolStats.totalEarned,
-                amountToDeposit: amountToDeposit,
-                'amountToDeposit(canonicalized)': canonicalizedAmountToDeposit.toString(),
-                amountToReserve: poolStats.totalEarned.minus(amountToDeposit)
-            },
-            finalizing: {
-                timestamp: formatTs(finalizing),
-                tokenValue: tokenValue.toString,
-                'tokenValue(canonicalized)': canonicalizedTokenValue.toString(),
-                released: released.toString()
-            },
+        logger.info('Will finalize with args: ' + JSON.stringify({
+            timestamp: formatTs(finalizing),
+            tokenValue: earningPerToken.toString(),
+            withdrawFrom: admin.address,
+            totalEarning: totalEarning.toString()
         }, null, 2));
 
         if (admin.type == 'GNOSIS') {
@@ -118,9 +144,9 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
                 'finalize',
                 [
                     finalizing,
-                    canonicalizedTokenValue,
+                    earningPerToken,
                     admin.address,
-                    canonicalizedAmountToDeposit
+                    totalEarning
                 ]
             );
             const safe = await gnosis.getSafe(hre, admin);
@@ -134,13 +160,13 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
                 {
                     operation: 'finalizeNFT',
                     functionToCall: 'finalize',
-                    finalizing: finalizing,
+                    finalizing,
                     finalizingAsDate: formatTs(finalizing),
-                    earningPerToken: canonicalizedTokenValue,
-                    totalEarning: canonicalizedAmountToDeposit,
+                    earningPerToken,
+                    earningPerTokenDecimal,
+                    totalEarning,
+                    totalEarningDecimal,
                     withdrawFrom: admin.address,
-                    earningPerTokenAsDecimal: tokenValue,
-                    totalEarningAsDecimal: amountToDeposit,
                 },
                 {
                     [earningToken.address]: await earningToken.symbol(),
@@ -155,9 +181,9 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
                     admin.signer
                 ).finalize(
                     finalizing,
-                    canonicalizedTokenValue,
+                    earningPerToken,
                     admin.address,
-                    canonicalizedAmountToDeposit
+                    totalEarning,
                 );
             });
         }

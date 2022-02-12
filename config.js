@@ -16,9 +16,6 @@ const config = {
         brand: process.env.COURIER_BRAND_ID,
         auth_token: process.env.COURIER_AUTH_TOKEN,
         recipient_id: process.env.COURIER_RECIPIENT_ID,
-        event_id: {
-            gnosis: process.env.COURIER_GNOSIS_EVENT_ID,
-        },
         profile: process.env.COURIER_PROFILE
     },
     alchemy: {
@@ -27,6 +24,7 @@ const config = {
         rinkeby: process.env.ALCHEMY_RINKEBY
     },
     gnosisSafe: {
+        skipPrompts: false,
         api: {
             rinkeby: 'https://safe-transaction.rinkeby.gnosis.io',
             bsc: 'https://safe-transaction.bsc.gnosis.io'
@@ -52,6 +50,7 @@ const config = {
         }
     },
     binance: {
+        skipPrompts: false,
         prod: {
             key: process.env.BINANCE_KEY,
             secret: process.env.BINANCE_SECRET,

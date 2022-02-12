@@ -7,6 +7,7 @@ require('hardhat-deploy-ethers');
 require('./tasks/wrapped.js');
 require('./tasks/nft.js');
 require('./tasks/nft-admin.js');
+require('./tasks/e2e.js');
 require('./tasks/agent.js');
 
 const config = require('./config');
