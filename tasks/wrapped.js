@@ -161,18 +161,19 @@ task('wrapped-mint', 'mint new nft tokens')
             currentBalance: balance.toString(),
             toMint: amount.toString()
         }, null, 2));
-        if (admin.signer) {
+
+        if (admin.type == 'GNOSIS') {
+            const calldata = erc20.interface.encodeFunctionData(
+                'mint', [admin.address, amount]
+            );
+            const safe = await gnosis.getSafe(hre, admin);
+            await gnosis.propose(hre, safe, erc20.address, calldata);
+        } else {
             await common.run(hre, async function() {
                 return await erc20.connect(admin.signer).mint(
                     admin.address, amount
                 );
             });
-        } else {
-            const calldata = erc20.interface.encodeFunctionData(
-                'mint', [admin.address, amount]
-            );
-            const safe = await gnosis.getSafe(hre);
-            await gnosis.propose(safe, erc20.address, calldata);
         }
         logger.info("=========== wrapped-mint end ===========");
     });
@@ -204,16 +205,17 @@ task('wrapped-burn', 'burn wrapped tokens')
             currentBalance: balance.toString(),
             toBurn: args.amount
         }, null, 2));
-        if (admin.signer) {
-            await common.run(hre, async function() {
-                return await erc20.connect(admin.signer).burn(args.amount);
-            });
-        } else {
+
+        if (admin.type == 'GNOSIS') {
             const calldata = erc20.interface.encodeFunctionData(
                 'burn', [args.amount]
             );
-            const safe = await gnosis.getSafe(hre);
-            await gnosis.propose(safe, erc20.address, calldata);
+            const safe = await gnosis.getSafe(hre, admin);
+            await gnosis.propose(hre, safe, erc20.address, calldata);
+        } else {
+            await common.run(hre, async function() {
+                return await erc20.connect(admin.signer).burn(args.amount);
+            });
         }
         logger.info("=========== wrapped-burn end ===========");
     });

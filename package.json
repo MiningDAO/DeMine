@@ -5,6 +5,7 @@
     "@gnosis.pm/safe-service-client": "^1.1.1",
     "@openzeppelin/contracts": "^4.4.0",
     "@openzeppelin/contracts-upgradeable": "^4.4.1",
+    "@trycourier/courier": "^3.5.0",
     "app-root-path": "^3.0.0",
     "axios-retry": "^3.2.4",
     "bignumber.js": "^9.0.2",

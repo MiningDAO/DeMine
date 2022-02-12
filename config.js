@@ -12,6 +12,15 @@ const config = {
         process.env.GNOSIS,
     ],
     statePath: path.join(__dirname, './state/'),
+    courier: {
+        brand: process.env.COURIER_BRAND_ID,
+        auth_token: process.env.COURIER_AUTH_TOKEN,
+        recipient_id: process.env.COURIER_RECIPIENT_ID,
+        event_id: {
+            gnosis: process.env.COURIER_GNOSIS_EVENT_ID,
+        },
+        profile: process.env.COURIER_PROFILE
+    },
     alchemy: {
         matic: process.env.ALCHEMY_MATIC,
         maticdev: process.env.ALCHEMY_MATIC_DEV,
@@ -20,7 +29,7 @@ const config = {
     gnosisSafe: {
         api: {
             rinkeby: 'https://safe-transaction.rinkeby.gnosis.io',
-            main: 'https://safe-transaction.gnosis.io'
+            bsc: 'https://safe-transaction.bsc.gnosis.io'
         },
         admin: {
             bsc: '0x782A6a9Bc11Fb6e8320b92f2217AfD80f813Bd05',
