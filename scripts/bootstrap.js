@@ -1,5 +1,4 @@
 const { ethers } = hre = require("hardhat");
-const cron = require('node-cron');
 const state = require('../lib/state.js');
 const time = require('../lib/time.js');
 const token = require('../lib/token.js');
@@ -66,11 +65,11 @@ async function main() {
     await redis.connect();
     await load('btc', redis);
     logger.info('Bootstrap done');
-    const job = cron.schedule('0 0 */24 * *', async () => {
-        await load('btc', redis);
-    });
-    job.start();
-    logger.info('Cron job started');
 };
 
-main();
+main()
+    .then(() => process.exit(0))
+    .catch((error) => {
+        logger.error(error);
+        process.exit(1);
+    });
