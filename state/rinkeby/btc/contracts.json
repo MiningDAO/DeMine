@@ -45,5 +45,52 @@
       "type": 2,
       "byzantium": true
     }
+  },
+  "nft": {
+    "source": "0xB2e7e72C96ac758dCdd52CAb6aD6E0515b597677",
+    "target": "0x45c0Ba3DFBDA9E55a5bD62812138670cD1680C85",
+    "fallback": "0x390C604fd04591bb1242a8dEbFd98bDE60b60806",
+    "txReceipt": {
+      "to": "0xB2e7e72C96ac758dCdd52CAb6aD6E0515b597677",
+      "from": "0xa4b368e3a9D49Ff15b58f70Fb976724A98B6D149",
+      "contractAddress": null,
+      "transactionIndex": 16,
+      "gasUsed": {
+        "type": "BigNumber",
+        "hex": "0x033ea8"
+      },
+      "logsBloom": "0x00000000000000000000400000000000000000000000000000002000000010000000000100000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000400000000200000010000000000000000000000000000000000000000000000000000000000000000000040000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "blockHash": "0xbf48456400694fa8b60418fdde08b7c235b3720e3c2b9dfbd82f2ba00a19ddaf",
+      "transactionHash": "0xe9fa0ca2f71729c41eddf1fa6637e39c50349b4f563cf6d3d70bbc22ada2826b",
+      "logs": [
+        {
+          "transactionIndex": 16,
+          "blockNumber": 10157802,
+          "transactionHash": "0xe9fa0ca2f71729c41eddf1fa6637e39c50349b4f563cf6d3d70bbc22ada2826b",
+          "address": "0xB2e7e72C96ac758dCdd52CAb6aD6E0515b597677",
+          "topics": [
+            "0xb557324045551eafb0789d69d5679a7017a31840124b2220df4b81dea45ec083",
+            "0x000000000000000000000000b2e7e72c96ac758dcdd52cab6ad6e0515b597677",
+            "0x00000000000000000000000045c0ba3dfbda9e55a5bd62812138670cd1680c85"
+          ],
+          "data": "0x",
+          "logIndex": 30,
+          "blockHash": "0xbf48456400694fa8b60418fdde08b7c235b3720e3c2b9dfbd82f2ba00a19ddaf"
+        }
+      ],
+      "blockNumber": 10157802,
+      "confirmations": 1,
+      "cumulativeGasUsed": {
+        "type": "BigNumber",
+        "hex": "0x24dae0"
+      },
+      "effectiveGasPrice": {
+        "type": "BigNumber",
+        "hex": "0x4ead99f5"
+      },
+      "status": 1,
+      "type": 2,
+      "byzantium": true
+    }
   }
 }

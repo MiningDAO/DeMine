@@ -39,7 +39,7 @@ task('wrapped-mint', 'mint new nft tokens')
             admin,
             erc20,
             'mint',
-            [admin.address, amount]
+            [["to", admin.address], ["amount", amount]]
         );
         logger.info("=========== wrapped-mint end ===========");
         return result;
@@ -74,7 +74,7 @@ task('wrapped-burn', 'burn wrapped tokens')
         }, null, 2));
 
         const result = await common.run(
-            hre, admin, erc20, 'burn', [args.amount]
+            hre, admin, erc20, 'burn', [["amount", args.amount]]
         );
         logger.info("=========== wrapped-burn end ===========");
         return result;

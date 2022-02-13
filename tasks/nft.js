@@ -66,7 +66,7 @@ task('nft-clone', 'Deploy clone of demine nft')
                 baseUri: token.uri(hre, args.coin)
             }
         }, null, 2));
-        const {cloned, receipt} = await common.clone(
+        const {cloned, txReceipt} = await common.clone(
             hre, admin.signer, base, initArgs,
         );
         logger.info('Cloned contract DeMineNFT at ' + cloned);
@@ -77,7 +77,7 @@ task('nft-clone', 'Deploy clone of demine nft')
                     source: base.address,
                     target: cloned,
                     fallback: erc1155Facet.address,
-                    txReceipt: receipt
+                    txReceipt
                 }
             }
         );

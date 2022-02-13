@@ -55,7 +55,7 @@ task("wrapped-clone", "clone wrapped token")
                 decimals: c.decimals
             }
         }, null, 2));
-        const {cloned, receipt} = await common.clone(
+        const {cloned, txReceipt} = await common.clone(
             hre, admin.signer, base, initArgs,
         );
         logger.info('Cloned DeMineERC20 at ' + cloned);
@@ -66,7 +66,7 @@ task("wrapped-clone", "clone wrapped token")
                     source: base.address,
                     target: cloned,
                     fallback: fallback.address,
-                    txReceipt: receipt
+                    txReceipt
                 }
             }
         );

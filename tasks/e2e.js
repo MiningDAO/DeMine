@@ -7,47 +7,86 @@ const common = require('../lib/common.js');
 const state = require("../lib/state.js");
 const gnosis = require('../lib/gnosis.js');
 const courier = require('../lib/courier.js');
+const binance = require('../lib/binance.js');
 
-function aggregate(txes) {
-    var res = {};
-    for (let i = 1; i <= txes.length; i++) {
-        const {tx, signer, contract, func, args} = txes[i];
-        res['tx_' + i] = tx;
-        res['signer_' + i] = signer.address;
-        res['contract_' + i] = contract.address;
-        res['func_' + i] = func;
-        res['args_' + i] = args;
-    }
-    return res;
+const workflow = 'nft-finalize-e2e';
+
+function genSafeRequest(request) {
+    return [
+        {
+            key: 'SenderAddress',
+            value: request.senderAddress,
+        },
+        {
+            key: 'SafeAddress',
+            value: request.safeAddress,
+        },
+        {
+            key: 'SafeTxHash',
+            value: request.safeAddress,
+        },
+        {
+            key: 'Interact With',
+            value: request.safeTransaction.data.to,
+        },
+        {
+            key: 'Calldata',
+            value: request.safeTransaction.data.data,
+        }
+    ];
 }
 
-async function exec(hre, admin, txes, note, options) {
+function genKV(obj) {
+    return Object.keys(obj).map(k => ({key: k, value: obj[k]}));
+}
+
+function genOperation(i, request, context) {
+    const {tx, signer, contract, func, args} = request;
+    return {
+        index: i,
+        senderAddress: signer.address,
+        contractAddress: contract.address,
+        func: func,
+        args: args.map(([k, v]) => k + ': ' + v).join('\n'),
+        calldata: tx.data.data,
+        operation: genKV(context),
+    };
+}
+
+function genOperations(requests) {
+    var result = [];
+    for (let i = 0; i < requests.length; i++) {
+        const {request, context} = requests[i];
+        result.push(genOperation(i + 1, request, context));
+    }
+    return result;
+}
+
+async function exec(hre, coin, admin, requests, options) {
     if (admin.type == 'GNOSIS') {
         const {safe, service} = hre.shared.gnosis;
-        const safeTx = txes.length == 1
-            ? txes[0]
-            : await safe.createTransaction(txes.map(tx => tx.tx.data));
-        const request = await gnosis.propose(
+        const safeTx = requests.length == 1
+            ? requests[0].request.tx
+            : await safe.createTransaction(
+                requests.map(req => req.request.tx.data)
+            );
+        const {request: safeReq} = await gnosis.propose(
             safe, service, safeTx, options
         );
-        const aggregated = aggregate(txes);
         await courier.notifyGnosis(
             hre,
-            args.coin,
-            request,
-            {
-                Workflow: 'nft-finalize-e2e',
-                "Number of operation": txes.length,
-                ...aggregated,
-            },
-            note
+            coin,
+            workflow,
+            genSafeRequest(safeReq),
+            genOperations(requests)
         );
-        return request;
+        return safeReq;
     } else {
         const txReceipts = [];
-        for (const tx of txes) {
+        // do this in order incase there is dependencies between txes
+        for (const req of requests) {
             txReceipts.push(await common.execTx(
-                hre, admin.signer, tx.tx, options
+                hre, admin.signer, req.request.tx, options
             ));
         }
         return txReceipts;
@@ -61,11 +100,8 @@ task('nft-finalize-e2e', 'withdraw and finalize')
         try {
             const admin = await config.admin(hre);
             if (hre.network.name == 'bsc') {
-                const func = async() => {
-                    await binance.withdrawAll(hre, args.coin, admin.address);
-                };
-                args.skipPrompts ? await func() : await utils.prompts(func);
                 logger.info("Will withdraw balance from binance to admin")
+                await binance.withdrawAll(hre, args.coin, admin.address, args.skipPrompts);
             }
 
             hre.shared.gnosis = await gnosis.getSafe(hre, admin);
@@ -73,8 +109,11 @@ task('nft-finalize-e2e', 'withdraw and finalize')
             const erc1155 = await ethers.getContractAt('ERC1155Facet', nft);
             const earningToken = await ethers.getContractAt(
                 '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
-                await erc1155Facet.earningToken()
+                await erc1155.earningToken()
             );
+
+            throw "Invalid";
+
             const note = {
                 [earningToken.address]: await earningToken.symbol(),
                 [nft]: 'DeMineNFT',
@@ -83,10 +122,10 @@ task('nft-finalize-e2e', 'withdraw and finalize')
             };
 
             var finalized = (await erc1155.finalized()).toNumber();
-            var tx = [];
+            var requests = [];
             if (finalized == 0) {
                 finalized = time.toEpoch(new Date('2022-02-02T00:00:00Z'));
-                tx.push(await run(
+                requests.push(await run(
                     'nft-admin-finalize',
                     {
                         coin: args.coin,
@@ -96,10 +135,9 @@ task('nft-finalize-e2e', 'withdraw and finalize')
                 ));
             }
 
-            finalized = time.toEpoch(new Date('2022-02-08T00:00:00Z'));
             const endTs = time.startOfDay(new Date());
             for (; finalized < endTs; finalized += 86400) {
-                tx.push(await run(
+                requests.push(await run(
                     'nft-admin-finalize',
                     {
                         coin: args.coin,
@@ -108,13 +146,15 @@ task('nft-finalize-e2e', 'withdraw and finalize')
                     }
                 ));
             }
-            return await exec(hre, admin, tx, note, {skipPrompts: args.skipPrompts});
+            return await exec(
+                hre, args.coin, admin, requests, {skipPrompts: args.skipPrompts}
+            );
         } catch(err) {
             await courier.notifyE2EFailure(
                 hre,
                 args.coin,
-                'NFT Finalize e2e workflow failed',
-                JSON.stringify({error: err})
+                workflow,
+                err.toString()
             );
         }
     });
