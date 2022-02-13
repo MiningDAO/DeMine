@@ -13,15 +13,15 @@ router.get("/:network/:coin/:id", async (req, res) => {
         id = ethers.BigNumber.from(req.params.id);
         decoded = token.decodeOne(id);
     } catch(err) {
-        console.log(`invalid token id ${id}`);
-        res.json({ok: false, message: 'invalid token id'});
+        console.log(`invalid input coin=${coin},network=${network},id=${id}`);
+        res.json({ok: false, message: 'invalid input'});
         return;
     }
 
     const contractKey = key(network, coin, 'contract');
     const contractStored = await redis.get(contractKey);
     if (contractStored === null || contractStored === undefined) {
-        console.log(`invalid request ${network} for ${btc}`);
+        console.log(`invalid request: network=${network}, coin=${coin}`);
         res.json({ok: false, message: 'nft contract not found'});
         return;
     }
