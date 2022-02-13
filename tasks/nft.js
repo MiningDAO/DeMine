@@ -167,8 +167,11 @@ task('nft-inspect-contract', 'Inspect state of DeMineNFT contract')
                 break;
             }
             const tokenId = token.genTokenId(finalized - i * 86400 - 86400, 'daily');
+            const encoded = token.encodeOne(tokenId);
             history.push({
-                tokenId,
+                tokenId: encoded.toString(),
+                tokenIdAsHex: encoded.toHexString(),
+                decoded: tokenId,
                 earning: (await erc1155Facet.earning(
                     token.encodeOne(tokenId)
                 )).toString()
@@ -203,7 +206,11 @@ task('nft-inspect-contract', 'Inspect state of DeMineNFT contract')
             earningToken,
             custodian,
             paused: await base.paused(),
-            finalized: { finalized, history,},
+            finalized: {
+                finalized,
+                finalizedAsDate: new Date(finalized * 1000).toISOString(),
+                history,
+            },
             uri: await erc1155Facet.uri(0),
             royaltyInfo: {
                 recipient: royaltyInfo[0],
