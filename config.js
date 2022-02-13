@@ -24,7 +24,6 @@ const config = {
         rinkeby: process.env.ALCHEMY_RINKEBY
     },
     gnosisSafe: {
-        skipPrompts: false,
         api: {
             rinkeby: 'https://safe-transaction.rinkeby.gnosis.io',
             bsc: 'https://safe-transaction.bsc.gnosis.io'
@@ -50,7 +49,6 @@ const config = {
         }
     },
     binance: {
-        skipPrompts: false,
         prod: {
             key: process.env.BINANCE_KEY,
             secret: process.env.BINANCE_SECRET,

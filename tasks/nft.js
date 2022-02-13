@@ -66,14 +66,8 @@ task('nft-clone', 'Deploy clone of demine nft')
                 baseUri: token.uri(hre, args.coin)
             }
         }, null, 2));
-        const { events } = receipt = await common.run(
-            hre,
-            async function() {
-                return await base.create(initArgs);
-            }
-        );
-        const { args: [from, cloned] } = events.find(
-            function(e) { return e.event === 'Clone'; }
+        const {cloned, receipt} = await common.clone(
+            hre, admin.signer, base, initArgs,
         );
         logger.info('Cloned contract DeMineNFT at ' + cloned);
         logger.info('Writing contract info to state file');

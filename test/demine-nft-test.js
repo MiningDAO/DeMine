@@ -1,5 +1,5 @@
 const { expect } = require("chai");
-const common = require("../lib/common.js");
+const utils = require("../lib/utils.js");
 const token = require("../lib/token.js");
 const time = require("../lib/time.js");
 const diamond = require("../lib/diamond.js");
@@ -217,7 +217,7 @@ describe("DeMineNFT", function () {
         // mint
         await facet.connect(admin).mint(encoded, amounts, []);
         const accounts = Array(3).fill(custodian.address);
-        common.compareArray(
+        utils.compareArray(
             await facet.balanceOfBatch(accounts, encoded),
             amounts
         );
@@ -311,12 +311,12 @@ describe("DeMineNFT", function () {
     it('IERC2981', async function() {
         const facet = await hre.ethers.getContractAt('ERC1155Facet', nft);
 
-        common.compareArray(await facet.royaltyInfo(1, 1000), [admin.address, 10]);
+        utils.compareArray(await facet.royaltyInfo(1, 1000), [admin.address, 10]);
         await expect(
             facet.connect(deployer).setRoyaltyInfo(admin.address, 1000)
         ).to.be.revertedWith('Ownable: sender must be owner');
         await facet.connect(admin).setRoyaltyInfo(admin.address, 1000);
-        common.compareArray(await facet.royaltyInfo(1, 1000), [admin.address, 100]);
+        utils.compareArray(await facet.royaltyInfo(1, 1000), [admin.address, 100]);
     });
 
     it('Mining', async function() {
@@ -420,7 +420,7 @@ describe("DeMineNFT", function () {
         expect(await earning(daily[0])).to.equal(1);
         expect(await earning(weekly[0])).to.equal(0);
         expect(await earning(biweekly[0])).to.equal(0);
-        common.compareArray(
+        utils.compareArray(
             await earningBatch([daily[0], weekly[0], biweekly[0]]),
             [1, 0, 0]
         ),
@@ -436,7 +436,7 @@ describe("DeMineNFT", function () {
         expect(await earning(daily[6])).to.equal(2);
         expect(await earning(weekly[0])).to.equal(2);
         expect(await earning(biweekly[0])).to.equal(2);
-        common.compareArray(
+        utils.compareArray(
             await earningBatch([daily[6], weekly[0], biweekly[0]]),
             [2, 2, 2]
         );
@@ -445,7 +445,7 @@ describe("DeMineNFT", function () {
         expect(await earning(daily[7])).to.equal(3);
         expect(await earning(weekly[0])).to.equal(5);
         expect(await earning(biweekly[0])).to.equal(5);
-        common.compareArray(
+        utils.compareArray(
             await earningBatch([daily[7], weekly[0], biweekly[0]]),
             [3, 5, 5]
         );
@@ -454,7 +454,7 @@ describe("DeMineNFT", function () {
         expect(await earning(daily[13])).to.equal(4);
         expect(await earning(weekly[1])).to.equal(4);
         expect(await earning(biweekly[0])).to.equal(9);
-        common.compareArray(
+        utils.compareArray(
             await earningBatch([daily[13], weekly[1], biweekly[0]]),
             [4, 4, 9]
         );
@@ -463,7 +463,7 @@ describe("DeMineNFT", function () {
         expect(await earning(daily[14])).to.equal(5);
         expect(await earning(weekly[1])).to.equal(9);
         expect(await earning(biweekly[0])).to.equal(14);
-        common.compareArray(
+        utils.compareArray(
             await earningBatch([daily[14], weekly[1], biweekly[0]]),
             [5, 9, 14]
         );
@@ -472,7 +472,7 @@ describe("DeMineNFT", function () {
         expect(await earning(daily[15])).to.equal(6);
         expect(await earning(weekly[2])).to.equal(6);
         expect(await earning(biweekly[1])).to.equal(6);
-        common.compareArray(
+        utils.compareArray(
             await earningBatch([daily[15], weekly[2], biweekly[1]]),
             [6, 6, 6]
         );

@@ -55,14 +55,8 @@ task("wrapped-clone", "clone wrapped token")
                 decimals: c.decimals
             }
         }, null, 2));
-        const { events } = receipt = await common.execTx(
-            hre,
-            async function() {
-                return await base.create(initArgs);
-            }
-        );
-        const { args: [_from, cloned] } = events.find(
-            function(e) { return e.event === 'Clone'; }
+        const {cloned, receipt} = await common.clone(
+            hre, admin.signer, base, initArgs,
         );
         logger.info('Cloned DeMineERC20 at ' + cloned);
         logger.info('Writing contract info to state file');

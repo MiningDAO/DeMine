@@ -14,6 +14,7 @@ require('./tasks/agent.js');
 const config = require('./config');
 extendEnvironment((hre) => {
     hre.localConfig = config;
+    hre.shared = {};
 });
 
 task('accounts', 'Prints the list of accounts')

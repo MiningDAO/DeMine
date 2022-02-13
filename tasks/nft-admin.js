@@ -148,7 +148,8 @@ task('nft-admin-finalize', 'finalize cycle for DeMineNFT contract')
                 earningPerToken,
                 admin.address,
                 totalEarning,
-            ]
+            ],
+            {dryrun: args.dryrun}
         );
         logger.info("=========== nft-admin-finalize End ===========");
         return result;
@@ -159,6 +160,7 @@ task('nft-admin-mint', 'mint new demine nft tokens')
     .addParam('ids', 'token id list, separated by comma')
     .addParam('amounts', 'amount per token, separated by comma')
     .addOptionalParam('nft', 'nft contract address')
+    .addFlag('dryrun', 'do not run but just simulate the process')
     .setAction(async (args, { ethers, deployments } = hre) => {
         logger.info("=========== nft-admin-mint start ===========");
         config.validateCoin(args.coin);
@@ -183,7 +185,8 @@ task('nft-admin-mint', 'mint new demine nft tokens')
             admin,
             erc1155Facet,
             'mint',
-            [ids, amounts, []]
+            [ids, amounts, []],
+            {dryrun: args.dryrun}
         );
         logger.info("=========== nft-admin-mint end ===========");
         return result;
@@ -195,6 +198,7 @@ task('nft-admin-release', 'transfer demine nft tokens')
     .addParam('ids', 'token id list, separated by comma')
     .addParam('amounts', 'amount per token, separated by comma')
     .addOptionalParam('nft', 'nft contract address')
+    .addFlag('dryrun', 'do not run but just simulate the process')
     .setAction(async (args, { ethers, deployments } = hre) => {
         logger.info("=========== nft-admin-release start ===========");
         config.validateCoin(args.coin);
@@ -222,7 +226,8 @@ task('nft-admin-release', 'transfer demine nft tokens')
             admin,
             erc1155Facet,
             'safeBatchTransferFrom',
-            [custodian.address, to, ids, amounts, []]
+            [custodian.address, to, ids, amounts, []],
+            {dryrun: args.dryrun}
         );
         logger.info("=========== nft-admin-release end ===========");
         return result;
@@ -230,6 +235,7 @@ task('nft-admin-release', 'transfer demine nft tokens')
 
 task('nft-admin-seturi', 'set uri for nft contract')
     .addParam('coin', 'Coin of DeMineNFT')
+    .addFlag('dryrun', 'do not run but just simulate the process')
     .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers } = hre) => {
         logger.info("=========== nft-admin-seturi start ===========");
@@ -252,7 +258,8 @@ task('nft-admin-seturi', 'set uri for nft contract')
             admin,
             erc1155Facet,
             'setURI',
-            [uri]
+            [uri],
+            {dryrun: args.dryrun}
         );
         logger.info("=========== nft-admin-seturi end ===========");
         return result;
@@ -260,6 +267,7 @@ task('nft-admin-seturi', 'set uri for nft contract')
 
 task('nft-admin-setfallback', 'set fallback address for nft contract')
     .addParam('coin', 'Coin of DeMineNFT')
+    .addFlag('dryrun', 'do not run but just simulate the process')
     .addOptionalParam('fallback', 'fallback to set')
     .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers } = hre) => {
@@ -288,7 +296,8 @@ task('nft-admin-setfallback', 'set fallback address for nft contract')
             admin,
             erc1155Facet,
             'setFallbackAddress',
-            [fallback]
+            [fallback],
+            {dryrun: args.dryrun}
         );
         logger.info("=========== nft-admin-setfallback end ===========");
         return result;
@@ -296,6 +305,7 @@ task('nft-admin-setfallback', 'set fallback address for nft contract')
 
 task('nft-admin-custody', 'approve admin for custodian contract at nft contract')
     .addParam('coin', 'Coin of DeMineNFT')
+    .addFlag('dryrun', 'do not run but just simulate the process')
     .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers } = hre) => {
         logger.info("=========== nft-admin-custody start ===========");
@@ -314,7 +324,8 @@ task('nft-admin-custody', 'approve admin for custodian contract at nft contract'
             admin,
             erc1155Facet,
             'custody',
-            [nft, admin.address, true]
+            [nft, admin.address, true],
+            {dryrun: args.dryrun},
         );
         logger.info("=========== nft-admin-custody end ===========");
         return result;
@@ -323,6 +334,7 @@ task('nft-admin-custody', 'approve admin for custodian contract at nft contract'
 task('nft-admin-setallowance', 'set allownace of admin for nft contract')
     .addParam('coin', 'Coin of DeMineNFT')
     .addParam('allowance', 'allowance to set, decimal')
+    .addFlag('dryrun', 'do not run but just simulate the process')
     .addOptionalParam('nft', 'nft contract address')
     .setAction(async (args, { ethers } = hre) => {
         logger.info("=========== nft-admin-setallowance start ===========");
@@ -344,10 +356,16 @@ task('nft-admin-setallowance', 'set allownace of admin for nft contract')
             contract: earningToken.address,
             owner: admin.address,
             spender: nft,
-            allowance: allowance.toString()
+            allowance: allowance.toString(),
+            allowanceDecimal: new BigNumber(args.allowance).toFixed(decimals)
         }, null, 2));
         const result = await common.run(
-            hre, admin, earningToken, 'approve', [nft, allowance]
+            hre,
+            admin,
+            earningToken,
+            'approve',
+            [nft, allowance],
+            {dryrun: args.dryrun},
         );
         logger.info("=========== nft-admin-setallowance end ===========");
         return result;
