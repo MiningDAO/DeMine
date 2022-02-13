@@ -120,6 +120,7 @@ task('nft-finalize-e2e', 'withdraw and finalize')
             if (finalized == endTs) {
                 const finalizedAsDate = new Date(finalized * 1000).toISOString();
                 logger.info(`No need to finalize, lastest finalized is ${finalizedAsDate}`);
+                return;
             }
 
             var requests = [];
