@@ -63,7 +63,6 @@ task('nft-clone', 'Deploy clone of demine nft')
                 },
                 royaltyRecipient: admin.address,
                 royaltyBps: royaltyBps,
-                baseUri: token.uri(hre, args.coin)
             }
         }, null, 2));
         const {cloned, txReceipt} = await common.clone(
@@ -90,7 +89,7 @@ task('nft-tokens', 'list tokens give date range')
     .setAction(async (args, { ethers, network, deployments } = hre) => {
         logger.info("=========== nft-tokens start ===========");
         const ids = token.parseTokenIds(args.tokens);
-        const encoded = token.encode(ethers, ids);
+        const encoded = token.encode(ids);
         logger.info(JSON.stringify({
             numTokenTypes: ids.length,
             idsAsDate: token.readableIds(encoded),
@@ -171,7 +170,7 @@ task('nft-inspect-contract', 'Inspect state of DeMineNFT contract')
             history.push({
                 tokenId,
                 earning: (await erc1155Facet.earning(
-                    token.encodeOne(ethers, tokenId)
+                    token.encodeOne(tokenId)
                 )).toString()
             });
         }

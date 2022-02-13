@@ -351,7 +351,7 @@ task('nft-admin-custody', 'approve admin for custodian contract at nft contract'
         const result = await common.run(
             hre,
             admin,
-            erc1155,
+            custodian,
             'custody',
             [
                 ["nftContractAddress", nft],

@@ -40,9 +40,8 @@ async function load(coin, redis) {
         logger.info(`Updating earning map...`);
         for (let i = earning.last; i < finalized; i += 86400) {
             const id = token.genTokenId(i, 'daily');
-            const earned = await erc1155.earning(
-                token.encodeOne(ethers, id)
-            );
+            const encoded = token.encodeOne(id);
+            const earned = await erc1155.earning(encoded);
             earning.earning[id.endTs] = earned.toString();
         }
         earning.last = finalized;

@@ -7,8 +7,8 @@ const config = require("../lib/config.js");
 const hre = require("hardhat");
 const address0 = hre.ethers.constants.AddressZero;
 
-const logger = require('../lib/logger.js');
-const console = logger.rawLogger.transports.find(
+const { logger } = require('../lib/logger.js');
+const console = logger.transports.find(
     t => t.name == 'console'
 );
 console.level = 'warn';
@@ -35,6 +35,7 @@ describe("DeMineNFT", function () {
         await hre.deployments.fixture(['NFT']);
         nft = await hre.run('nft-clone', {coin: coin});
         custodian = await config.getDeployment(hre, 'ERC1155Custodian');
+        await hre.run('nft-admin-custody', {coin: coin, nft: nft});
     });
 
     it("Initializable", async function() {
@@ -85,7 +86,7 @@ describe("DeMineNFT", function () {
 
         // mint
         var tokenIds = genTokenIds('2022-02-12', '2022-02-13', 'daily')
-        var encoded = token.encode(ethers, tokenIds);
+        var encoded = token.encode(tokenIds);
         await erc1155.connect(admin).mint(encoded, [50, 50], []);
         expect(await erc1155.balanceOf(custodian.address, encoded[0])).to.equal(50);
         expect(await erc1155.balanceOf(admin.address, encoded[0])).to.equal(0);
@@ -118,7 +119,7 @@ describe("DeMineNFT", function () {
 
         // mint not paused
         var tokenIds = genTokenIds('2022-02-12', '2022-02-13', 'daily')
-        var encoded = token.encode(ethers, tokenIds);
+        var encoded = token.encode(tokenIds);
         await expect(
             erc1155.connect(deployer).mint(encoded, [50, 50], [])
         ).to.be.revertedWith('Ownable: sender must be owner');
@@ -211,7 +212,7 @@ describe("DeMineNFT", function () {
     it("IERC1155", async function () {
         const facet = await hre.ethers.getContractAt('ERC1155Facet', nft);
         const ids = genTokenIds('2022-02-02', '2022-02-04', 'daily');
-        const [id1, id2, id3] = encoded = token.encode(hre.ethers, ids);
+        const [id1, id2, id3] = encoded = token.encode(ids);
         const amounts = [100, 100, 100];
 
         // mint
@@ -271,15 +272,14 @@ describe("DeMineNFT", function () {
 
     it("IERC1155Metadata", async function () {
         const facet = await hre.ethers.getContractAt('ERC1155Facet', nft);
-        const baseUri = hre.localConfig.tokenUri[coin];
         expect(await facet.uri(1)).to.equal('');
 
-        const newBaseUri = 'https://www.tokeninfo.com/token/';
+        const uri = token.uri(hre, coin);
         await expect(
-            facet.connect(deployer).setURI(newBaseUri)
+            facet.connect(deployer).setURI(uri)
         ).to.be.revertedWith('Ownable: sender must be owner');
-        await facet.connect(admin).setURI(newBaseUri);
-        expect(await facet.uri(1)).to.equal(newBaseUri + '1');
+        await facet.connect(admin).setURI(uri);
+        expect(await facet.uri(1)).to.equal(uri + '1');
     });
 
     it('IERC165', async function() {
@@ -339,9 +339,7 @@ describe("DeMineNFT", function () {
         };
         expect(daily.length).to.equal(days('2022-02-02', '2022-12-02'));
         const dailyAmounts = Array(daily.length).fill(100);
-        await erc1155.connect(admin).mint(
-            token.encode(ethers, daily), dailyAmounts, []
-        );
+        await erc1155.connect(admin).mint(token.encode(daily), dailyAmounts, []);
 
         const weekly = genTokenIds('2022-02-02', '2022-11-29', 'weekly');
         const weeks = function(start, end) {
@@ -353,9 +351,7 @@ describe("DeMineNFT", function () {
         };
         expect(weekly.length).to.equal(weeks('2022-02-03', '2022-11-29'));
         const weeklyAmounts = Array(weekly.length).fill(200);
-        await erc1155.connect(admin).mint(
-            token.encode(ethers, weekly), weeklyAmounts, []
-        );
+        await erc1155.connect(admin).mint(token.encode(weekly), weeklyAmounts, []);
 
         const biweekly = genTokenIds('2022-02-02', '2022-11-22', 'biweekly');
         const biweeks = function(start, end) {
@@ -368,7 +364,7 @@ describe("DeMineNFT", function () {
         expect(biweekly.length).to.equal(biweeks('2022-02-03', '2022-11-22'));
         const biweeklyAmounts = Array(biweekly.length).fill(300);
         await erc1155.connect(admin).mint(
-            token.encode(ethers, biweekly), biweeklyAmounts, []
+            token.encode(biweekly), biweeklyAmounts, []
         );
 
         // release
@@ -376,11 +372,11 @@ describe("DeMineNFT", function () {
             custodian.address,
             deployer.address,
             [
-                token.encodeOne(ethers, daily[13]),
-                token.encodeOne(ethers, daily[14]),
-                token.encodeOne(ethers, weekly[0]),
-                token.encodeOne(ethers, weekly[1]),
-                token.encodeOne(ethers, biweekly[0])
+                token.encodeOne(daily[13]),
+                token.encodeOne(daily[14]),
+                token.encodeOne(weekly[0]),
+                token.encodeOne(weekly[1]),
+                token.encodeOne(biweekly[0])
             ],
             [100, 100, 100, 100, 100],
             []
@@ -408,12 +404,10 @@ describe("DeMineNFT", function () {
         ).to.be.revertedWith('NFT: invalid timestamp')
 
         const earning = async function(id) {
-            return await erc1155.earning(token.encodeOne(ethers, id));
+            return await erc1155.earning(token.encodeOne(id));
         };
         const earningBatch = async function(ids) {
-            return await erc1155.earningBatch(
-                token.encode(ethers, ids)
-            );
+            return await erc1155.earningBatch(token.encode(ids));
         };
 
         await finalize('2022-02-03', 1);
@@ -482,11 +476,11 @@ describe("DeMineNFT", function () {
             deployer.address,
             custodian.address,
             [
-                token.encodeOne(ethers, daily[13]),
-                token.encodeOne(ethers, daily[14]),
-                token.encodeOne(ethers, weekly[0]),
-                token.encodeOne(ethers, weekly[1]),
-                token.encodeOne(ethers, biweekly[0])
+                token.encodeOne(daily[13]),
+                token.encodeOne(daily[14]),
+                token.encodeOne(weekly[0]),
+                token.encodeOne(weekly[1]),
+                token.encodeOne(biweekly[0])
             ],
             [100, 100, 100, 100, 100],
             []
@@ -497,11 +491,11 @@ describe("DeMineNFT", function () {
             custodian.address,
             custodian.address,
             [
-                token.encodeOne(ethers, daily[13]),
-                token.encodeOne(ethers, daily[14]),
-                token.encodeOne(ethers, weekly[0]),
-                token.encodeOne(ethers, weekly[1]),
-                token.encodeOne(ethers, biweekly[0])
+                token.encodeOne(daily[13]),
+                token.encodeOne(daily[14]),
+                token.encodeOne(weekly[0]),
+                token.encodeOne(weekly[1]),
+                token.encodeOne(biweekly[0])
             ],
             [100, 100, 100, 100, 100],
             []
@@ -509,7 +503,7 @@ describe("DeMineNFT", function () {
         expect(await income.balanceOf(nft)).to.equal(8900);
 
         const balanceOf = async function(address, id) {
-            return await erc1155.balanceOf(address, token.encodeOne(ethers, id));
+            return await erc1155.balanceOf(address, token.encodeOne(id));
         };
         expect(await balanceOf(deployer.address, daily[13])).to.equal(0);
         expect(await balanceOf(deployer.address, daily[14])).to.equal(0);
