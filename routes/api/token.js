@@ -5,24 +5,18 @@ const BigNumber = require("bignumber.js");
 const token = require('../../lib/token.js');
 const { key, redis } = require('../../lib/redis.js');
 
-function genType(startTs, endTs) {
-    if (endTs - startTs == 86400) {
-        return 'daily';
-    }
-    if (endTs - startTs == 86400 * 7) {
-        return 'weekly';
-    }
-    if (endTs - startTs == 86400 * 14) {
-        return 'biweekly';
-    }
-    throw 'Invalid token id';
-}
-
 router.get("/:network/:coin/:id", async (req, res) => {
     const coin = req.params.coin.toLowerCase();
     const network = req.params.network.toLowerCase();
-    const id = ethers.BigNumber.from(req.params.id);
-    const decoded = token.decodeOne(id);
+    var id, decoded;
+    try {
+        id = ethers.BigNumber.from(req.params.id);
+        decoded = token.decodeOne(id);
+    } catch(err) {
+        console.log(`invalid token id ${id}`);
+        res.json({ok: false, message: 'invalid token id'});
+        return;
+    }
 
     const contractKey = key(network, coin, 'contract');
     const contractStored = await redis.get(contractKey);
@@ -56,7 +50,7 @@ router.get("/:network/:coin/:id", async (req, res) => {
         properties: {
             id: {
                 hex: hex,
-                type: genType(decoded.startTs, decoded.endTs),
+                type: decoded.type,
                 ...decoded
             },
             earningToken: contract.earningToken,
