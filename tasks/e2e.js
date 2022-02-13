@@ -95,14 +95,14 @@ async function exec(hre, coin, admin, requests, options) {
 
 task('nft-finalize-e2e', 'withdraw and finalize')
     .addParam('coin', 'Coin of DeMineNFT')
-    .addFlag('skipPrompts', 'if to skip prompts')
+    .addFlag('skipprompts', 'if to skip prompts')
     .addFlag('enforce', 'enforce option for nft-admin-finalize task')
     .setAction(async (args, { ethers, localConfig } = hre) => {
         try {
             const admin = await config.admin(hre);
             if (hre.network.name == 'bsc') {
                 logger.info("Will withdraw balance from binance to admin")
-                await binance.withdrawAll(hre, args.coin, admin.address, args.skipPrompts);
+                await binance.withdrawAll(hre, args.coin, admin.address, args.skipprompts);
             }
             if (admin.type == 'GNOSIS') {
                 hre.shared.gnosis = await gnosis.getSafe(hre, admin);
@@ -149,7 +149,7 @@ task('nft-finalize-e2e', 'withdraw and finalize')
                 ));
             }
             return await exec(
-                hre, args.coin, admin, requests, {skipPrompts: args.skipPrompts}
+                hre, args.coin, admin, requests, {skipPrompts: args.skipprompts}
             );
         } catch(err) {
             await courier.notifyE2EFailure(
