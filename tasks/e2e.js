@@ -96,6 +96,7 @@ async function exec(hre, coin, admin, requests, options) {
 task('nft-finalize-e2e', 'withdraw and finalize')
     .addParam('coin', 'Coin of DeMineNFT')
     .addFlag('skipPrompts', 'if to skip prompts')
+    .addFlag('enforce', 'enforce option for nft-admin-finalize task')
     .setAction(async (args, { ethers, localConfig } = hre) => {
         try {
             const admin = await config.admin(hre);
@@ -103,8 +104,10 @@ task('nft-finalize-e2e', 'withdraw and finalize')
                 logger.info("Will withdraw balance from binance to admin")
                 await binance.withdrawAll(hre, args.coin, admin.address, args.skipPrompts);
             }
+            if (admin.type == 'GNOSIS') {
+                hre.shared.gnosis = await gnosis.getSafe(hre, admin);
+            }
 
-            hre.shared.gnosis = await gnosis.getSafe(hre, admin);
             const nft = state.loadNFTClone(hre, args.coin).target;
             const erc1155 = await ethers.getContractAt('ERC1155Facet', nft);
             const earningToken = await ethers.getContractAt(
@@ -112,16 +115,13 @@ task('nft-finalize-e2e', 'withdraw and finalize')
                 await erc1155.earningToken()
             );
 
-            throw "Invalid";
-
-            const note = {
-                [earningToken.address]: await earningToken.symbol(),
-                [nft]: 'DeMineNFT',
-                [admin.address]: 'DeMineAdmin(Gnosis Safe)',
-                [admin.signer.address]: 'DeMineAdmin(EOA)',
-            };
-
             var finalized = (await erc1155.finalized()).toNumber();
+            const endTs = time.startOfDay(new Date());
+            if (finalized == endTs) {
+                const finalizedAsDate = new Date(finalized * 1000).toISOString();
+                logger.info(`No need to finalize, lastest finalized is ${finalizedAsDate}`);
+            }
+
             var requests = [];
             if (finalized == 0) {
                 finalized = time.toEpoch(new Date('2022-02-02T00:00:00Z'));
@@ -130,18 +130,19 @@ task('nft-finalize-e2e', 'withdraw and finalize')
                     {
                         coin: args.coin,
                         timestamp: finalized,
+                        enforce: args.enforce,
                         dryrun: true,
                     }
                 ));
             }
 
-            const endTs = time.startOfDay(new Date());
             for (; finalized < endTs; finalized += 86400) {
                 requests.push(await run(
                     'nft-admin-finalize',
                     {
                         coin: args.coin,
                         timestamp: finalized + 86400,
+                        enforce: args.enforce,
                         dryrun: true,
                     }
                 ));

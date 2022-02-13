@@ -22,7 +22,7 @@ async function getFinalizing(erc1155, args) {
 
     const finalizing = args.timestamp || finalized.plus(86400).toNumber();
     const finalizingAsDate = new Date(finalizing * 1000).toISOString();
-    logger.info(`Finalizing ${finalizing}`);
+    logger.info(`Finalizing ${formatTs(finalizing)}`);
 
     const errMsg = `finalizing=${finalizing}(${finalizingAsDate})` +
         `finalized=${finalized}(${finalizedAsDate})`;
