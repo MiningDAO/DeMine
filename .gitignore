@@ -116,3 +116,5 @@ artifacts
 
 #vim temp file
 *.swp
+
+earning.json
