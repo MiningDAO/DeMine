@@ -19,12 +19,11 @@ async function check(coin, slippage) {
     const nft = state.loadNFTClone(hre, coin).target;
     const erc1155 = await ethers.getContractAt('ERC1155Facet', nft);
     const endOfToday = time.startOfDay(new Date()) + 86400;
-    const stats = await token.supplyOf(erc1155, endOfToday);
-    const tokenReleased = new BN(stats.tokenReleased.toString());
+    const tokenizedHashrate = await token.tokenizedHashrate(erc1155, endOfToday);
 
-    const hashrateMsg = `Hashrate=${hashrateDecimal} TH, `
-        + `ReleasedToken=${tokenReleased.toString()}`;
-    if (hashrateDecimal.lt(tokenReleased.times(1 - slippage))) {
+    const hashrateMsg = `Real hashrate=${hashrateDecimal} TH, `
+        + `tokenzied hashrate=${tokenizedHashrate.toString()}`;
+    if (hashrateDecimal.lt(tokenizedHashrate.times(1 - slippage))) {
         const workflow = 'antpool-hashrate-check-e2e';
         const msg = `Last 1h Hashrate is lower than token supply! `
             + `${hashrateMsg}, check details at https://v3.antpool.com/dashboard`;

@@ -57,35 +57,32 @@ async function getPoolStatsAndTokenRelease(hre, args, erc1155, context) {
     poolStats.hashrateDecimal = poolStats.hashrate.div(hashPerToken);
     logger.info('AntPool stats loaded: ' + JSON.stringify(poolStats, null, 2));
 
-    const tokenStats = await token.supplyOf(erc1155, finalizing);
-    const tokenReleased = new BN(tokenStats.tokenReleased.toString());
-    const tokenSupply = new BN(tokenStats.tokenSupply.toString());
-    logger.info(`Token supply is ${tokenSupply} with ${tokenReleased} released`);
+    const tokenizedHashrate = await token.tokenizedHashrate(erc1155, finalizing);
+    logger.info(`Tokenized hashrate is ${tokenizedHashrate}`);
 
-    if (poolStats.hashrateDecimal.lt(tokenReleased)) {
+    if (poolStats.hashrateDecimal.lt(tokenizedHashrate)) {
         const errMsg = "Effective hashrate is lower than token released!"
         if (!args.enforce) {
-            throw `Error: ${errMsg} hashrate=${poolStats.hashrateDecimal.toString()},`
-                + `released=${tokenReleased.toString()}`;
+            throw `Error: ${errMsg} Real Hashrate is ${poolStats.hashrateDecimal.toString()},`
+                + `tokenized Hashrate is ${tokenizedHashrate.toString()}`;
         } else {
             logger.warn(errMsg);
         }
     }
     return {
-        tokenSupply,
-        tokenReleased,
+        tokenizedHashrate,
         ...poolStats
     };
 }
 
 async function earning(admin, earningToken, context) {
-    const {tokenReleased, totalEarnedDecimal, hashrateDecimal} = context;
+    const {tokenizedHashrate, totalEarnedDecimal, hashrateDecimal} = context;
     const base = new BN(10).pow(await earningToken.decimals());
     const earningPerTokenDecimal = totalEarnedDecimal.div(hashrateDecimal);
     const earningPerToken = earningPerTokenDecimal.times(base).integerValue();
 
-    const amountToDeposit = earningPerToken.times(tokenReleased);
-    const amountToDepositDecimal = earningPerTokenDecimal.times(tokenReleased);
+    const amountToDeposit = earningPerToken.times(tokenizedHashrate);
+    const amountToDepositDecimal = earningPerTokenDecimal.times(tokenizedHashrate);
 
     const adminBalance = await earningToken.balanceOf(admin.address);
     const adminBalanceDecimal = new BN(adminBalance.toString()).div(base);

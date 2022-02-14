@@ -43,7 +43,7 @@ contract ERC1155Facet is
     function finalize(
         uint128 endOfDay,
         uint earningPerTPerDay,
-        address custodian,
+        address earningSource,
         uint totalEarning
     ) external onlyOwner {
         require(
@@ -56,7 +56,7 @@ contract ERC1155Facet is
             s.weekly[endOfDay + i * 86400] += earningPerTPerDay;
         }
         IERC20(s.earningToken).safeTransferFrom(
-            custodian,
+            earningSource,
             address(this),
             totalEarning
         );
