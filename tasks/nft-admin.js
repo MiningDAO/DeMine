@@ -65,7 +65,7 @@ async function getPoolStatsAndTokenRelease(hre, args, erc1155, context) {
     if (poolStats.hashrateDecimal.lt(tokenReleased)) {
         const errMsg = "Effective hashrate is lower than token released!"
         if (!args.enforce) {
-            throw `Error: ${errMsg} poolStats=${poolStats},`
+            throw `Error: ${errMsg} hashrate=${poolStats.hashrateDecimal.toString()},`
                 + `released=${tokenReleased.toString()}`;
         } else {
             logger.warn(errMsg);
