@@ -15,7 +15,8 @@ const config = {
     courier: {
         brand: process.env.COURIER_BRAND_ID,
         auth_token: process.env.COURIER_AUTH_TOKEN,
-        recipient_id: process.env.COURIER_RECIPIENT_ID,
+        gnosis_recipient_id: process.env.COURIER_GNOSIS_RECIEPINET_ID,
+        e2e_recipient_id: process.env.COURIER_E2E_RECIEPINET_ID,
         profile: process.env.COURIER_PROFILE
     },
     alchemy: {
