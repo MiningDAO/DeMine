@@ -22,10 +22,6 @@ function genSafeRequest(request) {
             value: request.safeAddress,
         },
         {
-            key: 'SafeTxHash',
-            value: request.safeAddress,
-        },
-        {
             key: 'Interact With',
             value: request.safeTransaction.data.to,
         },
