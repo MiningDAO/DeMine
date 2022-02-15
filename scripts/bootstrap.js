@@ -6,9 +6,11 @@ const logger = require('../lib/logger.js');
 const { key } = require('../lib/redis.js');
 
 async function abi() {
-    const abi1 = await hre.run('abi', {contract: 'ERC1155Facet'});
+    var abi1 = await hre.run('abi', {contract: 'ERC1155Facet'});
     const abi2 = await hre.run('abi', {contract: 'Diamond'});
-    return abi1.concat(abi2);
+    const names = abi2.map(a => a.name);
+    abi1 = abi1.filter(a => !names.includes(a.name));
+    return abi2.concat(abi1);
 }
 
 async function load(coin, redis) {

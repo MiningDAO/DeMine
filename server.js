@@ -9,6 +9,14 @@ const https = require('https');
 const express = require('express');
 const app = express();
 
+const cors = require('cors');
+const corsOptions = {
+  origin: function (origin, callback) {
+    callback(null, true)
+  }
+}
+app.use(cors(corsOptions));
+
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
