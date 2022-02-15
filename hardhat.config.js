@@ -31,6 +31,7 @@ task('abi', 'Prints abi of contract')
     .setAction(async (taskArgs, { artifacts }) => {
         let artifact = await artifacts.readArtifact(taskArgs.contract);
         console.log(JSON.stringify(artifact.abi));
+        return artifact.abi;
     });
 
 module.exports = {

@@ -1,9 +1,15 @@
-const { ethers } = hre = require("hardhat");
+const { ethers, artifacts } = hre = require("hardhat");
 const state = require('../lib/state.js');
 const time = require('../lib/time.js');
 const token = require('../lib/token.js');
 const logger = require('../lib/logger.js');
 const { key } = require('../lib/redis.js');
+
+async function abi() {
+    const abi1 = await hre.run('abi', {contract: 'ERC1155Facet'});
+    const abi2 = await hre.run('abi', {contract: 'Diamond'});
+    return abi1.concat(abi2);
+}
 
 async function load(coin, redis) {
     logger.info(`Bootstraping ${coin} ...`);
@@ -25,7 +31,8 @@ async function load(coin, redis) {
             name: await earningToken.name(),
             symbol: await earningToken.symbol(),
             decimals: await earningToken.decimals(),
-        }
+        },
+        abi: await abi()
     }));
     logger.info(`Contract metadata updated...`);
 

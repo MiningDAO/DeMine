@@ -14,7 +14,9 @@ app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
 
 const token = require("./routes/api/token");
+const contract = require("./routes/api/contract");
 app.use("/api/v1/token", token);
+app.use("/api/v1/contract", contract);
 app.use('/static', express.static(path.join(__dirname, 'files')))
 
 const options = {
