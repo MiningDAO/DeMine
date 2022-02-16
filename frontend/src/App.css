@@ -31,3 +31,26 @@
 .site-page-header {
   border: 1px solid rgb(235, 237, 240);
 }
+
+.transfer {
+  margin-top: 25px;
+}
+
+.finalized {
+   background-color: #A9A9A9;
+}
+
+.finalizing {
+   background-color: #DCDCDC;
+}
+
+.pending-transfer {
+   background-color: #fdb44b;
+}
+
+.ant-table-thead>tr.ant-table-row-hover:not(.ant-table-expanded-row)>td,
+.ant-table-tbody>tr.ant-table-row-hover:not(.ant-table-expanded-row)>td,
+.ant-table-thead>tr:hover:not(.ant-table-expanded-row)>td,
+.ant-table-tbody>tr:hover:not(.ant-table-expanded-row)>td {
+    background: unset;
+}

@@ -3,7 +3,7 @@ import moment from 'moment';
 import { ethers } from 'ethers';
 import { useState, useEffect } from 'react';
 import { Table, Tag, Input, InputNumber } from 'antd';
-import { Divider, DatePicker, Space } from 'antd';
+import { Modal, Divider, DatePicker, Spin, notification } from 'antd';
 
 const { RangePicker } = DatePicker;
 const { Search } = Input;
@@ -11,7 +11,6 @@ const { Search } = Input;
 const MONTH_NAME_SHORT = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
-
 
 function toEpoch(date) {
     return Math.floor(new Date(date).getTime() / 1000);
@@ -69,8 +68,16 @@ function genTokenIds(startDate, endDate) {
 
 function Balance(props) {
     const [dataSource, setDataSource] = useState([]);
+    const [dataLoading, setDataLoading] = useState(true);
+    const [dateRange, setDateRange] = useState([
+        startOfWeek().subtract(4, 'week'),
+        startOfWeek().add(1, 'y'),
+    ]);
     const [transferAmounts, setTransferAmounts] = useState({});
-    const [recipientAddress, setRecipientAddress] = useState({});
+    const [recipient, setRecipient] = useState(null);
+    const [transferring, setTransferring] = useState(false);
+    const [pendingConfirm, setPendingConfirm] = useState(false);
+
     const columns = [
         {
             title: 'Token Id',
@@ -107,30 +114,28 @@ function Balance(props) {
         },
         {title: 'Balance', dataIndex: 'balance', key: 'balance'},
         {
-            title: 'Amount',
+            title: 'Amount To Transfer',
             dataIndex: 'amount',
             key: 'amount',
             render: (amount, row) => (
-              <InputNumber
-                min={0}
-                max={row.balance}
-                defaultValue={0}
-                onChange={(value) => {
-                  value && onTransferAmountChange(row, value);
-                }}
-              />
-            )
+                <InputNumber
+                  min={0}
+                  max={row.balance}
+                  disabled={transferring}
+                  defaultValue={0}
+                  onChange={(value) => {
+                    onTransferAmountChange(row, value);
+                  }}
+                />
+            ),
         },
     ];
 
-    const getSignerAddress = async () => {
+    const fetchData = async () => {
+      setDataLoading(true);
+      const ids = genTokenIds(dateRange[0], dateRange[1]);
       const signer = props.contract.provider.getSigner();
-      return await signer.getAddress();
-    };
-
-    const fetchData = async (startDate, endDate) => {
-      const ids = genTokenIds(startDate, endDate);
-      const address = await getSignerAddress();
+      const address = await signer.getAddress();
       const accounts = Array(ids.length).fill(address);
       const balances = await props.contract.balanceOfBatch(
           accounts, ids.map(id => id.raw)
@@ -142,6 +147,8 @@ function Balance(props) {
           key: i.toString(),
           id: id.id,
           start: id.start,
+          startTs: id.startTs,
+          endTs: id.endTs,
           end: id.end,
           tags: id.tags.concat([id.type]),
           balance: balances[i].toNumber(),
@@ -149,6 +156,7 @@ function Balance(props) {
         });
       }
       setDataSource(dataSource);
+      setDataLoading(false);
     }
 
     const onTransferAmountChange = (row, value) => {
@@ -157,48 +165,129 @@ function Balance(props) {
     }
 
     const onDateChange = (_dates, datesString) => {
-        fetchData(datesString[0], datesString[1]);
+        setDateRange(datesString);
     }
 
-    const defaultStart = startOfWeek();
-    const defaultEnd = startOfWeek().add(1, 'y');
+    useEffect(() => { fetchData(); }, [dateRange]);
 
-    useEffect(() => {
-      fetchData(defaultStart, defaultEnd);
-    }, []);
+    const openNotification = (err) => {
+      notification.open({
+        message: 'Failed to transfer',
+        description: err,
+        onClick: () => {},
+      });
+    };
 
-    const transfer = async(address) => {
-        const sender = await getSignerAddress();
-        const recipient = ethers.getAddress(address);
+    const execTransfer = async() => {
+        setPendingConfirm(false);
+        setTransferring(true);
+        const signer = props.contract.provider.getSigner();
+        const sender = await signer.getAddress();
         const ids = Object.keys(transferAmounts).filter(
             id => transferAmounts[id] > 0
         );
         const encoded = ids.map(id => ethers.BigNumber.from(id));
-        const amounts = ids.map(id => transferAmounts[ids]);
-        props.contract.safeTransferFrom(sender, recipient, encoded, amounts, []);
+        const amounts = ids.map(
+            id => ethers.BigNumber.from(transferAmounts[id])
+        );
+        props.contract.connect(signer).safeBatchTransferFrom(
+            sender, recipient, encoded, amounts, []
+        ).then((tx) => {
+            return tx.wait(3);
+        }).then((txReceipt) => {
+            setTransferring(false);
+            const newAmounts = {};
+            setTransferAmounts(ids.reduce(
+                (prev, cur) => ({[cur]: 0, ...prev}),
+                {}
+            ));
+            fetchData();
+        }).catch((err) => {
+            setTransferring(false);
+            openNotification(err.toString());
+        });
+    }
+
+    const confirmTransfer = (recipientAddress) => {
+        if (Object.keys(transferAmounts).length == 0) {
+          openNotification("You have to specify at least one token to transfer");
+          return;
+        }
+
+        try {
+          setRecipient(ethers.utils.getAddress(recipientAddress));
+          setPendingConfirm(true);
+        } catch(err) {
+          openNotification(err.toString());
+          return;
+        }
+    }
+
+    const cancelTransfer = () => {
+        setPendingConfirm(false);
+        setRecipient(null);
     }
 
     return (
-      <div>
-        <Search
-          addonBefore="Recipient Address"
-          placeholder="0x..."
-          allowClear
-          enterButton="Transfer"
-          onSearch={(recipient, e) => transfer(recipient)}
-          style={{ width: 800 }}
-        />
+      <div className='transfer'>
+        <>
+          {
+            transferring
+              ? <Spin tip="Will wait for 3 confirmations..." />
+              : <Search
+                  addonBefore="Recipient Address"
+                  placeholder="0x..."
+                  allowClear
+                  enterButton="Transfer"
+                  onSearch={
+                      (recipientAddress, e) => confirmTransfer(recipientAddress)
+                  }
+                  style={{ width: 800 }}
+                />
+          }
+        </>
         <Divider />
         <RangePicker
-          defaultValue={[defaultStart, defaultEnd]}
+          defaultValue={dateRange}
           format={'YYYY-MM-DDT00:00:00[Z]'}
           onChange={onDateChange}
         />
         <Table
+          rowClassName={(row) => {
+              let classes = [];
+              let now = moment().unix();
+              if (row.startTs <= now && row.endTs > now) {
+                  classes.push('finalizing');
+              }
+              if (row.endTs <= now) {
+                  classes.push('finalized');
+              }
+              if (transferAmounts[row.id] > 0 && pendingConfirm) {
+                  classes.push('pending-transfer');
+              }
+              return classes.join(' ');
+          }}
           dataSource={dataSource}
           columns={columns}
           pagination={false}
+          loading={dataLoading}
         />
+        <Modal
+          title="Confirm to transfer"
+          visible={pendingConfirm}
+          onOk={execTransfer}
+          onCancel={cancelTransfer}
+        >
+          {
+            Object.keys(transferAmounts).filter(
+              id => transferAmounts[id] > 0
+            ).map(id => {
+              return (
+                  <p key={id}>{id}, {transferAmounts[id]}</p>
+              )
+            })
+          }
+        </Modal>
       </div>
     );
 }
