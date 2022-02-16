@@ -122,6 +122,7 @@ function Balance(props) {
                   min={0}
                   max={row.balance}
                   disabled={transferring}
+                  value={transferAmounts[row.id]}
                   defaultValue={0}
                   onChange={(value) => {
                     onTransferAmountChange(row, value);
@@ -160,8 +161,10 @@ function Balance(props) {
     }
 
     const onTransferAmountChange = (row, value) => {
-        transferAmounts[row.id] = value;
-        setTransferAmounts(transferAmounts);
+        setTransferAmounts({
+            ...transferAmounts,
+            [row.id]: value,
+        });
     }
 
     const onDateChange = (_dates, datesString) => {
