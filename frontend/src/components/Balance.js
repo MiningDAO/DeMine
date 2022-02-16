@@ -1,7 +1,11 @@
 import React from 'react';
+import moment from 'moment';
 import { ethers } from 'ethers';
 import { useState, useEffect } from 'react';
 import { Table, Tag } from 'antd';
+
+import { DatePicker, Space } from 'antd';
+const { RangePicker } = DatePicker;
 
 const MONTH_NAME_SHORT = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
@@ -9,6 +13,11 @@ const MONTH_NAME_SHORT = [
 
 function toEpoch(date) {
     return Math.floor(new Date(date).getTime() / 1000);
+}
+
+function startOfDay() {
+    const epoch = moment().unix();
+    return moment.unix(epoch - epoch % 86400);
 }
 
 function genTokenId(startTs, endTs, type) {
@@ -42,9 +51,9 @@ function genTokenId(startTs, endTs, type) {
     };
 }
 
-function genTokenIds() {
-    var startTs = toEpoch('2022-02-03T00:00:00Z');
-    const endTs = startTs + 86400 * 365;
+function genTokenIds(startDate, endDate) {
+    var startTs = toEpoch(startDate);
+    const endTs = toEpoch(endDate);
     var tokenIds = [];
     for (;startTs < endTs;) {
         const tokenId = genTokenId(startTs, startTs + 86400 * 7, 'weekly');
@@ -58,7 +67,6 @@ function genTokenIds() {
 
 function Balance(props) {
     const [dataSource, setDataSource] = useState([]);
-    const ids = genTokenIds();
     const columns = [
         {
             title: 'Token Id',
@@ -96,7 +104,8 @@ function Balance(props) {
         {title: 'Balance', dataIndex: 'balance', key: 'balance'},
     ];
 
-    const fetchData = async () => {
+    const fetchData = async (startDate, endDate) => {
+      const ids = genTokenIds(startDate, endDate);
       const signer = props.contract.provider.getSigner();
       const address = await signer.getAddress();
       const accounts = Array(ids.length).fill(address);
@@ -118,18 +127,31 @@ function Balance(props) {
       setDataSource(dataSource);
     }
 
+    const onDateChange = (_dates, datesString) => {
+        fetchData(datesString[0], datesString[1]);
+    }
+
+    const defaultStart = startOfDay();
+    const defaultEnd = startOfDay().add(1, 'y');
+
     useEffect(() => {
-      fetchData();
+      fetchData(defaultStart, defaultEnd);
     }, []);
 
     return (
-      <Table
-        dataSource={dataSource}
-        columns={columns}
-        pagination={false}
-      />
+      <div>
+        <RangePicker
+          defaultValue={[defaultStart, defaultEnd]}
+          format={'YYYY-MM-DDT00:00:00[Z]'}
+          onChange={onDateChange}
+        />
+        <Table
+          dataSource={dataSource}
+          columns={columns}
+          pagination={false}
+        />
+      </div>
     );
 }
 
 export default Balance;
-
