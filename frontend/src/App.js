@@ -6,28 +6,32 @@ import Balance from './components/Balance.js';
 import Connect from './components/Connect.js';
 
 function App() {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [contract, setContract] = useState(false);
 
-  const onConnected = async(chain) => {
-    const provider = new ethers.providers.Web3Provider(
-      window.ethereum
-    );
-    var res = await fetch(
-        `https://api.hypertrons.com/api/v1/contract/${bscdev}/btc`
-    )
-    res = await res.json();
-    const contract = new ethers.Contract(
-        res.address, res.abi, provider
-    );
-    setContract(contract);
-    setIsConnected(true);
+  const onChange = async(chain, accounts) => {
+    if (chain && accounts.length > 0) {
+      const provider = new ethers.providers.Web3Provider(
+        window.ethereum
+      );
+      var res = await fetch(
+          `https://api.hypertrons.com/api/v1/contract/${chain}/btc`
+      )
+      res = await res.json();
+      const contract = new ethers.Contract(
+          res.address, res.abi, provider
+      );
+      setContract(contract);
+      setIsReady(true);
+    } else {
+      setIsReady(false);
+    }
   };
 
   return (
     <div className="App">
-      <Connect onConnected={onConnected}/>
-      {isConnected && <Balance contract={contract}/>}
+      <Connect onChange={onChange}/>
+      {isReady && <Balance contract={contract}/>}
     </div>
   );
 }

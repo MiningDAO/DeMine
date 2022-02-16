@@ -238,21 +238,22 @@ task('nft-admin-release', 'transfer demine nft tokens')
             to: to,
             numTokenTypes: ids.length,
             idsAsDate: token.readableIds(ids),
-            ids: ids.map(t => t.toString()).join(','),
+            ids: ids.map(t => t.toFixed()).join(','),
             amount: args.amounts
         }, null, 2));
+        const params = [
+            ["from", custodian.address],
+            ["to", to],
+            ["ids", ids],
+            ["amounts", amounts],
+            ["data", []],
+        ];
         const result = await common.run(
             hre,
             admin,
             erc1155,
             'safeBatchTransferFrom',
-            [
-                ["from", custodian.address]
-                ["to", to],
-                ["ids", ids],
-                ["amounts", amounts],
-                ["data", []],
-            ],
+            params,
             {dryrun: args.dryrun}
         );
         logger.info("=========== nft-admin-release end ===========");

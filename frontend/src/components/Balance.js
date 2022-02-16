@@ -17,9 +17,9 @@ function toEpoch(date) {
     return Math.floor(new Date(date).getTime() / 1000);
 }
 
-function startOfDay() {
+function startOfWeek() {
     const epoch = moment().unix();
-    return moment.unix(epoch - epoch % 86400);
+    return moment.unix(epoch - epoch % (86400 * 7));
 }
 
 function genTokenId(startTs, endTs, type) {
@@ -160,8 +160,8 @@ function Balance(props) {
         fetchData(datesString[0], datesString[1]);
     }
 
-    const defaultStart = startOfDay();
-    const defaultEnd = startOfDay().add(1, 'y');
+    const defaultStart = startOfWeek();
+    const defaultEnd = startOfWeek().add(1, 'y');
 
     useEffect(() => {
       fetchData(defaultStart, defaultEnd);

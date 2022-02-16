@@ -39,19 +39,36 @@ const isBSCTest = (chainId) => (
   chainId && BSC_TESTNET_PARAMS.chainId.toLowerCase() === chainId
 );
 
-function Connect({ onConnected }) {
+function Connect(props) {
   const [accounts, setAccounts] = useState([]);
   const [chainId, setChainId] = useState(null);
   const onboarding = new MetaMaskOnboarding();
 
+  const onChange = (from, chainId, accounts) => {
+    if (isBSC(chainId)) {
+      props.onChange("bsc", accounts);
+    } else if (isBSCTest(chainId)) {
+      props.onChange("bscdev", accounts);
+    } else {
+      props.onChange(null, []);
+    }
+  };
+
   const connectMetaMask = () => {
     window.ethereum
       .request({ method: 'eth_requestAccounts' })
-      .then(accounts => setAccounts(accounts));
+      .then(accs => {
+          if (
+              accounts.length !== accs.length ||
+              (accs.length > 0 && accounts[0] !== accs[0])
+          ) {
+            setAccounts(accs);
+            onChange('connectMetaMask', chainId, accs);
+          }
+      });
   }
 
   const switchToBSC = () => {
-    // Request to switch to the selected Avalanche network
     window.ethereum
       .request({
         method: 'wallet_addEthereumChain',
@@ -60,37 +77,34 @@ function Connect({ onConnected }) {
   }
 
   useEffect(() => {
-    connectMetaMask();
     if (MetaMaskOnboarding.isMetaMaskInstalled()) {
+      connectMetaMask();
       window.ethereum.on(
         'accountsChanged',
         accounts => {
-          window.location.reload();
+          setAccounts(accounts);
+          onChange('accountsChanged', chainId, accounts);
         }
       );
 
       window.ethereum.on(
         'chainChanged',
-        () => window.location.reload()
+        (chainId) => { onChange('chainChanged', chainId, accounts); }
       );
 
       window.ethereum.on(
         'disconnect',
-        (connectInfo) => {
-          window.location.reload();
-        }
+        (connectInfo) => { window.location.reload(); }
       );
 
       window.ethereum.on('connect', (connectInfo) => {
-        setChainId(connectInfo.chainId);
-        if (isBSC(connectInfo.chainId)) {
-          onConnected("bsc");
-        } else if (isBSCTest(connectInfo.chainId)) {
-          onConnected("bscdev");
+        if (chainId !== connectInfo.chainId) {
+          setChainId(connectInfo.chainId);
+          onChange('connect', connectInfo.chainId, accounts);
         }
       });
     }
-  }, []);
+  }, [chainId, accounts]);
 
   if (MetaMaskOnboarding.isMetaMaskInstalled() && accounts.length > 0) {
     onboarding.stopOnboarding();
@@ -127,7 +141,6 @@ function Connect({ onConnected }) {
       </div>
     )
   } else {
-    // The user is connected to the MetaMask wallet and has the Avalanche chain selected.
     return (
       <PageHeader
         className="site-page-header"
