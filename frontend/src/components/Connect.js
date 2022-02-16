@@ -22,7 +22,7 @@ const isBSC = (chainId) => (
   chainId && BSC_MAINNET_PARAMS.chainId.toLowerCase() === chainId
 );
 
-function Connect({ onConnected, onTransfer }) {
+function Connect({ onConnected }) {
   const [accounts, setAccounts] = useState([]);
   const [chainId, setChainId] = useState(null);
   const onboarding = new MetaMaskOnboarding();
@@ -115,10 +115,7 @@ function Connect({ onConnected, onTransfer }) {
         title="Mining3"
         subTitle="Mining for Web3"
         extra={[
-            <div key="1">Account: {accounts[0]}</div>,
-            <Button key="2" type="primary" onClick={onTransfer}>
-              Transfer
-            </Button>,
+            <div key="1">Account: {accounts[0]}</div>
         ]}
       />
     );

@@ -2,14 +2,16 @@ import React from 'react';
 import moment from 'moment';
 import { ethers } from 'ethers';
 import { useState, useEffect } from 'react';
-import { Table, Tag } from 'antd';
+import { Table, Tag, Input, InputNumber } from 'antd';
+import { Divider, DatePicker, Space } from 'antd';
 
-import { DatePicker, Space } from 'antd';
 const { RangePicker } = DatePicker;
+const { Search } = Input;
 
 const MONTH_NAME_SHORT = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
+
 
 function toEpoch(date) {
     return Math.floor(new Date(date).getTime() / 1000);
@@ -67,6 +69,8 @@ function genTokenIds(startDate, endDate) {
 
 function Balance(props) {
     const [dataSource, setDataSource] = useState([]);
+    const [transferAmounts, setTransferAmounts] = useState({});
+    const [recipientAddress, setRecipientAddress] = useState({});
     const columns = [
         {
             title: 'Token Id',
@@ -102,12 +106,31 @@ function Balance(props) {
             ),
         },
         {title: 'Balance', dataIndex: 'balance', key: 'balance'},
+        {
+            title: 'Amount',
+            dataIndex: 'amount',
+            key: 'amount',
+            render: (amount, row) => (
+              <InputNumber
+                min={0}
+                max={row.balance}
+                defaultValue={0}
+                onChange={(value) => {
+                  value && onTransferAmountChange(row, value);
+                }}
+              />
+            )
+        },
     ];
+
+    const getSignerAddress = async () => {
+      const signer = props.contract.provider.getSigner();
+      return await signer.getAddress();
+    };
 
     const fetchData = async (startDate, endDate) => {
       const ids = genTokenIds(startDate, endDate);
-      const signer = props.contract.provider.getSigner();
-      const address = await signer.getAddress();
+      const address = await getSignerAddress();
       const accounts = Array(ids.length).fill(address);
       const balances = await props.contract.balanceOfBatch(
           accounts, ids.map(id => id.raw)
@@ -121,10 +144,16 @@ function Balance(props) {
           start: id.start,
           end: id.end,
           tags: id.tags.concat([id.type]),
-          balance: balances[i].toString(),
+          balance: balances[i].toNumber(),
+          amount: 0
         });
       }
       setDataSource(dataSource);
+    }
+
+    const onTransferAmountChange = (row, value) => {
+        transferAmounts[row.id] = value;
+        setTransferAmounts(transferAmounts);
     }
 
     const onDateChange = (_dates, datesString) => {
@@ -138,8 +167,28 @@ function Balance(props) {
       fetchData(defaultStart, defaultEnd);
     }, []);
 
+    const transfer = async(address) => {
+        const sender = await getSignerAddress();
+        const recipient = ethers.getAddress(address);
+        const ids = Object.keys(transferAmounts).filter(
+            id => transferAmounts[id] > 0
+        );
+        const encoded = ids.map(id => ethers.BigNumber.from(id));
+        const amounts = ids.map(id => transferAmounts[ids]);
+        props.contract.safeTransferFrom(sender, recipient, encoded, amounts, []);
+    }
+
     return (
       <div>
+        <Search
+          addonBefore="Recipient Address"
+          placeholder="0x..."
+          allowClear
+          enterButton="Transfer"
+          onSearch={(recipient, e) => transfer(recipient)}
+          style={{ width: 800 }}
+        />
+        <Divider />
         <RangePicker
           defaultValue={[defaultStart, defaultEnd]}
           format={'YYYY-MM-DDT00:00:00[Z]'}
