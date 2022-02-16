@@ -28,9 +28,12 @@ task('accounts', 'Prints the list of accounts')
 
 task('abi', 'Prints abi of contract')
     .addParam('contract', 'contract name')
-    .setAction(async (taskArgs, { artifacts }) => {
-        let artifact = await artifacts.readArtifact(taskArgs.contract);
-        console.log(JSON.stringify(artifact.abi));
+    .addFlag('print', 'print abi')
+    .setAction(async (args, { artifacts }) => {
+        let artifact = await artifacts.readArtifact(args.contract);
+        if (args.print) {
+            console.log(JSON.stringify(artifact.abi));
+        }
         return artifact.abi;
     });
 
