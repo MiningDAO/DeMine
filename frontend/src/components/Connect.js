@@ -1,11 +1,10 @@
+import React from 'react';
 import { useEffect, useState } from 'react';
-import { ethers } from "ethers";
 import MetaMaskOnboarding from '@metamask/onboarding';
-
-import './App.css';
-import logo from './logo.svg';
-
 import { Button } from 'antd';
+import { PageHeader } from 'antd';
+
+import '../App.css';
 
 const BSC_MAINNET_PARAMS = {
   chainId: '0x38',
@@ -23,9 +22,9 @@ const isBSC = (chainId) => (
   chainId && BSC_MAINNET_PARAMS.chainId.toLowerCase() === chainId
 );
 
-function Connect(props) {
+function Connect({ onConnected }) {
   const [accounts, setAccounts] = useState([]);
-  const [chainId, setChainId] = useState(null); // default bsc
+  const [chainId, setChainId] = useState(null);
   const onboarding = new MetaMaskOnboarding();
 
   const connectMetaMask = () => {
@@ -44,30 +43,38 @@ function Connect(props) {
   }
 
   useEffect(() => {
+    connectMetaMask();
     if (MetaMaskOnboarding.isMetaMaskInstalled()) {
-      connectMetaMask()
+      window.ethereum.on(
+        'accountsChanged',
+        accounts => {
+          window.location.reload();
+        }
+      );
 
-      // Update the list of accounts if the user switches accounts in MetaMask
-      window.ethereum.on('accountsChanged', accounts => this.setState({ accounts }))
+      window.ethereum.on(
+        'chainChanged',
+        () => window.location.reload()
+      );
 
-      // Reload the site if the user selects a different chain
-      window.ethereum.on('chainChanged', () => window.location.reload())
+      window.ethereum.on(
+        'disconnect',
+        (connectInfo) => {
+          window.location.reload();
+        }
+      );
 
-      // Set the chain id once the MetaMask wallet is connected
       window.ethereum.on('connect', (connectInfo) => {
-        const chainId = connectInfo.chainId;
-        setChainId(chainId);
-        if (isBSC(chainId)) {
-          // The user is now connected to the MetaMask wallet and has the correct
-          // Avalanche chain selected.
-          props.onConnected()
+        setChainId(connectInfo.chainId);
+        if (isBSC(connectInfo.chainId)) {
+          onConnected();
         }
       });
     }
-  });
+  }, []);
 
   if (MetaMaskOnboarding.isMetaMaskInstalled() && accounts.length > 0) {
-    onboarding.stopOnboarding()
+    onboarding.stopOnboarding();
   }
 
   if (!MetaMaskOnboarding.isMetaMaskInstalled()) {
@@ -79,7 +86,7 @@ function Connect(props) {
         </Button>
       </div>
     )
-  } else if (this.state.accounts.length === 0) {
+  } else if (accounts.length === 0) {
     return (
       <div>
         <div>To run this dApp you need to connect your MetaMask Wallet.</div>
@@ -92,21 +99,26 @@ function Connect(props) {
     return (
       <div>
         <div>MetaMask Wallet connected!</div>
-        <div>Chain: {this.state.chainId}</div>
-        <div>Account: {this.state.accounts[0]}</div>
+        <div>Chain: {chainId}</div>
+        <div>Account: {accounts[0]}</div>
         <div>To run this dApp you need to switch to the {BSC_MAINNET_PARAMS.chainName} chain</div>
-        <Button type="primary" onClick={switchBSC}>
+        <Button type="primary" onClick={switchToBSC}>
           Switch to the {BSC_MAINNET_PARAMS.chainName} chain
         </Button>
       </div>
     )
   } else {
     // The user is connected to the MetaMask wallet and has the Avalanche chain selected.
-    return <div>
-      <div>MetaMask Wallet connected!</div>
-      <div>Chain: {this.state.chainId}</div>
-      <div>Account: {this.state.accounts[0]}</div>
-    </div>
+    return (
+      <PageHeader
+        className="site-page-header"
+        title="Mining3"
+        subTitle="Mining for Web3"
+        extra={[
+            <div key="1">Account: {accounts[0]}</div>
+        ]}
+      />
+    );
   }
 }
 
