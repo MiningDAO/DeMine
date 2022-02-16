@@ -14,12 +14,29 @@ const BSC_MAINNET_PARAMS = {
     symbol: 'BNB',
     decimals: 8
   },
-  rpcUrls: ['https://bsc-dataseed.binance.org/'],
+  rpcUrls: ['https://bsc-dataseed.binance.org'],
   blockExplorerUrls: ['https://bscscan.com']
-}
+};
+
+const BSC_TESTNET_PARAMS = {
+  chainId: '0x61',
+  chainName: 'Binance Smart Chain TestNet',
+  nativeCurrency: {
+    name: 'Test Binance Coin',
+    symbol: 'TBNB',
+    decimals: 8
+  },
+  rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545'],
+  blockExplorerUrls: ['https://testnet.bscscan.com']
+
+};
 
 const isBSC = (chainId) => (
   chainId && BSC_MAINNET_PARAMS.chainId.toLowerCase() === chainId
+);
+
+const isBSCTest = (chainId) => (
+  chainId && BSC_TESTNET_PARAMS.chainId.toLowerCase() === chainId
 );
 
 function Connect({ onConnected }) {
@@ -67,7 +84,9 @@ function Connect({ onConnected }) {
       window.ethereum.on('connect', (connectInfo) => {
         setChainId(connectInfo.chainId);
         if (isBSC(connectInfo.chainId)) {
-          onConnected();
+          onConnected("bsc");
+        } else if (isBSCTest(connectInfo.chainId)) {
+          onConnected("bscdev");
         }
       });
     }
@@ -95,7 +114,7 @@ function Connect({ onConnected }) {
         </Button>
       </div>
     )
-  } else if (!isBSC(chainId)) {
+  } else if (!isBSC(chainId) && !isBSCTest(chainId)) {
     return (
       <div>
         <div>MetaMask Wallet connected!</div>

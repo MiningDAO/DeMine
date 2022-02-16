@@ -9,12 +9,12 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [contract, setContract] = useState(false);
 
-  const onConnected = async() => {
+  const onConnected = async(chain) => {
     const provider = new ethers.providers.Web3Provider(
       window.ethereum
     );
     var res = await fetch(
-        "https://api.hypertrons.com/api/v1/contract/bsc/btc"
+        `https://api.hypertrons.com/api/v1/contract/${bscdev}/btc`
     )
     res = await res.json();
     const contract = new ethers.Contract(
