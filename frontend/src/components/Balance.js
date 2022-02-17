@@ -84,6 +84,7 @@ function Balance(props) {
 
     const [transferAmounts, setTransferAmounts] = useState({});
     const [enableCustodian, setEnableCustodian] = useState(false);
+    const [sendAll, setSendAll] = useState(false);
     const [recipientAddress, setRecipientAddress] = useState('');
     const [custodian, setCustodian] = useState(null);
     const [finalized, setFinalized] = useState(0);
@@ -131,7 +132,7 @@ function Balance(props) {
                 <InputNumber
                   min={0}
                   max={row.balance}
-                  disabled={status === Status.TRANSFERRING}
+                  disabled={status === Status.TRANSFERRING || sendAll}
                   value={transferAmounts[row.id]}
                   defaultValue={0}
                   onChange={(value) => {
@@ -169,7 +170,6 @@ function Balance(props) {
           end: id.end,
           tags: id.tags.concat([id.type]),
           balance: balances[i].toNumber(),
-          amount: 0
         });
       }
       return dataSource;
@@ -217,8 +217,6 @@ function Balance(props) {
           return;
         }
 
-        console.log(recipient);
-
         const signer = props.contract.provider.getSigner();
         const sender = await signer.getAddress();
         const ids = Object.keys(transferAmounts).filter(
@@ -256,21 +254,15 @@ function Balance(props) {
         setStatus(Status.CONFIRMING);
     };
 
-    const cancelTransfer = () => {
-        setStatus(Status.DATA_LOADED);
-    };
-
-    const updateRecipientAddress = (address) => {
-        setRecipientAddress(address);
-    }
-
-    const onSetEnableCustodian = (checked) => {
-        if (custodian && checked) {
-          setEnableCustodian(true);
-        } else {
-          openNotification('Custodian not set');
+    const onSendAll = (checked) => {
+        setSendAll(checked);
+        if (checked) {
+            setTransferAmounts(dataSource.reduce(
+                (p, d) => ({...p, [d.id]: d.balance}),
+                {}
+            ));
         }
-    };
+    }
 
     return (
       <div className='transfer'>
@@ -287,7 +279,7 @@ function Balance(props) {
                   value={enableCustodian ? custodian : recipientAddress}
                   allowClear
                   onChange={
-                      (e) => updateRecipientAddress(e.target.value)
+                      (e) => setRecipientAddress(e.target.value)
                   }
                   style={{ width: 800 }}
                 />
@@ -298,8 +290,14 @@ function Balance(props) {
                 >
                   Transfer
                 </Button>
-                <Checkbox onChange={onSetEnableCustodian}>
+                <Checkbox
+                  disabled={custodian === null}
+                  onChange={(e) => setEnableCustodian(e.target.checked)}>
                   Send to custodian
+                </Checkbox>
+                <Checkbox
+                  onChange={(e) => onSendAll(e.target.checked)}>
+                  Send All
                 </Checkbox>
                 </>
           }
@@ -333,7 +331,7 @@ function Balance(props) {
           title="Confirm to transfer"
           visible={status === Status.CONFIRMING}
           onOk={execTransfer}
-          onCancel={cancelTransfer}
+          onCancel={() => setStatus(Status.DATA_LOADED)}
         >
           {
             Object.keys(transferAmounts).filter(
