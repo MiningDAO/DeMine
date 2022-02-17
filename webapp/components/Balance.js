@@ -84,12 +84,8 @@ function genTokenIds(startDate, endDate) {
 }
 
 function Balance(props) {
-    const contract = new ethers.Contract(
-        props.contract.address,
-        props.contract.abi,
-        props.provider
-    );
     const [status, setStatus] = useState(Status.NO_DATA);
+    const [contract, setContract] = useState(null);
 
     const [dataSource, setDataSource] = useState([]);
     const [dateRange, setDateRange] = useState([
@@ -97,11 +93,12 @@ function Balance(props) {
         startOfWeek().add(1, 'y'),
     ]);
 
+    const [tabKey, setTabKey] = useState('btc');
     const [transferAmounts, setTransferAmounts] = useState({});
     const [enableCustodian, setEnableCustodian] = useState(false);
     const [sendAll, setSendAll] = useState(false);
     const [recipientAddress, setRecipientAddress] = useState('');
-    const [custodian, setCustodian] = useState(null);
+    const [custodian, setCustodian] = useState(false);
     const [finalized, setFinalized] = useState(0);
 
     const columns = [
@@ -110,7 +107,7 @@ function Balance(props) {
             dataIndex: 'id',
             key: 'id',
             render: id => (
-                <a href={'/api/v1/token/bsc/btc/' + id.id}>{id.id}</a>
+                <a href={'/api/v1/token/bsc/' + tabKey + '/' + id.id}>{id.id}</a>
             )
         },
         {title: 'Start', dataIndex: 'start', key: 'start',},
@@ -195,42 +192,52 @@ function Balance(props) {
     };
 
     const fetchData = async () => {
-      setStatus(Status.LOADING_DATA);
-      const ids = genTokenIds(dateRange[0], dateRange[1]);
-      const signer = contract.provider.getSigner();
-      const address = await signer.getAddress();
-      const accounts = Array(ids.length).fill(address);
+        setStatus(Status.LOADING_DATA);
 
-      const custodian = await contract.custodian();
-      const finalized = await contract.finalized();
-      setCustodian(ethers.utils.getAddress(custodian));
-      setFinalized(finalized.toNumber());
+        var contractMeta = await fetch(`/api/v1/contract/${props.chain}/${tabKey}`);
+        contractMeta = await contractMeta.json();
 
-      const balances = await contract.balanceOfBatch(
-          accounts, ids.map(id => id.raw)
-      );
-      var dataSource = [];
-      var totalEarning = new BigNumber(0);
-      for (let i = 0; i < ids.length; i++) {
-        const id = ids[i];
-        const balance = balances[i].toNumber();
-        const earingPerToken = calEarning(
-          props.earningMap, id, props.contract.earningToken.decimals
+        const contract = new ethers.Contract(
+            contractMeta.address, contractMeta.abi, props.provider
         );
-        const earning = earingPerToken.times(balance);
-        totalEarning = totalEarning.plus(earning);
-        dataSource.push({
-          key: i.toString(),
-          id: id,
-          start: id.start,
-          end: id.end,
-          tags: id.tags.concat([id.type]),
-          balance: balance,
-          earning: earingPerToken,
-        });
-      }
-      props.onEarning(totalEarning.toFixed());
-      return dataSource;
+        setContract(contract);
+
+        var earningMap = await fetch(`/api/v1/earning/${props.chain}/${tabKey}`);
+        earningMap = await earningMap.json();
+
+        const ids = genTokenIds(dateRange[0], dateRange[1]);
+        const signer = props.provider.getSigner();
+        const address = await signer.getAddress();
+        const accounts = Array(ids.length).fill(address);
+
+        setCustodian(await contract.custodian());
+        const finalized = await contract.finalized();
+        setFinalized(finalized.toNumber());
+
+        const balances = await contract.balanceOfBatch(
+            accounts, ids.map(id => id.raw)
+        );
+        var dataSource = [];
+        var totalEarning = new BigNumber(0);
+        for (let i = 0; i < ids.length; i++) {
+          const id = ids[i];
+          const balance = balances[i].toNumber();
+          const earingPerToken = calEarning(
+            earningMap.earning, id, contractMeta.earningToken.decimals
+          );
+          totalEarning = totalEarning.plus(earingPerToken.times(balance));
+          dataSource.push({
+            key: i.toString(),
+            id: id,
+            start: id.start,
+            end: id.end,
+            tags: id.tags.concat([id.type]),
+            balance: balance,
+            earning: earingPerToken,
+          });
+        }
+        props.onEarning(totalEarning.toFixed());
+        setDataSource(dataSource);
     }
 
     const onTransferAmountChange = (row, value) => {
@@ -245,9 +252,8 @@ function Balance(props) {
     }
 
     useEffect(() => {
-        fetchData().then((dataSource) => {
+        fetchData().then(() => {
             setStatus(Status.DATA_LOADED);
-            setDataSource(dataSource);
         }).catch((err) => {
             setStatus(Status.NO_DATA);
             setDataSource([]);
@@ -295,8 +301,7 @@ function Balance(props) {
                 {}
             ));
             return fetchData();
-        }).then((dataSource) => {
-            setDataSource(dataSource);
+        }).then(() => {
             setStatus(Status.DATA_LOADED);
         }).catch((err) => {
             setStatus(Status.NO_DATA);
@@ -320,7 +325,11 @@ function Balance(props) {
                 {}
             ));
         }
-    }
+    };
+
+    const onTabKey = (key) => {
+        setTabKey(key);
+    };
 
     return (
       <div className='transfer'>

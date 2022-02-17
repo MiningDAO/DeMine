@@ -10,26 +10,15 @@ const { Header, Content, Footer } = Layout;
 function HomePage() {
   const [isReady, setIsReady] = useState(false);
   const [provider, setProvider] = useState(false);
-  const [contract, setContract] = useState(false);
-  const [earningMap, setEarningMap] = useState(false);
+  const [chain, setChain] = useState(false);
   const [earning, setEarning] = useState(0);
 
   const onChange = async(chain, accounts) => {
     if (chain && accounts.length > 0) {
       setProvider(
-        new ethers.providers.Web3Provider(
-          window.ethereum
-        )
+        new ethers.providers.Web3Provider(window.ethereum)
       );
-
-      var contract = await fetch(`/api/v1/contract/${chain}/btc`);
-      contract = await contract.json();
-      setContract(contract);
-
-      var earning = await fetch(`/api/v1/earning/${chain}/btc`);
-      earning = await earning.json();
-      setEarningMap(earning.earning);
-
+      setChain(chain);
       setIsReady(true);
     } else {
       setIsReady(false);
@@ -47,8 +36,7 @@ function HomePage() {
           <Balance
             onEarning={(value) => setEarning(value)}
             provider={provider}
-            contract={contract}
-            earningMap={earningMap}
+            chain={chain}
           />
         </Content>
       }
