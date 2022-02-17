@@ -26,11 +26,11 @@ app.prepare().then(() => {
         };
         https.createServer(options, server).listen(port, err => {
             if (err) { throw err; }
-            console.log(`> Ready on localhost:${port}`)
+            console.log(`> Mining3 listening on port ${port}`)
         });
     } else {
         server.listen(port, () => {
-            console.log(`Example app listening on port ${port}`)
+            console.log(`> Mining3 listening on port ${port}`)
         })
     }
 });
