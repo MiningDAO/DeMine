@@ -62,9 +62,13 @@ async function load(coin, redis) {
         i <= earning.last;
         i += 86400
     ) {
-        const earningKey = key(network, coin, 'earning', i);
-        await redis.set(earningKey, earning.earning[i]);
+        // save per token earning
+        const tokenEarningKey = key(network, coin, 'earning', i);
+        await redis.set(tokenEarningKey, earning.earning[i]);
     }
+    // save the whole earning map
+    const earningKey = key(network, coin, 'earning');
+    await redis.set(earningKey, JSON.stringify(earning));
     logger.info(`Earning map updated...`);
 }
 
