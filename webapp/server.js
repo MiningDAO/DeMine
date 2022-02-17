@@ -1,5 +1,5 @@
 const certDir = `/etc/letsencrypt/live`;
-const domain = `www.hypertrons.com`;
+const domain = `mining3.io`;
 
 const express = require('express');
 const fs = require('fs');
