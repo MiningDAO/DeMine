@@ -1,11 +1,10 @@
-import './App.css';
 import React from 'react';
 import { ethers } from 'ethers';
 import { useState } from 'react';
-import Balance from './components/Balance.js';
-import Connect from './components/Connect.js';
+import Balance from '../components/Balance.js';
+import Connect from '../components/Connect.js';
 
-function App() {
+function HomePage() {
   const [isReady, setIsReady] = useState(false);
   const [contract, setContract] = useState(false);
 
@@ -36,4 +35,4 @@ function App() {
   );
 }
 
-export default App;
+export default HomePage;

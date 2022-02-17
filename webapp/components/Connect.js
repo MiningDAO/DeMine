@@ -1,10 +1,7 @@
 import React from 'react';
 import { useEffect, useState } from 'react';
 import MetaMaskOnboarding from '@metamask/onboarding';
-import { Button } from 'antd';
-import { PageHeader } from 'antd';
-
-import '../App.css';
+import { Spin, Button, PageHeader } from 'antd';
 
 const BSC_MAINNET_PARAMS = {
   chainId: '0x38',
@@ -42,7 +39,7 @@ const isBSCTest = (chainId) => (
 function Connect(props) {
   const [accounts, setAccounts] = useState([]);
   const [chainId, setChainId] = useState(null);
-  const onboarding = new MetaMaskOnboarding();
+  const [onboarding, setOnboarding] = useState(null);
 
   const onChange = (from, chainId, accounts) => {
     if (isBSC(chainId)) {
@@ -77,6 +74,7 @@ function Connect(props) {
   }
 
   useEffect(() => {
+    setOnboarding(new MetaMaskOnboarding());
     if (MetaMaskOnboarding.isMetaMaskInstalled()) {
       connectMetaMask();
       window.ethereum.on(
@@ -106,19 +104,23 @@ function Connect(props) {
     }
   }, [chainId, accounts]);
 
-  if (MetaMaskOnboarding.isMetaMaskInstalled() && accounts.length > 0) {
+  if (onboarding && MetaMaskOnboarding.isMetaMaskInstalled() && accounts.length > 0) {
     onboarding.stopOnboarding();
   }
 
-  if (!MetaMaskOnboarding.isMetaMaskInstalled()) {
+  if (onboarding == null) {
+    return (
+      <Spin />
+    );
+  } else if (!MetaMaskOnboarding.isMetaMaskInstalled()) {
     return (
       <div>
         <div>To run this dApp you need the MetaMask Wallet installed.</div>
-        <Button type="primary" onClick={onboarding.startOnboarding}>
+        <Button type="primary" onClick={onboarding && onboarding.startOnboarding}>
           Install MetaMask
         </Button>
       </div>
-    )
+    );
   } else if (accounts.length === 0) {
     return (
       <div>

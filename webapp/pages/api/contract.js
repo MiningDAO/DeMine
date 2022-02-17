@@ -2,8 +2,8 @@ const { ethers } = require("ethers");
 const express = require("express");
 const router = express.Router();
 const BigNumber = require("bignumber.js");
-const token = require('../../lib/token.js');
-const { key, redis } = require('../../lib/redis.js');
+const token = require('../../../lib/token.js');
+const { key, redis } = require('../../../lib/redis.js');
 
 router.get("/:network/:coin", async (req, res) => {
     const coin = req.params.coin.toLowerCase();
