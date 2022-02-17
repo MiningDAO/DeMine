@@ -129,19 +129,43 @@ function Balance(props) {
             dataIndex: 'amount',
             key: 'amount',
             render: (amount, row) => (
-                <InputNumber
-                  min={0}
-                  max={row.balance}
-                  disabled={status === Status.TRANSFERRING || sendAll}
-                  value={transferAmounts[row.id]}
-                  defaultValue={0}
-                  onChange={(value) => {
-                    onTransferAmountChange(row, value);
-                  }}
-                />
+                <>
+                  <InputNumber
+                    className='right-space'
+                    min={0}
+                    max={row.balance}
+                    disabled={status === Status.TRANSFERRING || sendAll}
+                    value={transferAmounts[row.id]}
+                    defaultValue={0}
+                    onChange={(value) => {
+                      onTransferAmountChange(row, value);
+                    }}
+                  />
+                  <Button
+                    disabled={status === Status.TRANSFERRING || sendAll}
+                    onClick={applyToAll(row)}
+                  >
+                    Apply To All
+                  </Button>
+                </>
             ),
         },
     ];
+
+    const applyToAll = (row) => () => {
+        const amount = transferAmounts[row.id];
+        if (amount > 0) {
+          setTransferAmounts(dataSource.reduce(
+              (p, d) => ({
+                  ...p,
+                  [d.id]: amount > d.balance ? d.balance : amount
+              }),
+              {}
+          ));
+        } else {
+          openNotification("Amount must be larger than 0");
+        }
+    };
 
     const fetchData = async () => {
       setStatus(Status.LOADING_DATA);
@@ -272,7 +296,7 @@ function Balance(props) {
               ? <Spin tip="Waiting for 3 confirmations..." />
               : <>
                 <Input
-                  className='transfer-item'
+                  className='right-space'
                   addonBefore="Recipient Address"
                   placeholder="0x..."
                   disabled={enableCustodian || status === Status.NO_DATA}
@@ -284,7 +308,7 @@ function Balance(props) {
                   style={{ width: 800 }}
                 />
                 <Button
-                  className='transfer-item'
+                  className='right-space'
                   type="primary"
                   onClick={confirmTransfer}
                 >
