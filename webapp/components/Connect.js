@@ -131,6 +131,7 @@ function Connect(props) {
       </div>
     )
   } else if (!isBSC(chainId) && !isBSCTest(chainId)) {
+    console.log(chainId);
     return (
       <div>
         <div>MetaMask Wallet connected!</div>

@@ -13,9 +13,7 @@ function HomePage() {
       const provider = new ethers.providers.Web3Provider(
         window.ethereum
       );
-      var res = await fetch(
-          `https://api.hypertrons.com/api/v1/contract/${chain}/btc`
-      )
+      var res = await fetch(`/api/v1/contract/${chain}/btc`);
       res = await res.json();
       const contract = new ethers.Contract(
           res.address, res.abi, provider

@@ -1,7 +1,7 @@
 const { ethers } = require("ethers");
 const BigNumber = require("bignumber.js");
-const token = require('../../../../lib/token.js');
-const { key, redis } = require('../../../../lib/redis.js');
+const token = require('../../../../../lib/token.js');
+const { key, redis } = require('../../../../../lib/redis.js');
 
 export default async (req, res) => {
     const { param } = req.query;
