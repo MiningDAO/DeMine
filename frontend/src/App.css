@@ -36,6 +36,10 @@
   margin-top: 25px;
 }
 
+.transfer-item {
+  margin-right: 15px;
+}
+
 .finalized {
    background-color: #A9A9A9;
 }

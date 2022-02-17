@@ -3,14 +3,21 @@ import moment from 'moment';
 import { ethers } from 'ethers';
 import { useState, useEffect } from 'react';
 import { Table, Tag, Input, InputNumber } from 'antd';
-import { Modal, Divider, DatePicker, Spin, notification } from 'antd';
+import { Checkbox, Button, Modal, Divider, DatePicker, Spin, notification } from 'antd';
 
 const { RangePicker } = DatePicker;
-const { Search } = Input;
 
 const MONTH_NAME_SHORT = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
+
+const Status = {
+  NO_DATA: 'no_data',
+  LOADING_DATA: 'loading_data',
+  DATA_LOADED: 'data_loaded',
+  CONFIRMING: 'confirming',
+  TRANSFERRING: 'transferring',
+};
 
 function toEpoch(date) {
     return Math.floor(new Date(date).getTime() / 1000);
@@ -67,16 +74,19 @@ function genTokenIds(startDate, endDate) {
 }
 
 function Balance(props) {
+    const [status, setStatus] = useState(Status.NO_DATA);
+
     const [dataSource, setDataSource] = useState([]);
-    const [dataLoading, setDataLoading] = useState(true);
     const [dateRange, setDateRange] = useState([
         startOfWeek().subtract(4, 'week'),
         startOfWeek().add(1, 'y'),
     ]);
+
     const [transferAmounts, setTransferAmounts] = useState({});
-    const [recipient, setRecipient] = useState(null);
-    const [transferring, setTransferring] = useState(false);
-    const [pendingConfirm, setPendingConfirm] = useState(false);
+    const [enableCustodian, setEnableCustodian] = useState(false);
+    const [recipientAddress, setRecipientAddress] = useState('');
+    const [custodian, setCustodian] = useState(null);
+    const [finalized, setFinalized] = useState(0);
 
     const columns = [
         {
@@ -121,7 +131,7 @@ function Balance(props) {
                 <InputNumber
                   min={0}
                   max={row.balance}
-                  disabled={transferring}
+                  disabled={status === Status.TRANSFERRING}
                   value={transferAmounts[row.id]}
                   defaultValue={0}
                   onChange={(value) => {
@@ -133,11 +143,17 @@ function Balance(props) {
     ];
 
     const fetchData = async () => {
-      setDataLoading(true);
+      setStatus(Status.LOADING_DATA);
       const ids = genTokenIds(dateRange[0], dateRange[1]);
       const signer = props.contract.provider.getSigner();
       const address = await signer.getAddress();
       const accounts = Array(ids.length).fill(address);
+
+      const custodian = await props.contract.custodian();
+      const finalized = await props.contract.finalized();
+      setCustodian(ethers.utils.getAddress(custodian));
+      setFinalized(finalized.toNumber());
+
       const balances = await props.contract.balanceOfBatch(
           accounts, ids.map(id => id.raw)
       );
@@ -156,8 +172,7 @@ function Balance(props) {
           amount: 0
         });
       }
-      setDataSource(dataSource);
-      setDataLoading(false);
+      return dataSource;
     }
 
     const onTransferAmountChange = (row, value) => {
@@ -171,7 +186,16 @@ function Balance(props) {
         setDateRange(datesString);
     }
 
-    useEffect(() => { fetchData(); }, [dateRange]);
+    useEffect(() => {
+        fetchData().then((dataSource) => {
+            setStatus(Status.DATA_LOADED);
+            setDataSource(dataSource);
+        }).catch((err) => {
+            setStatus(Status.NO_DATA);
+            setDataSource([]);
+            openNotification(err.toString());
+        })
+    }, [dateRange]);
 
     const openNotification = (err) => {
       notification.open({
@@ -182,8 +206,19 @@ function Balance(props) {
     };
 
     const execTransfer = async() => {
-        setPendingConfirm(false);
-        setTransferring(true);
+        setStatus(Status.TRANSFERRING);
+        let recipient;
+        try {
+          recipient = enableCustodian
+              ? custodian
+              : ethers.utils.getAddress(recipientAddress);
+        } catch(err) {
+          openNotification(err.toString());
+          return;
+        }
+
+        console.log(recipient);
+
         const signer = props.contract.provider.getSigner();
         const sender = await signer.getAddress();
         const ids = Object.keys(transferAmounts).filter(
@@ -198,55 +233,75 @@ function Balance(props) {
         ).then((tx) => {
             return tx.wait(3);
         }).then((txReceipt) => {
-            setTransferring(false);
-            const newAmounts = {};
+            setStatus(Status.DATA_LOADED);
             setTransferAmounts(ids.reduce(
                 (prev, cur) => ({[cur]: 0, ...prev}),
                 {}
             ));
-            fetchData();
+            return fetchData();
+        }).then((dataSource) => {
+            setDataSource(dataSource);
+            setStatus(Status.DATA_LOADED);
         }).catch((err) => {
-            setTransferring(false);
+            setStatus(Status.NO_DATA);
             openNotification(err.toString());
         });
     }
 
-    const confirmTransfer = (recipientAddress) => {
-        if (Object.keys(transferAmounts).length == 0) {
+    const confirmTransfer = () => {
+        if (Object.keys(transferAmounts).length === 0) {
           openNotification("You have to specify at least one token to transfer");
           return;
         }
-
-        try {
-          setRecipient(ethers.utils.getAddress(recipientAddress));
-          setPendingConfirm(true);
-        } catch(err) {
-          openNotification(err.toString());
-          return;
-        }
-    }
+        setStatus(Status.CONFIRMING);
+    };
 
     const cancelTransfer = () => {
-        setPendingConfirm(false);
-        setRecipient(null);
+        setStatus(Status.DATA_LOADED);
+    };
+
+    const updateRecipientAddress = (address) => {
+        setRecipientAddress(address);
     }
+
+    const onSetEnableCustodian = (checked) => {
+        if (custodian && checked) {
+          setEnableCustodian(true);
+        } else {
+          openNotification('Custodian not set');
+        }
+    };
 
     return (
       <div className='transfer'>
         <>
           {
-            transferring
-              ? <Spin tip="Will wait for 3 confirmations..." />
-              : <Search
+            status === Status.TRANSFERRING
+              ? <Spin tip="Waiting for 3 confirmations..." />
+              : <>
+                <Input
+                  className='transfer-item'
                   addonBefore="Recipient Address"
                   placeholder="0x..."
+                  disabled={enableCustodian || status === Status.NO_DATA}
+                  value={enableCustodian ? custodian : recipientAddress}
                   allowClear
-                  enterButton="Transfer"
-                  onSearch={
-                      (recipientAddress, e) => confirmTransfer(recipientAddress)
+                  onChange={
+                      (e) => updateRecipientAddress(e.target.value)
                   }
                   style={{ width: 800 }}
                 />
+                <Button
+                  className='transfer-item'
+                  type="primary"
+                  onClick={confirmTransfer}
+                >
+                  Transfer
+                </Button>
+                <Checkbox onChange={onSetEnableCustodian}>
+                  Send to custodian
+                </Checkbox>
+                </>
           }
         </>
         <Divider />
@@ -258,14 +313,13 @@ function Balance(props) {
         <Table
           rowClassName={(row) => {
               let classes = [];
-              let now = moment().unix();
-              if (row.startTs <= now && row.endTs > now) {
+              if (row.startTs <= finalized && row.endTs > finalized) {
                   classes.push('finalizing');
               }
-              if (row.endTs <= now) {
+              if (row.endTs <= finalized) {
                   classes.push('finalized');
               }
-              if (transferAmounts[row.id] > 0 && pendingConfirm) {
+              if (transferAmounts[row.id] > 0 && status === Status.CONFIRMING) {
                   classes.push('pending-transfer');
               }
               return classes.join(' ');
@@ -273,11 +327,11 @@ function Balance(props) {
           dataSource={dataSource}
           columns={columns}
           pagination={false}
-          loading={dataLoading}
+          loading={status === Status.LOADING_DATA}
         />
         <Modal
           title="Confirm to transfer"
-          visible={pendingConfirm}
+          visible={status === Status.CONFIRMING}
           onOk={execTransfer}
           onCancel={cancelTransfer}
         >
