@@ -50,7 +50,7 @@ export default async (req, res) => {
     res.json({
         name: `DeMine${coin.toUpperCase()}`,
         description: `Earning from ${decoded.startDate} to ${decoded.endDate}`,
-        image: `https://api.hypertrons.com/static/${coin}.jpg`,
+        image: `https://mining3.io/${coin}.jpg`,
         properties: {
             id: {
                 hex: hex,
