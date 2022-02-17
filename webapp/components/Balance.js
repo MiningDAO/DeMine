@@ -95,7 +95,7 @@ function Balance(props) {
             dataIndex: 'id',
             key: 'id',
             render: id => (
-                <a href={'https://api.hypertrons.com/api/v1/token/bsc/btc/' + id}>{id}</a>
+                <a href={'/api/token/bsc/btc/' + id}>{id}</a>
             )
         },
         {title: 'Start', dataIndex: 'start', key: 'start'},

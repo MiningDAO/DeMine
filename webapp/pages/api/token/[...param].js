@@ -1,16 +1,20 @@
 const { ethers } = require("ethers");
-const express = require("express");
-const router = express.Router();
 const BigNumber = require("bignumber.js");
-const token = require('../../../lib/token.js');
-const { key, redis } = require('../../../lib/redis.js');
+const token = require('../../../../lib/token.js');
+const { key, redis } = require('../../../../lib/redis.js');
 
-router.get("/:network/:coin/:id", async (req, res) => {
-    const coin = req.params.coin.toLowerCase();
-    const network = req.params.network.toLowerCase();
+export default async (req, res) => {
+    const { param } = req.query;
+    if (param.length != 3) {
+        res.json({ok: false, message: 'invalid path'});
+        return;
+    }
+    const network = param[0].toLowerCase();
+    const coin = param[1].toLowerCase();
+
     var id, decoded;
     try {
-        id = ethers.BigNumber.from(req.params.id);
+        id = ethers.BigNumber.from(param[2]);
         decoded = token.decodeOne(id);
     } catch(err) {
         console.log(`invalid input coin=${coin},network=${network},id=${id}`);
@@ -58,6 +62,4 @@ router.get("/:network/:coin/:id", async (req, res) => {
             earning: totalEarning.div(base),
         }
     });
-});
-
-module.exports = router;
+};
