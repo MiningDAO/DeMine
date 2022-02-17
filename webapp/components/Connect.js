@@ -9,7 +9,7 @@ const BSC_MAINNET_PARAMS = {
   nativeCurrency: {
     name: 'Binance Coin',
     symbol: 'BNB',
-    decimals: 8
+    decimals: 18
   },
   rpcUrls: ['https://bsc-dataseed.binance.org'],
   blockExplorerUrls: ['https://bscscan.com']
@@ -21,7 +21,7 @@ const BSC_TESTNET_PARAMS = {
   nativeCurrency: {
     name: 'Test Binance Coin',
     symbol: 'TBNB',
-    decimals: 8
+    decimals: 18
   },
   rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545'],
   blockExplorerUrls: ['https://testnet.bscscan.com']
@@ -52,6 +52,7 @@ function Connect(props) {
   };
 
   const connectMetaMask = () => {
+    setOnboarding(new MetaMaskOnboarding());
     window.ethereum
       .request({ method: 'eth_requestAccounts' })
       .then(accs => {
@@ -74,9 +75,7 @@ function Connect(props) {
   }
 
   useEffect(() => {
-    setOnboarding(new MetaMaskOnboarding());
     if (MetaMaskOnboarding.isMetaMaskInstalled()) {
-      connectMetaMask();
       window.ethereum.on(
         'accountsChanged',
         accounts => {
@@ -101,6 +100,8 @@ function Connect(props) {
           onChange('connect', connectInfo.chainId, accounts);
         }
       });
+
+      connectMetaMask();
     }
   }, [chainId, accounts]);
 
@@ -121,7 +122,7 @@ function Connect(props) {
         </Button>
       </div>
     );
-  } else if (accounts.length === 0 || chainId == null) {
+  } else if (accounts.length === 0) {
     return (
       <div>
         <div>To run this dApp you need to connect your MetaMask Wallet.</div>
