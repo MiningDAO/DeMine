@@ -121,7 +121,7 @@ function Connect(props) {
         </Button>
       </div>
     );
-  } else if (accounts.length === 0) {
+  } else if (accounts.length === 0 || chainId == null) {
     return (
       <div>
         <div>To run this dApp you need to connect your MetaMask Wallet.</div>
@@ -149,7 +149,11 @@ function Connect(props) {
         title="Mining3"
         subTitle="Mining for Web3"
         extra={[
-            <div key="1">Account: {accounts[0]}</div>
+            <div key="1">
+              <span> Account: {accounts[0]} </span>
+              <br/>
+              <span> Aggregated Earning: {props.earning} </span>
+            </div>
         ]}
       />
     );

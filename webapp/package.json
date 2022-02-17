@@ -22,7 +22,7 @@
     "eslint-config-next": "12.0.10"
   },
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "nodemon -w server.js server.js",
     "build": "next build",
     "start": "NODE_ENV=production node server.js"
   }

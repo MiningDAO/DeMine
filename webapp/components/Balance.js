@@ -1,5 +1,6 @@
 import React from 'react';
 import moment from 'moment';
+import BigNumber from "bignumber.js";
 import { ethers } from 'ethers';
 import { useState, useEffect } from 'react';
 import { Table, Tag, Input, InputNumber } from 'antd';
@@ -10,6 +11,15 @@ const { RangePicker } = DatePicker;
 const MONTH_NAME_SHORT = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
+
+const calEarning = (earningMap, id, decimals) => {
+  let earning = new BigNumber(0);
+  for (let ts = id.startTs + 86400; ts <= id.endTs; ts += 86400) {
+      earning = earning.plus(earningMap[ts] || 0);
+  }
+  const base = new BigNumber(10).pow(decimals);
+  return earning.div(base);
+}
 
 const Status = {
   NO_DATA: 'no_data',
@@ -74,6 +84,11 @@ function genTokenIds(startDate, endDate) {
 }
 
 function Balance(props) {
+    const contract = new ethers.Contract(
+        props.contract.address,
+        props.contract.abi,
+        props.provider
+    );
     const [status, setStatus] = useState(Status.NO_DATA);
 
     const [dataSource, setDataSource] = useState([]);
@@ -95,11 +110,11 @@ function Balance(props) {
             dataIndex: 'id',
             key: 'id',
             render: id => (
-                <a href={'/api/v1/token/bsc/btc/' + id}>{id}</a>
+                <a href={'/api/v1/token/bsc/btc/' + id.id}>{id.id}</a>
             )
         },
-        {title: 'Start', dataIndex: 'start', key: 'start'},
-        {title: 'End', dataIndex: 'end', key: 'end'},
+        {title: 'Start', dataIndex: 'start', key: 'start',},
+        {title: 'End', dataIndex: 'end', key: 'end',},
         {
             title: 'Tags',
             dataIndex: 'tags',
@@ -123,6 +138,18 @@ function Balance(props) {
               </>
             ),
         },
+        {
+            title: 'Earning',
+            dataIndex: 'earning',
+            key: 'earning',
+            render: (value, row) => (
+                <>
+                  <span>Total: {value.times(row.balance).toFixed()}</span>
+                  <br/>
+                  <span>Per token: {value.toFixed()}</span>
+                </>
+            ),
+        },
         {title: 'Balance', dataIndex: 'balance', key: 'balance'},
         {
             title: 'Amount To Transfer',
@@ -135,7 +162,7 @@ function Balance(props) {
                     min={0}
                     max={row.balance}
                     disabled={status === Status.TRANSFERRING || sendAll}
-                    value={transferAmounts[row.id]}
+                    value={transferAmounts[row.id.id]}
                     defaultValue={0}
                     onChange={(value) => {
                       onTransferAmountChange(row, value);
@@ -153,7 +180,7 @@ function Balance(props) {
     ];
 
     const applyToAll = (row) => () => {
-        const amount = transferAmounts[row.id];
+        const amount = transferAmounts[row.id.id];
         if (amount > 0) {
           setTransferAmounts(dataSource.reduce(
               (p, d) => ({
@@ -170,39 +197,46 @@ function Balance(props) {
     const fetchData = async () => {
       setStatus(Status.LOADING_DATA);
       const ids = genTokenIds(dateRange[0], dateRange[1]);
-      const signer = props.contract.provider.getSigner();
+      const signer = contract.provider.getSigner();
       const address = await signer.getAddress();
       const accounts = Array(ids.length).fill(address);
 
-      const custodian = await props.contract.custodian();
-      const finalized = await props.contract.finalized();
+      const custodian = await contract.custodian();
+      const finalized = await contract.finalized();
       setCustodian(ethers.utils.getAddress(custodian));
       setFinalized(finalized.toNumber());
 
-      const balances = await props.contract.balanceOfBatch(
+      const balances = await contract.balanceOfBatch(
           accounts, ids.map(id => id.raw)
       );
       var dataSource = [];
+      var totalEarning = new BigNumber(0);
       for (let i = 0; i < ids.length; i++) {
         const id = ids[i];
+        const balance = balances[i].toNumber();
+        const earingPerToken = calEarning(
+          props.earningMap, id, props.contract.earningToken.decimals
+        );
+        const earning = earingPerToken.times(balance);
+        totalEarning = totalEarning.plus(earning);
         dataSource.push({
           key: i.toString(),
-          id: id.id,
+          id: id,
           start: id.start,
-          startTs: id.startTs,
-          endTs: id.endTs,
           end: id.end,
           tags: id.tags.concat([id.type]),
-          balance: balances[i].toNumber(),
+          balance: balance,
+          earning: earingPerToken,
         });
       }
+      props.onEarning(totalEarning.toFixed());
       return dataSource;
     }
 
     const onTransferAmountChange = (row, value) => {
         setTransferAmounts({
             ...transferAmounts,
-            [row.id]: value,
+            [row.id.id]: value,
         });
     }
 
@@ -241,7 +275,7 @@ function Balance(props) {
           return;
         }
 
-        const signer = props.contract.provider.getSigner();
+        const signer = props.provider.getSigner();
         const sender = await signer.getAddress();
         const ids = Object.keys(transferAmounts).filter(
             id => transferAmounts[id] > 0
@@ -250,7 +284,7 @@ function Balance(props) {
         const amounts = ids.map(
             id => ethers.BigNumber.from(transferAmounts[id])
         );
-        props.contract.connect(signer).safeBatchTransferFrom(
+        contract.connect(signer).safeBatchTransferFrom(
             sender, recipient, encoded, amounts, []
         ).then((tx) => {
             return tx.wait(3);
@@ -335,13 +369,13 @@ function Balance(props) {
         <Table
           rowClassName={(row) => {
               let classes = [];
-              if (row.startTs <= finalized && row.endTs > finalized) {
+              if (row.id.startTs <= finalized && row.id.endTs > finalized) {
                   classes.push('finalizing');
               }
-              if (row.endTs <= finalized) {
+              if (row.id.endTs <= finalized) {
                   classes.push('finalized');
               }
-              if (transferAmounts[row.id] > 0 && status === Status.CONFIRMING) {
+              if (transferAmounts[row.id.id] > 0 && status === Status.CONFIRMING) {
                   classes.push('pending-transfer');
               }
               return classes.join(' ');
