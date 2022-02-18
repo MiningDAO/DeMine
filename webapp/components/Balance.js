@@ -179,7 +179,9 @@ function Balance(props) {
     const applyToAll = (row) => () => {
         const amount = dataSource.find(d => d.key === row.key).amount;
         if (amount) {
-          setDataSource(dataSource.d(d => ({...d, amount: amount})));
+          setDataSource(dataSource.map(d => (
+              {...d, amount: amount > d.balance ? d.balance : amount}
+          )));
         } else {
           openNotification("Amount must be larger than 0");
         }
@@ -311,9 +313,7 @@ function Balance(props) {
     const onSendAll = (checked) => {
         setSendAll(checked);
         if (checked) {
-            setDataSource(dataSource.map(d => {
-                d.amount = d.balance;
-            }));
+            setDataSource(dataSource.map(d => ({...d, amount: d.balance})));
         }
     };
 
