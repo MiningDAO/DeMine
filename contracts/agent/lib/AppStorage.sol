@@ -8,8 +8,6 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import '../../nft/interfaces/IERC1155Rewardable.sol';
 
 struct Account {
-    uint128 dailyTokenLockStart;  // The start timestamp of the first locked daily token in the agent
-    uint128 dailyTokenLockEnd;  // The end timestamp of the last locked daily token in the agent
     uint128 weeklyTokenLockStart;  // The start timestamp of the first locked weekly token in the agent
     uint128 weeklyTokenLockEnd;  // The start timestamp of the first locked daily token in the agent
     uint maxBalance;  // The max balance of the single day NFT that is owned by this account but locked in the agent
