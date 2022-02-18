@@ -88,7 +88,6 @@ function Balance(props) {
     const [contract, setContract] = useState(null);
 
     const [dataSource, setDataSource] = useState([]);
-    const [dataView, setDataView] = useState([]);
 
     const [dateRange, setDateRange] = useState([
         startOfWeek().subtract(4, 'week'),
@@ -96,7 +95,6 @@ function Balance(props) {
     ]);
 
     const [tabKey, setTabKey] = useState('btc');
-    const [transferAmounts, setTransferAmounts] = useState({});
     const [redeem, setRedeem] = useState(false);
     const [sendAll, setSendAll] = useState(false);
     const [recipientAddress, setRecipientAddress] = useState('');
@@ -161,7 +159,7 @@ function Balance(props) {
                     min={0}
                     max={row.balance}
                     disabled={status === Status.TRANSFERRING || sendAll}
-                    value={transferAmounts[row.id.id]}
+                    value={row.amount}
                     defaultValue={0}
                     onChange={(value) => {
                       onTransferAmountChange(row, value);
@@ -179,15 +177,9 @@ function Balance(props) {
     ];
 
     const applyToAll = (row) => () => {
-        const amount = transferAmounts[row.id.id];
-        if (amount > 0) {
-          setTransferAmounts(dataView.reduce(
-              (p, d) => ({
-                  ...p,
-                  [d.id.id]: amount > d.balance ? d.balance : amount
-              }),
-              {}
-          ));
+        const amount = dataSource.find(d => d.key === row.key).amount;
+        if (amount) {
+          setDataSource(dataSource.d(d => ({...d, amount: amount})));
         } else {
           openNotification("Amount must be larger than 0");
         }
@@ -236,18 +228,21 @@ function Balance(props) {
             tags: id.tags.concat([id.type]),
             balance: balance,
             earning: earingPerToken,
+            amount: 0,
           });
         }
         props.onEarning(totalEarning.toFixed());
         setDataSource(dataSource);
-        setDataView(dataSource);
     }
 
     const onTransferAmountChange = (row, value) => {
-        setTransferAmounts({
-            ...transferAmounts,
-            [row.id.id]: value,
-        });
+        setDataSource(
+            dataSource.map(d =>
+                d.key === row.key
+                  ? ({...d, amount: value})
+                  : d
+            )
+        );
     }
 
     const onDateChange = (_dates, datesString) => {
@@ -260,7 +255,6 @@ function Balance(props) {
         }).catch((err) => {
             setStatus(Status.NO_DATA);
             setDataSource([]);
-            setDataView([]);
             openNotification(err.toString());
         })
     }, [dateRange]);
@@ -287,23 +281,15 @@ function Balance(props) {
 
         const signer = props.provider.getSigner();
         const sender = await signer.getAddress();
-        const ids = Object.keys(transferAmounts).filter(
-            id => transferAmounts[id] > 0
-        );
-        const encoded = ids.map(id => ethers.BigNumber.from(id));
-        const amounts = ids.map(
-            id => ethers.BigNumber.from(transferAmounts[id])
-        );
+        const filtered = dataSource.filter(d => d.amount);
+        const ids = filtered.map(d => ethers.BigNumber.from(d.id.id));
+        const amounts = filtered.map(d => ethers.BigNumber.from(d.amount));
         contract.connect(signer).safeBatchTransferFrom(
-            sender, recipient, encoded, amounts, []
+            sender, recipient, ids, amounts, []
         ).then((tx) => {
             return tx.wait(3);
         }).then((txReceipt) => {
             setStatus(Status.DATA_LOADED);
-            setTransferAmounts(ids.reduce(
-                (prev, cur) => ({[cur]: 0, ...prev}),
-                {}
-            ));
             return fetchData();
         }).then(() => {
             setStatus(Status.DATA_LOADED);
@@ -314,27 +300,20 @@ function Balance(props) {
     }
 
     const confirmTransfer = () => {
-        const keys = Object.keys(
-            transferAmounts
-        ).filter(k => transferAmounts[k] > 0);
-        if (keys.length === 0) {
+        const filtered = dataSource.filter(d => d.amount);
+        if (filtered.length === 0) {
           openNotification("You have to specify at least one token to transfer");
           return;
         }
-        setTransferAmounts(keys.reduce(
-            (p, k) => ({...p, [k]: transferAmounts[k]}),
-            {}
-        ));
         setStatus(Status.CONFIRMING);
     };
 
     const onSendAll = (checked) => {
         setSendAll(checked);
         if (checked) {
-            setTransferAmounts(dataView.reduce(
-                (p, d) => ({...p, [d.id.id]: d.balance}),
-                {}
-            ));
+            setDataSource(dataSource.map(d => {
+                d.amount = d.balance;
+            }));
         }
     };
 
@@ -342,20 +321,9 @@ function Balance(props) {
         setTabKey(key);
     };
 
-    const enableRedeem = (value) => {
-        setRedeem(value);
-        if (value) {
-            const filtered = dataSource.filter(d => d.id.endTs <= finalized);
-            setDataView(filtered);
-            setTransferAmounts(filtered.reduce(
-                (p, d) => ({...p, [d.id.id]: transferAmounts[d.id.id]}),
-                {}
-            ));
-        } else {
-            setDataView(dataSource);
-            setTransferAmounts(transferAmounts);
-        }
-    };
+    const tableData = redeem
+        ? dataSource.filter(d => d.id.endTs < finalized)
+        : dataSource;
 
     return (
       <div className='transfer'>
@@ -385,7 +353,8 @@ function Balance(props) {
                 </Button>
                 <Checkbox
                   disabled={custodian === null}
-                  onChange={(e) => enableRedeem(e.target.checked)}>
+                  checked={redeem}
+                  onChange={(e) => setRedeem(e.target.checked)}>
                   Redeem
                 </Checkbox>
                 <Checkbox
@@ -410,12 +379,12 @@ function Balance(props) {
               if (row.id.endTs <= finalized) {
                   classes.push('finalized');
               }
-              if (transferAmounts[row.id.id] > 0 && status === Status.CONFIRMING) {
+              if (row.amount && status === Status.CONFIRMING) {
                   classes.push('pending-transfer');
               }
               return classes.join(' ');
           }}
-          dataSource={dataView}
+          dataSource={tableData}
           columns={columns}
           pagination={false}
           loading={status === Status.LOADING_DATA}
@@ -427,11 +396,9 @@ function Balance(props) {
           onCancel={() => setStatus(Status.DATA_LOADED)}
         >
           {
-            Object.keys(transferAmounts).filter(
-              id => transferAmounts[id] > 0
-            ).map(id => {
+            tableData.filter(d => d.amount).map(d => {
               return (
-                  <p key={id}>{id}, {transferAmounts[id]}</p>
+                  <p key={d.id.id}>{d.id.id}, {d.amount}</p>
               )
             })
           }
