@@ -88,6 +88,8 @@ function Balance(props) {
     const [contract, setContract] = useState(null);
 
     const [dataSource, setDataSource] = useState([]);
+    const [dataView, setDataView] = useState([]);
+
     const [dateRange, setDateRange] = useState([
         startOfWeek().subtract(4, 'week'),
         startOfWeek().add(1, 'y'),
@@ -95,7 +97,7 @@ function Balance(props) {
 
     const [tabKey, setTabKey] = useState('btc');
     const [transferAmounts, setTransferAmounts] = useState({});
-    const [enableCustodian, setEnableCustodian] = useState(false);
+    const [redeem, setRedeem] = useState(false);
     const [sendAll, setSendAll] = useState(false);
     const [recipientAddress, setRecipientAddress] = useState('');
     const [custodian, setCustodian] = useState(false);
@@ -179,7 +181,7 @@ function Balance(props) {
     const applyToAll = (row) => () => {
         const amount = transferAmounts[row.id.id];
         if (amount > 0) {
-          setTransferAmounts(dataSource.reduce(
+          setTransferAmounts(dataView.reduce(
               (p, d) => ({
                   ...p,
                   [d.id.id]: amount > d.balance ? d.balance : amount
@@ -238,6 +240,7 @@ function Balance(props) {
         }
         props.onEarning(totalEarning.toFixed());
         setDataSource(dataSource);
+        setDataView(dataSource);
     }
 
     const onTransferAmountChange = (row, value) => {
@@ -257,6 +260,7 @@ function Balance(props) {
         }).catch((err) => {
             setStatus(Status.NO_DATA);
             setDataSource([]);
+            setDataView([]);
             openNotification(err.toString());
         })
     }, [dateRange]);
@@ -273,7 +277,7 @@ function Balance(props) {
         setStatus(Status.TRANSFERRING);
         let recipient;
         try {
-          recipient = enableCustodian
+          recipient = redeem
               ? custodian
               : ethers.utils.getAddress(recipientAddress);
         } catch(err) {
@@ -310,17 +314,24 @@ function Balance(props) {
     }
 
     const confirmTransfer = () => {
-        if (Object.keys(transferAmounts).length === 0) {
+        const keys = Object.keys(
+            transferAmounts
+        ).filter(k => transferAmounts[k] > 0);
+        if (keys.length === 0) {
           openNotification("You have to specify at least one token to transfer");
           return;
         }
+        setTransferAmounts(keys.reduce(
+            (p, k) => ({...p, [k]: transferAmounts[k]}),
+            {}
+        ));
         setStatus(Status.CONFIRMING);
     };
 
     const onSendAll = (checked) => {
         setSendAll(checked);
         if (checked) {
-            setTransferAmounts(dataSource.reduce(
+            setTransferAmounts(dataView.reduce(
                 (p, d) => ({...p, [d.id.id]: d.balance}),
                 {}
             ));
@@ -329,6 +340,21 @@ function Balance(props) {
 
     const onTabKey = (key) => {
         setTabKey(key);
+    };
+
+    const enableRedeem = (value) => {
+        setRedeem(value);
+        if (value) {
+            const filtered = dataSource.filter(d => d.id.endTs <= finalized);
+            setDataView(filtered);
+            setTransferAmounts(filtered.reduce(
+                (p, d) => ({...p, [d.id.id]: transferAmounts[d.id.id]}),
+                {}
+            ));
+        } else {
+            setDataView(dataSource);
+            setTransferAmounts(transferAmounts);
+        }
     };
 
     return (
@@ -342,8 +368,8 @@ function Balance(props) {
                   className='right-space'
                   addonBefore="Recipient Address"
                   placeholder="0x..."
-                  disabled={enableCustodian || status === Status.NO_DATA}
-                  value={enableCustodian ? custodian : recipientAddress}
+                  disabled={redeem || status === Status.NO_DATA}
+                  value={redeem ? custodian : recipientAddress}
                   allowClear
                   onChange={
                       (e) => setRecipientAddress(e.target.value)
@@ -355,12 +381,12 @@ function Balance(props) {
                   type="primary"
                   onClick={confirmTransfer}
                 >
-                  Transfer
+                  {redeem ? 'Redeem' : 'Transfer'}
                 </Button>
                 <Checkbox
                   disabled={custodian === null}
-                  onChange={(e) => setEnableCustodian(e.target.checked)}>
-                  Send to custodian
+                  onChange={(e) => enableRedeem(e.target.checked)}>
+                  Redeem
                 </Checkbox>
                 <Checkbox
                   onChange={(e) => onSendAll(e.target.checked)}>
@@ -389,7 +415,7 @@ function Balance(props) {
               }
               return classes.join(' ');
           }}
-          dataSource={dataSource}
+          dataSource={dataView}
           columns={columns}
           pagination={false}
           loading={status === Status.LOADING_DATA}
