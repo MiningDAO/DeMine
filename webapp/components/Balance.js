@@ -182,7 +182,7 @@ function Balance(props) {
           setTransferAmounts(dataSource.reduce(
               (p, d) => ({
                   ...p,
-                  [d.id]: amount > d.balance ? d.balance : amount
+                  [d.id.id]: amount > d.balance ? d.balance : amount
               }),
               {}
           ));
@@ -321,7 +321,7 @@ function Balance(props) {
         setSendAll(checked);
         if (checked) {
             setTransferAmounts(dataSource.reduce(
-                (p, d) => ({...p, [d.id]: d.balance}),
+                (p, d) => ({...p, [d.id.id]: d.balance}),
                 {}
             ));
         }
