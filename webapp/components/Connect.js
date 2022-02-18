@@ -40,6 +40,7 @@ function Connect(props) {
   const [accounts, setAccounts] = useState([]);
   const [chainId, setChainId] = useState(null);
   const [onboarding, setOnboarding] = useState(null);
+  const [installed, setInstalled] = useState(false);
 
   const onChange = (from, chainId, accounts) => {
     if (isBSC(chainId)) {
@@ -52,17 +53,20 @@ function Connect(props) {
   };
 
   const connectMetaMask = () => {
-    setOnboarding(new MetaMaskOnboarding());
     window.ethereum
       .request({ method: 'eth_requestAccounts' })
       .then(accs => {
-          if (
-              accounts.length !== accs.length ||
-              (accs.length > 0 && accounts[0] !== accs[0])
-          ) {
-            setAccounts(accs);
-            onChange('connectMetaMask', chainId, accs);
-          }
+          setAccounts(accs);
+          window.ethereum
+            .request({
+              method: 'eth_chainId',
+              params: []
+            }).then(
+              chainId => {
+                setChainId(chainId);
+                onChange('init', chainId, accs);
+              }
+            );
       });
   }
 
@@ -71,11 +75,19 @@ function Connect(props) {
       .request({
         method: 'wallet_addEthereumChain',
         params: [BSC_MAINNET_PARAMS]
-      })
+      }).then(() => {
+        setChainId(BSC_MAINNET_PARAMS.chainId);
+        onChange('switch', BSC_MAINNET_PARAMS.chainId, accounts);
+      });
   }
 
   useEffect(() => {
-    if (MetaMaskOnboarding.isMetaMaskInstalled()) {
+    const installed = MetaMaskOnboarding.isMetaMaskInstalled();
+    const onboarding = new MetaMaskOnboarding();
+    setOnboarding(onboarding);
+    setInstalled(installed);
+
+    if (installed) {
       window.ethereum.on(
         'accountsChanged',
         accounts => {
@@ -86,7 +98,10 @@ function Connect(props) {
 
       window.ethereum.on(
         'chainChanged',
-        (chainId) => { onChange('chainChanged', chainId, accounts); }
+        (chainId) => {
+           setChainId(chainId);
+           onChange('chainChanged', chainId, accounts);
+        }
       );
 
       window.ethereum.on(
@@ -95,30 +110,26 @@ function Connect(props) {
       );
 
       window.ethereum.on('connect', (connectInfo) => {
-        if (chainId !== connectInfo.chainId) {
-          setChainId(connectInfo.chainId);
-          onChange('connect', connectInfo.chainId, accounts);
-        }
+        setChainId(connectInfo.chainId);
+        onChange('connect', connectInfo.chainId, accounts);
       });
+    }
 
+    if (installed && accounts.length > 0) {
+      onboarding.stopOnboarding();
+    }
+
+    if (installed && accounts.length == 0) {
       connectMetaMask();
     }
-  }, [chainId, accounts]);
+  }, [chainId]);
 
-  if (onboarding && MetaMaskOnboarding.isMetaMaskInstalled() && accounts.length > 0) {
-    onboarding.stopOnboarding();
-  }
-
-  if (onboarding == null) {
-    return (
-      <Spin />
-    );
-  } else if (!MetaMaskOnboarding.isMetaMaskInstalled()) {
+  if (!installed) {
     return (
       <div>
         <div>To run this dApp you need the MetaMask Wallet installed.</div>
         <Button type="primary" onClick={onboarding && onboarding.startOnboarding}>
-          Install MetaMask
+            Install MetaMask
         </Button>
       </div>
     );
