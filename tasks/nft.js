@@ -200,6 +200,7 @@ task('nft-inspect-contract', 'Inspect state of DeMineNFT contract')
             decimals: await reward.decimals(),
             balance: (await reward.balanceOf(nft)).toString()
         };
+        const tokenId = history.length == 0 ? 0 : history[0].tokenId;
         logger.info('Summary: ' + JSON.stringify({
             address: nft,
             ownership,
@@ -211,7 +212,7 @@ task('nft-inspect-contract', 'Inspect state of DeMineNFT contract')
                 finalizedAsDate: new Date(finalized * 1000).toISOString(),
                 history,
             },
-            uri: await erc1155Facet.uri(0),
+            uri: await erc1155Facet.uri(tokenId),
             royaltyInfo: {
                 recipient: royaltyInfo[0],
                 bps: royaltyInfo[1].toNumber(),
