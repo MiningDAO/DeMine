@@ -84,19 +84,19 @@ contract MortgageFacet is
     }
 
     /**
-     * @notice adjust deposit for msg sender and update account info
-     *         Ensure you have a valid start and end set for msg.sender
-     *         to prevent infinite loop
+     * @notice adjust accounts for msg sender for valid weeklyTokenLockStart and
+     *         weeklyTokenLockEnd times for msg.sender to prevent infinite loop.
+     *         weeklyTokenLockStart and weeklyTokenLockEnd could be inaccurate
+     *         after redeemNFT().
      */
     function correctAccount() external whenNotPaused {
         Account memory current = s.accounts[msg.sender];
         Account memory update = Account(
             current.weeklyTokenLockStart,
-            current.weeklyTokenLockEnd,
-            current.maxBalance);
+            current.weeklyTokenLockEnd);
 
         // Correct account for weekly token.
-        uint256 lockedWeeklyToken = nextWeeklyTokenId(uint256(update.weeklyTokenLockStart));
+        uint256 lockedWeeklyToken = getWeeklyTokenFromStartTime(update.weeklyTokenLockStart);
         while(tokenIdToEnd(lockedWeeklyToken) <= update.weeklyTokenLockEnd) {
             if (s.balances[lockedWeeklyToken][msg.sender] == 0 &&
                 update.weeklyTokenLockStart <= update.weeklyTokenLockEnd) {
@@ -106,7 +106,7 @@ contract MortgageFacet is
             }
             lockedWeeklyToken = nextWeeklyTokenId(lockedWeeklyToken);
         }
-        lockedWeeklyToken = previousWeeklyTokenId(uint256(update.weeklyTokenLockEnd) << 128);
+        lockedWeeklyToken = getWeeklyTokenFromEndTime(update.weeklyTokenLockEnd);
         while(tokenIdToStart(lockedWeeklyToken) >= update.weeklyTokenLockStart) {
             if (s.balances[lockedWeeklyToken][msg.sender] == 0 &&
                 update.weeklyTokenLockStart <= update.weeklyTokenLockEnd) {
@@ -115,11 +115,6 @@ contract MortgageFacet is
                 break;
             }
             lockedWeeklyToken = previousWeeklyTokenId(lockedWeeklyToken);
-        }
-        lockedWeeklyToken = nextWeeklyTokenId(uint256(update.weeklyTokenLockStart));
-        while(tokenIdToEnd(lockedWeeklyToken) <= update.weeklyTokenLockEnd) {
-            update.maxBalance = Util.max2(update.maxBalance, s.balances[lockedWeeklyToken][msg.sender]);
-            lockedWeeklyToken = nextWeeklyTokenId(lockedWeeklyToken);
         }
         updateAccount(msg.sender, current, update);
     }
@@ -171,16 +166,14 @@ contract MortgageFacet is
         Account memory current = s.accounts[mortgager];
         Account memory update = Account(
             current.weeklyTokenLockStart,
-            current.weeklyTokenLockEnd,
-            current.maxBalance);
+            current.weeklyTokenLockEnd);
         for (uint i = 0; i < ids.length; i++) {
+            require(isWeeklyToken(ids[i]), "DeMineAgent: Only weekly token is supported");
             uint balance = s.balances[ids[i]][mortgager] + amounts[i];
             s.balances[ids[i]][mortgager] = balance;
 
-            require(isWeeklyToken(ids[i]), "DeMineAgent: Only weekly token is supported");
             update.weeklyTokenLockStart = Util.uint128min2(tokenIdToStart(ids[i]), update.weeklyTokenLockStart);
             update.weeklyTokenLockEnd = Util.uint128max2(tokenIdToEnd(ids[i]), update.weeklyTokenLockEnd);
-            update.maxBalance = Util.max2(balance, update.maxBalance);
         }
         updateAccount(msg.sender, current, update);
         return IERC1155Receiver.onERC1155BatchReceived.selector;
@@ -198,8 +191,8 @@ contract MortgageFacet is
         require(end <= s.finalizedEnd, 'DeMineAgent: cannot payoff unfinalized NFTs');
 
         // Payoff weekly token
-        uint256 lockedWeeklyToken = nextWeeklyTokenId(uint256(account.weeklyTokenLockStart));
-        do {
+        uint256 lockedWeeklyToken = getWeeklyTokenFromStartTime(account.weeklyTokenLockStart);
+        while(tokenIdToEnd(lockedWeeklyToken) <= end) {
             uint balance = s.balances[lockedWeeklyToken][msg.sender];
             if (balance > 0) {
                 uint128 lastDayEnd = tokenIdToEnd(lockedWeeklyToken);
@@ -213,12 +206,10 @@ contract MortgageFacet is
             }
             lockedWeeklyToken = nextWeeklyTokenId(lockedWeeklyToken);
         }
-        while(tokenIdToEnd(lockedWeeklyToken) <= end);
         s.accounts[msg.sender].weeklyTokenLockStart = tokenIdToStart(lockedWeeklyToken);
 
         if (debt > 0) {
             s.paymentToken.safeTransferFrom(s.payee, msg.sender, debt);
-            s.deposit += debt;
         }
         s.incomeToken.safeTransfer(msg.sender, income);
     }
@@ -230,21 +221,6 @@ contract MortgageFacet is
     ) private {
         s.accounts[account].weeklyTokenLockStart = update.weeklyTokenLockStart;
         s.accounts[account].weeklyTokenLockEnd = update.weeklyTokenLockEnd;
-        s.accounts[account].maxBalance = update.maxBalance;
-
-        if (update.maxBalance < current.maxBalance) {
-            uint delta = (current.maxBalance - update.maxBalance) * depositBase();
-            s.paymentToken.safeTransfer(account, delta);
-            s.deposit -= delta;
-        } else if (update.maxBalance > current.maxBalance) {
-            uint delta = (update.maxBalance - current.maxBalance) * depositBase();
-            s.paymentToken.safeTransferFrom(msg.sender, s.payee, delta);
-            s.deposit += delta;
-        }
-    }
-
-    function depositBase() private view returns(uint) {
-        return s.tokenCost * s.depositMultiplier;
     }
 
     function tokenIdToStart(uint256 tokenId) private pure returns(uint128) {
@@ -271,5 +247,13 @@ contract MortgageFacet is
     // previousWeeklyTokenId assumes weekly tokens are created every 7 days.
     function previousWeeklyTokenId(uint256 tokenId) private pure returns(uint256) {
         return uint256(uint256(tokenIdToStart(tokenId) - 604800) << 128 | (tokenIdToStart(tokenId)));
+    }
+
+    function getWeeklyTokenFromStartTime(uint128 start) private pure returns(uint256) {
+        return nextWeeklyTokenId(uint256(start))
+    }
+
+    function getWeeklyTokenFromEndTime(uint128 end) private pure returns(uint256) {
+        return previousWeeklyTokenId(uint256(end) << 128);
     }
 }
