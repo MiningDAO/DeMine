@@ -250,7 +250,7 @@ contract MortgageFacet is
     }
 
     function getWeeklyTokenFromStartTime(uint128 start) private pure returns(uint256) {
-        return nextWeeklyTokenId(uint256(start))
+        return nextWeeklyTokenId(uint256(start));
     }
 
     function getWeeklyTokenFromEndTime(uint128 end) private pure returns(uint256) {
