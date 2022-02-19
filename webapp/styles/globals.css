@@ -1,0 +1,53 @@
+@import '~antd/dist/antd.css';
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.App {
+  text-align: center;
+}
+
+.header {
+  background-color: white;
+}
+
+.transfer {
+  margin-top: 25px;
+}
+
+.right-space {
+  margin-right: 15px;
+}
+
+.finalized {
+   background-color: #A9A9A9;
+}
+
+.finalizing {
+   background-color: #DCDCDC;
+}
+
+.pending-transfer {
+   background-color: #fdb44b;
+}
+
+.ant-table-thead>tr.ant-table-row-hover:not(.ant-table-expanded-row)>td,
+.ant-table-tbody>tr.ant-table-row-hover:not(.ant-table-expanded-row)>td,
+.ant-table-thead>tr:hover:not(.ant-table-expanded-row)>td,
+.ant-table-tbody>tr:hover:not(.ant-table-expanded-row)>td {
+    background: unset;
+}

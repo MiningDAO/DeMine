@@ -1,6 +1,7 @@
 const assert = require("assert");
 const { types } = require("hardhat/config");
-const common = require("../lib/common.js");
+const logger = require('../lib/logger.js');
+const config = require("../lib/config.js");
 
 task('agent-clone', 'Deploy clone of demine agent')
     .addOptionalParam('nft', 'contract address of DeMineNFT', undefined)
@@ -8,7 +9,7 @@ task('agent-clone', 'Deploy clone of demine agent')
     .addParam('cost', 'Cost per token')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
         assert(network.name !== 'hardhat', 'Not supported at hardhat network');
-        common.validateCoin(args.coin);
+        config.validateCoin(args.coin);
 
         const { deployer, admin, custodian } = await ethers.getNamedSigners();
         let localNetworkConfig = localConfig[network.name] || {};
@@ -17,9 +18,9 @@ task('agent-clone', 'Deploy clone of demine agent')
         var usd = localNetworkConfig.usd.wrapped;
         assert(nft && payment, 'invalid nft or payment contract address');
 
-        const diamondFacet = await common.getDeployment(hre, 'DiamondFacet');
-        const mortgageFacet = await common.getDeployment(hre, 'MortgageFacet');
-        const base = await common.getDeployment(hre, 'DeMineAgent');
+        const diamondFacet = await config.getDeployment(hre, 'DiamondFacet');
+        const mortgageFacet = await config.getDeployment(hre, 'MortgageFacet');
+        const base = await config.getDeployment(hre, 'DeMineAgent');
         const tx = await base.create(
             admin.address,
             diamondFacet.address,
@@ -39,10 +40,7 @@ task('agent-clone', 'Deploy clone of demine agent')
         const { args: [from, cloned] } = events.find(
             function(e) { return e.event === 'Clone'; }
         );
-        console.log(
-            'Cloning contract DeMineAgent at ' + cloned +
-            ' with ' + common.gas(txReceipt) + ' gas'
-        );
+        logger.log('Cloning contract DeMineAgent at ' + cloned);
     });
 
 async function genMortgageFacetCut(hre) {

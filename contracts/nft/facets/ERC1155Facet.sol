@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.4;
+pragma solidity 0.8.11;
 pragma experimental ABIEncoderV2;
 
 import '@solidstate/contracts/access/OwnableStorage.sol';
@@ -23,9 +23,6 @@ contract ERC1155Facet is
 {
     using SafeERC20 for IERC20;
 
-    event Finalize(uint128 indexed, uint indexed);
-    event Alchemy(address indexed account, uint totalEarning);
-
     function init(address _earningToken) external onlyInitializing {
         s.earningToken = _earningToken;
         s.royalty = RoyaltyInfo(
@@ -46,12 +43,12 @@ contract ERC1155Facet is
     function finalize(
         uint128 endOfDay,
         uint earningPerTPerDay,
-        address custodian,
+        address earningSource,
         uint totalEarning
     ) external onlyOwner {
         require(
             endOfDay > s.finalized && endOfDay % 86400 == 0,
-            'DeMineNFT: invalid timestamp'
+            'NFT: invalid timestamp'
         );
         s.finalized = endOfDay;
         s.daily[endOfDay] = earningPerTPerDay;
@@ -59,17 +56,10 @@ contract ERC1155Facet is
             s.weekly[endOfDay + i * 86400] += earningPerTPerDay;
         }
         IERC20(s.earningToken).safeTransferFrom(
-            custodian,
+            earningSource,
             address(this),
             totalEarning
         );
-        emit Finalize(endOfDay, earningPerTPerDay);
-    }
-
-    function earning(uint tokenId) external view returns(uint) {
-        uint128 start = uint128(tokenId >> 128);
-        uint128 end = uint128(tokenId);
-        return _earning(start, end);
     }
 
     function _beforeTokenTransfer(
@@ -79,56 +69,28 @@ contract ERC1155Facet is
         uint[] memory ids,
         uint[] memory amounts,
         bytes memory data
-    ) internal virtual override(ERC1155BaseInternal) {
+    ) internal nonReentrant virtual override(ERC1155BaseInternal) {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
         // mint
         if (from == address(0)) {
             for (uint i = 0; i < ids.length; i++) {
                 s.supply[ids[i]] += amounts[i];
             }
-        // release
-        } else if (from == _custodian) {
-            uint lastFinalized = s.finalized;
-            for (uint i = 0; i < ids.length; i++) {
-                uint128 start = uint128(ids[i] >> 128);
-                require(
-                    start >= lastFinalized,
-                    'DeMineNFT: token finalized or in finalization'
-                );
-            }
         // alchemize or burn
-        } else if (to == _custodian) {
+        } else if (to == _custodian && from != _custodian) {
             require(!LibPausable.layout().paused, 'Pausable: paused');
             uint totalEarning;
             uint lastFinalized = s.finalized;
             for (uint i; i < ids.length; i++) {
                 uint128 end = uint128(ids[i]);
-                if (end <= lastFinalized) {
+                if (end <= lastFinalized) { // already finalized
                     uint128 start = uint128(ids[i] >> 128);
                     totalEarning += amounts[i] * _earning(start, end);
                 }
             }
             if (totalEarning > 0) {
                 IERC20(s.earningToken).safeTransfer(from, totalEarning);
-                emit Alchemy(from, totalEarning);
             }
-        }
-    }
-
-    function _earning(uint128 start, uint128 end)
-        private
-        view
-        returns(uint value)
-    {
-        // daily token
-        if (end - start == 86400) {
-            value = s.daily[end];
-        // weekly token
-        } else if (end - start == 604800) {
-            value = s.weekly[end];
-        // biweekly token
-        } else if (end - start == 1209600) {
-            value = s.weekly[end] + s.weekly[end - 604800];
         }
     }
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.4;
+pragma solidity 0.8.11;
 
 struct RoyaltyInfo {
     address recipient;
@@ -10,6 +10,7 @@ struct RoyaltyInfo {
 struct AppStorage {
     RoyaltyInfo royalty;
     address earningToken;
+    uint256 status;
 
     // Oracle
     uint128 finalized;
