@@ -1,12 +1,21 @@
 {
   "dependencies": {
+    "@gnosis.pm/safe-core-sdk": "^2.0.0",
+    "@gnosis.pm/safe-ethers-lib": "^1.0.0",
+    "@gnosis.pm/safe-service-client": "^1.1.1",
     "@openzeppelin/contracts": "^4.4.0",
     "@openzeppelin/contracts-upgradeable": "^4.4.1",
+    "@trycourier/courier": "^3.5.0",
+    "app-root-path": "^3.0.0",
+    "axios-retry": "^3.2.4",
     "bignumber.js": "^9.0.2",
+    "cors": "^2.8.5",
+    "express": "^4.17.2",
     "install": "^0.13.0",
     "lodash": "^4.17.21",
     "npm": "^8.2.0",
-    "npmlog": "^4.1.2"
+    "redis": "^4.0.3",
+    "winston": "^3.5.1"
   },
   "devDependencies": {
     "@chainlink/contracts": "^0.3.1",
@@ -25,6 +34,7 @@
     "hardhat-deploy": "^0.9.24",
     "hardhat-deploy-ethers": "^0.3.0-beta.13",
     "hardhat-gas-reporter": "^1.0.6",
+    "mocha": "^7.2.0",
     "prompt-confirm": "^2.0.4",
     "prompts": "^2.4.2"
   }

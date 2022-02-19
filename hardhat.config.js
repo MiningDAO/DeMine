@@ -5,13 +5,16 @@ require('hardhat-deploy');
 require("@nomiclabs/hardhat-etherscan");
 require('hardhat-deploy-ethers');
 require('./tasks/wrapped.js');
+require('./tasks/wrapped-admin.js');
 require('./tasks/nft.js');
 require('./tasks/nft-admin.js');
+require('./tasks/e2e.js');
 require('./tasks/agent.js');
 
 const config = require('./config');
 extendEnvironment((hre) => {
     hre.localConfig = config;
+    hre.shared = {};
 });
 
 task('accounts', 'Prints the list of accounts')
@@ -25,14 +28,24 @@ task('accounts', 'Prints the list of accounts')
 
 task('abi', 'Prints abi of contract')
     .addParam('contract', 'contract name')
-    .setAction(async (taskArgs, { artifacts }) => {
-        let artifact = await artifacts.readArtifact(taskArgs.contract);
-        console.log(JSON.stringify(artifact.abi));
+    .addFlag('print', 'print abi')
+    .setAction(async (args, { artifacts }) => {
+        let artifact = await artifacts.readArtifact(args.contract);
+        if (args.print) {
+            console.log(JSON.stringify(artifact.abi));
+        }
+        return artifact.abi;
     });
 
 module.exports = {
-    solidity: '0.8.4',
+    solidity: '0.8.11',
     networks: {
+        rinkeby: {
+            live: true,
+            url: config.alchemy.rinkeby,
+            chainId: 4,
+            accounts: config.accounts
+        },
         matic: {
             live: true,
             url: config.alchemy.matic,
@@ -71,11 +84,8 @@ module.exports = {
         admin: {
             default: 1
         },
-        custodian: {
-            default: 2
-        },
-        alchemist: {
-            default: 3
+        gnosis: {
+            default: 1
         }
     },
     gasReporter: {
