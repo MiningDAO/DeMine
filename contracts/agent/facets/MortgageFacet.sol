@@ -83,12 +83,6 @@ contract MortgageFacet is
         return balances;
     }
 
-    function billingStatementOf(
-        uint tokenId
-    ) external view returns(BillingStatement memory) {
-        return s.statements[tokenId];
-    }
-
     function billingStatementOfBatch(
         uint[] calldata tokenIds
     ) external view returns(BillingStatement[] memory) {
