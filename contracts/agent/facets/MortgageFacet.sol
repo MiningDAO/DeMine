@@ -32,8 +32,6 @@ contract MortgageFacet is
 
     using SafeERC20 for IERC20;
 
-    event Redeem(address indexed, uint[], uint[]);
-
     function init(
         address nft,
         address payment,
@@ -76,7 +74,6 @@ contract MortgageFacet is
         if (totalCost > 0) {
             s.paymentToken.safeTransferFrom(msg.sender, s.payee, totalCost);
         }
-        emit Redeem(msg.sender, ids, amounts);
         s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
     }
 
@@ -112,8 +109,8 @@ contract MortgageFacet is
         bytes calldata data
     ) external override returns (bytes4) {
         require(
-            msg.sender == address(s.nft) && from == address(0),
-            'DeMineAgent: only minted tokens from DeMineNFT allowed'
+            msg.sender == s.nft.custodian(),
+            'DeMineAgent: only minted tokens from custodian allowed'
         );
         (address mortgager) = abi.decode(data, (address));
         for (uint i = 0; i < ids.length; i++) {
