@@ -12,7 +12,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import '../../shared/lib/Util.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../lib/AppStorage.sol';
-import '../lib/BillingStorage.sol';
 import '../../shared/lib/LibInitializable.sol';
 
 /**
@@ -34,15 +33,14 @@ contract MortgageFacet is
 
     function init(
         address nft,
-        address payment,
-        address payee,
+        address paymentToken,
+        address custodian,
         uint tokenCost
     ) external onlyInitializing {
         IERC1155Rewardable nftContract = IERC1155Rewardable(nft);
         s.nft = nftContract;
-        s.incomeToken = IERC20(nftContract.earningToken());
-        s.paymentToken = IERC20(payment);
-        s.payee = payee;
+        s.paymentToken = paymentToken;
+        s.custodian = custodian;
         s.tokenCost = tokenCost;
     }
 
@@ -57,22 +55,19 @@ contract MortgageFacet is
     ) external whenNotPaused {
         require(
             ids.length == amounts.length,
-            "DeMineAgent: array length mismatch");
+            "DeMineAgent: array length mismatch"
+        );
         uint tokenCost = s.tokenCost;
-        uint128 billedTime = s.billedTime;
 
         uint totalCost;
         for (uint i = 0; i < ids.length; i++) {
-            require(
-                tokenIdToStart(ids[i]) >= billedTime,
-                "DeMineAgent: cannot redeem NFT for ongoing/completed mining.");
             totalCost += tokenCost * amounts[i] * daysInToken(ids[i]);
             uint balance = s.balances[ids[i]][msg.sender];
             require(balance > 0 && balance > amounts[i], 'DeMineAgent: no sufficient balance');
             s.balances[ids[i]][msg.sender] = balance - amounts[i];
         }
         if (totalCost > 0) {
-            s.paymentToken.safeTransferFrom(msg.sender, s.payee, totalCost);
+            IERC20(s.paymentToken).safeTransferFrom(msg.sender, s.custodian, totalCost);
         }
         s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
     }
@@ -86,6 +81,22 @@ contract MortgageFacet is
             balances[i] = s.balances[ids[i]][account];
         }
         return balances;
+    }
+
+    function billingStatementOf(
+        uint tokenId
+    ) external view returns(BillingStatement memory) {
+        return s.statements[tokenId];
+    }
+
+    function billingStatementOfBatch(
+        uint[] calldata tokenIds
+    ) external view returns(BillingStatement[] memory) {
+        BillingStatement[] memory res = new BillingStatement[](tokenIds.length);
+        for (uint i = 0; i < tokenIds.length; i++) {
+            res[i] = s.statements[tokenIds[i]];
+        }
+        return res;
     }
 
     function onERC1155Received(
@@ -109,8 +120,8 @@ contract MortgageFacet is
         bytes calldata data
     ) external override returns (bytes4) {
         require(
-            msg.sender == s.nft.custodian(),
-            'DeMineAgent: only minted tokens from custodian allowed'
+            from == s.nft.custodian(),
+            'DeMineAgent: only tokens from custodian allowed'
         );
         (address mortgager) = abi.decode(data, (address));
         for (uint i = 0; i < ids.length; i++) {
@@ -130,13 +141,13 @@ contract MortgageFacet is
     ) external whenNotPaused {
         uint income;
         uint debt;
-        uint128 billedTime = s.billedTime;
 
         for (uint i = 0; i < ids.length; i++) {
-            require(
-                tokenIdToEnd(ids[i]) <= billedTime,
-                "DeMineAgent: cannot withdraw or payoff NFT for not yet billed mining.");
             BillingStatement memory st = s.statements[ids[i]];
+            require(
+                st.lockedUtil <= block.timestamp,
+                "DeMineAgent: earning not ready to withdraw yet"
+            );
             uint balance = s.balances[ids[i]][msg.sender];
             income += st.surplus * balance / st.balance;
             debt += st.debt * balance / st.balance;
@@ -144,10 +155,10 @@ contract MortgageFacet is
         }
 
         if (debt > 0) {
-            s.paymentToken.safeTransferFrom(s.payee, msg.sender, debt);
+            IERC20(s.paymentToken).safeTransferFrom(s.custodian, msg.sender, debt);
         }
         if (income > 0) {
-            s.incomeToken.safeTransfer(msg.sender, income);
+            IERC20(s.nft.earningToken()).safeTransfer(msg.sender, income);
         }
     }
 

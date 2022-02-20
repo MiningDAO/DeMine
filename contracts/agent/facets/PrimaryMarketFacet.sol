@@ -20,7 +20,6 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
 
     using SafeERC20 for IERC20;
 
-    event Claim(address indexed, address indexed, uint[], uint[]);
     event IncreaseAllowance(
         address indexed,
         address indexed,
@@ -35,7 +34,6 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
     );
 
     struct ClaimState {
-        uint billing;
         uint tokenCost;
         uint totalCost;
         uint totalPay;
@@ -123,23 +121,22 @@ contract PrimaryMarketFacet is PausableModifier, PricingStatic, PricingLinearDec
             ids.length == maxAmounts.length,
             "TokenLocker: array length mismatch"
         );
-        ClaimState memory cs = ClaimState(s.billing, s.tokenCost, 0, 0);
+        ClaimState memory cs = ClaimState(s.tokenCost, 0, 0);
         PricingStorage.Layout storage l = PricingStorage.layout();
         function(
             PricingStorage.Layout storage, address, uint, uint
         ) internal view returns(uint) f = priceF(l.strategy[from]);
         uint[] memory amounts = new uint[](ids.length);
         for (uint i = 0; i < ids.length; i++) {
-            require(ids[i] > cs.billing, 'DeMineAgent: billing token');
             uint amount = maxAllowed(from, ids[i], maxAmounts[i]);
             amounts[i] = amount;
             cs.totalCost += cs.tokenCost * amount;
             cs.totalPay += f(l, from, ids[i], cs.tokenCost) * amount;
         }
-        s.payment.safeTransferFrom(msg.sender, s.payee, cs.totalCost);
-        s.payment.safeTransferFrom(msg.sender, from, cs.totalPay - cs.totalCost);
+        IERC20 payment = IERC20(s.paymentToken);
+        payment.safeTransferFrom(msg.sender, s.custodian, cs.totalCost);
+        payment.safeTransferFrom(msg.sender, from, cs.totalPay - cs.totalCost);
         s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
-        emit Claim(msg.sender, from, ids, amounts);
         return amounts;
     }
 
