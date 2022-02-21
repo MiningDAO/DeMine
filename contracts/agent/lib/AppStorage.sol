@@ -19,15 +19,23 @@ struct AppStorage {
     address incomeToken; // The target token to be mined (e.g. BTC)
     address paymentToken; // The type of token to pay off cost (e.g. USDT)
     address custodian; // payee account address, could be contract
-
-    mapping(uint256 => BillingStatement) statements; // Billing statement for each NFT token.
-
     mapping(uint => mapping(address => uint)) balances;  // owner => buyer => allowance
-    mapping(address => mapping(address => mapping(uint => uint))) allowances;
 
     // billing related
+    mapping(uint256 => BillingStatement) statements; // Billing statement for each NFT token.
     AggregatorV3Interface chainlink;
     address swapRouter;
     uint16 earningTokenSaleDiscount10000Based; // 10000 based
     mapping(uint => uint) lockedUntil; // earning token sale
+
+    // primary market sale related
+    mapping(address => bool) supportedPricingStrategies;
+    mapping(address => address) pricingStategy;
+
+    mapping(address => bool) supportedAllowanceStrategies;
+    mapping(address => address) allowanceStrategy;
+}
+
+abstract contract StorageBase {
+    AppStorage internal s;
 }
