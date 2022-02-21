@@ -72,7 +72,10 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
 
     function setPricing(bytes memory args) external {
         address pricing = s.pricingStategy[msg.sender];
-        require(pricing != address(0), 'Mining3Agent: pricing not set');
+        require(
+            pricing != address(0),
+            'Mining3Agent: pricing strategy not set'
+        );
         (
             bool success,
             bytes memory result
@@ -101,7 +104,10 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
 
     function setAllowance(address buyer, bytes memory args) external {
         address allowance = s.pricingStategy[msg.sender];
-        require(allowance != address(0), 'Mining3Agent: pricing not set');
+        require(
+            allowance != address(0),
+            'Mining3Agent: allowance strategy not set'
+        );
         (
             bool success,
             bytes memory result

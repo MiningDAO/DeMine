@@ -35,13 +35,21 @@ contract MortgageFacet is
         address nft,
         address paymentToken,
         address custodian,
-        uint tokenCost
+        uint tokenCost,
+        address[] calldata pricingStrategies,
+        address[] calldata allowanceStrategies
     ) external onlyInitializing {
         IERC1155Rewardable nftContract = IERC1155Rewardable(nft);
         s.nft = nftContract;
         s.paymentToken = paymentToken;
         s.custodian = custodian;
         s.tokenCost = tokenCost;
+        for (uint i = 0; i < pricingStrategies.length; i++) {
+            s.supportedPricingStrategies[pricingStrategies[i]] = true;
+        }
+        for (uint i = 0; i < allowanceStrategies.length; i++) {
+            s.supportedAllowanceStrategies[allowanceStrategies[i]] = true;
+        }
     }
 
     /**
