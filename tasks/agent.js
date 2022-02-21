@@ -5,13 +5,14 @@ const logger = require('../lib/logger.js');
 const common = require("../lib/common.js");
 const state = require("../lib/state.js");
 const diamond = require("../lib/diamond.js");
+const BN = require("bignumber.js");
 
 task('agent-clone', 'Deploy clone of demine agent')
     .addParam('miningCoin', 'coin that NFT the agent is mining for')
     .addParam('paymentCoin', 'coin used for paying mining cost')
     .addParam('cost', 'Cost per NFT token in paymentToken')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        let costNum = parseInt(args.cost);
+        let costNum = BN.BigNumber(args.cost);
         if (isNaN(costNum)) {
             logger.warn("Invalid cost, which should be number.");
             return ethers.utils.getAddress( "0x0000000000000000000000000000000000000000");
@@ -53,7 +54,7 @@ task('agent-clone', 'Deploy clone of demine agent')
             admin.address,
             await diamond.genInterfaces(
                 hre,
-                ['@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol:IERC1155Receiver']
+                ['MortgageFacet']
             ),
             mortgageFacet.address,
             iface.encodeFunctionData('init', [nftAddr, paymentToken.address, nftToken.custodian(), costNum, [], []])
