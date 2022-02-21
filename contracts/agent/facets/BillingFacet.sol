@@ -61,25 +61,24 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             s.statements[tokenId] = BillingStatement(
                 balance,
                 earningTokenLeft,
-                debt - paymentTokenReceived,
-                block.timestamp + 86400
+                debt - paymentTokenReceived
             );
         }
     }
 
     /**
-     * @notice purchase on sale earning token to pay debt
+     * @notice purchase on sale earning token to pay debt for token owner
      * @param tokenId token id to get statement
      * @param debtToPay Amount of debt to pay
      */
-    function purchaseEarningTokenOnSale(
+    function purchaseEarningTokenToPayDebt(
         uint tokenId,
         uint debtToPay
     ) external whenNotPaused {
         BillingStatement memory st = s.statements[tokenId];
         require(
             st.surplus > 0 && st.debt > 0,
-            'Mining3Agent: no debt to pay or no earning token for sale'
+            'Mining3Agent: no debt or earning'
         );
         if (debtToPay > st.debt) {
             debtToPay = st.debt;

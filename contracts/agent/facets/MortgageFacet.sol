@@ -138,10 +138,6 @@ contract MortgageFacet is
 
         for (uint i = 0; i < ids.length; i++) {
             BillingStatement memory st = s.statements[ids[i]];
-            require(
-                st.lockedUtil <= block.timestamp,
-                "DeMineAgent: earning not ready to withdraw yet"
-            );
             uint balance = s.balances[ids[i]][msg.sender];
             income += st.surplus * balance / st.balance;
             debt += st.debt * balance / st.balance;

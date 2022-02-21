@@ -9,7 +9,6 @@ struct BillingStatement {
     uint balance;  // Today's total locked (not liquidated) NFT for today
     uint surplus;  // Today's surplus (mined target tokens - the part to payoff unpaid cost) in incomeToken
     uint debt;  // The debt in paymentToken if today's mined target tokens cannot pay off cost
-    uint lockedUtil;
 }
 
 struct AppStorage {
