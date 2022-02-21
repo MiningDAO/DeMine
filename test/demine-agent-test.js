@@ -3,50 +3,31 @@ const { ethers } = require("hardhat");
 const utils = require("./demine-test-utils.js");
 
 describe("DeMine Agent", function () {
-    const OwnableError = "Ownable: caller is not the owner";
-    const address0 = ethers.utils.getAddress(
-        "0x0000000000000000000000000000000000000000"
-    );
-    var signers;
-    var contracts;
-
-    let checkIncomeInfo = async function(user, payments, expected) {
-        let balances = await agent.incomeInfo(
-            user.address, payments
-        );
-        utils.compareArray(balances, expected);
-    }
-
-    let checkAllowances = async function(
-        to, ids, expectedAmounts
-    ) {
-        let amounts = await agent.allowances(to, ids);
-        utils.compareArray(amounts, expectedAmounts);
-    };
-
-    let mint = async function(user1, user2) {
-        const { admin } = signers;
-        const { nft } = contracts;
-        let numCycles = 120;
-        let supplies = Array(numCycles).fill(100);
-        await nft.connect(admin).newPool(
-            10, numCycles, supplies, 1000, 2000, user1.address
-        ); // pool 1
-        await nft.connect(admin).newPool(
-            10, numCycles, supplies, 1000, 2000, user2.address
-        ); // pool 2
-        return supplies;
-    };
-
-    before(async function() {
-        signers = await utils.signers();
-    });
+    const miningCoin = 'btc';
+    const paymentCoin = 'usd';
+    const tokenCost = '100';
+    var mortgageAgentAddr, deployer, admin;
 
     beforeEach(async function() {
-        contracts = await utils.setupDeMine(signers);
+        const signers = await hre.ethers.getNamedSigners();
+        deployer = signers.deployer;
+        admin = signers.admin;
+        await hre.deployments.fixture(['NFT', 'Agent']);
+        mortgageAgentAddr = await hre.run('agent-clone', {
+            miningCoin,
+            paymentCoin,
+            cost: tokenCost
+        });
     });
 
-    it("Pausable", async function () {
+    it("Initializable", async function () {
+        const mortgageAgent = await hre.ethers.getContractAt('MortgageFacet', mortgageAgentAddr);
+        gotTokenCost = await mortgageAgent.getTokenCost();
+        expect(gotTokenCost).to.equal(tokenCost);
+    });
+
+
+        /*
         let { agent, payments: [p1, p2, _] } = contracts;
         let { admin, users: [user1, user2, _user3] } = signers;
 
@@ -598,4 +579,5 @@ describe("DeMine Agent", function () {
             agent.connect(admin).cashout(ids, amounts)
         ).to.be.revertedWith("ERC1155: burn amount exceeds balance");
     });
+    */
 });

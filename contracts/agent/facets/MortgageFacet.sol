@@ -171,4 +171,8 @@ contract MortgageFacet is
     function daysInToken(uint256 tokenId) private pure returns(uint) {
         return (tokenIdToEnd(tokenId) - tokenIdToStart(tokenId)) / 86400;
     }
+
+    function getTokenCost() external view returns(uint) {
+        return s.tokenCost;
+    }
 }

@@ -1,20 +1,28 @@
 const assert = require("assert");
 const { types } = require("hardhat/config");
-const logger = require('../lib/logger.js');
 const config = require("../lib/config.js");
+const logger = require('../lib/logger.js');
+const common = require("../lib/common.js");
+const state = require("../lib/state.js");
 const diamond = require("../lib/diamond.js");
 
 task('agent-clone', 'Deploy clone of demine agent')
     .addParam('miningCoin', 'coin that NFT the agent is mining for')
-    .addParam('paymentTokenAddr', 'contract address of token for paying mining cost')
+    .addParam('paymentCoin', 'coin used for paying mining cost')
     .addParam('cost', 'Cost per NFT token in paymentToken')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
+        let costNum = parseInt(args.cost);
+        if (isNaN(costNum)) {
+            logger.warn("Invalid cost, which should be number.");
+            return ethers.utils.getAddress( "0x0000000000000000000000000000000000000000");
+        }
         logger.info("=========== MortgageFacet-clone start ===========");
-        config.validatePaymentCoin(args.coin);
+        config.validateCoin(args.miningCoin);
+        config.validatePaymentCoin(args.paymentCoin);
 
         const base = await config.getDeployment(hre, 'Diamond');
         const mortgageFacet = await config.getDeployment(hre, 'MortgageFacet');
-        const contracts = state.tryLoadContracts(hre, args.coin);
+        const contracts = state.tryLoadContracts(hre, args.miningCoin);
         if (
             contracts.mortgage &&
             contracts.mortgage.target &&
@@ -27,9 +35,13 @@ task('agent-clone', 'Deploy clone of demine agent')
         }
         const nftAddr = (contracts.nft && contracts.nft.target)
             || await hre.run('nft-clone', { coin: args.miningCoin });
-        const nftToken = await ethers.getContractAt(
-            '@solidstate/contracts/token/ERC1155/IERC1155.sol:IERC1155',
-            nftAddr
+        const nftToken = await ethers.getContractAt('ERC1155Facet', nftAddr);
+
+        const paymentTokenAddr = (contracts.payment && contracts.payment.target)
+            || await hre.run('wrapped-clone', { coin: args.paymentCoin });
+        const paymentToken = await ethers.getContractAt(
+            '@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol:IERC20Metadata',
+            paymentTokenAddr
         );
 
         const admin = await config.admin(hre);
@@ -44,8 +56,9 @@ task('agent-clone', 'Deploy clone of demine agent')
                 ['@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol:IERC1155Receiver']
             ),
             mortgageFacet.address,
-            iface.encodeFunctionData('init', [nftAddr, paymentTokenAddr, nftToken.custodian(), cost, [], []])
+            iface.encodeFunctionData('init', [nftAddr, paymentToken.address, nftToken.custodian(), costNum, [], []])
         ];
+
         logger.info('Cloning DeMine MortgageFacet: ' + JSON.stringify({
             network: network.name,
             source: base.address,
@@ -55,7 +68,7 @@ task('agent-clone', 'Deploy clone of demine agent')
                 nft: nftAddr,
                 custodian: nftToken.custodian(),
                 paymentToken: paymentTokenAddr,
-                tokenCost: cost,
+                tokenCost: costNum,
                 pricingStrategies: [],
                 allowanceStrategies: []
             }
@@ -66,7 +79,7 @@ task('agent-clone', 'Deploy clone of demine agent')
         logger.info('Cloned contract DeMine MortgageFacet at ' + cloned);
         logger.info('Writing contract info to state file');
         state.updateContract(
-            hre, args.coin, {
+            hre, args.miningCoin, {
                 'mortgageFacet': {
                     source: base.address,
                     target: cloned,
