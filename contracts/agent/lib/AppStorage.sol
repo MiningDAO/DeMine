@@ -18,6 +18,9 @@ struct AppStorage {
     address incomeToken; // The target token to be mined (e.g. BTC)
     address paymentToken; // The type of token to pay off cost (e.g. USDT)
     address custodian; // payee account address, could be contract
+    uint16 royaltyBps;  // royalty bps, 10000 based
+    uint royaltyCap;  // max royalty value to accept
+
     mapping(uint => mapping(address => uint)) balances;  // owner => buyer => allowance
 
     // billing related

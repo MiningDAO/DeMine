@@ -14,7 +14,7 @@ library AllowanceRangeOneTimeStorage {
     }
 
     bytes32 internal constant STORAGE_SLOT =
-        keccak256('mining3.agent.contracts.storage.AllowanceRange');
+        keccak256('mining3.agent.contracts.storage.AllowanceRangeOneTime');
 
     function layout() internal pure returns(Layout storage l) {
         bytes32 slot = STORAGE_SLOT;

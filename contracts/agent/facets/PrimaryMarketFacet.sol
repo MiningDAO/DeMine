@@ -32,7 +32,7 @@ contract PrimaryMarketFacet is
     struct ClaimState {
         uint tokenCost;
         uint totalCost;
-        uint totalPay;
+        uint totalEarned;
     }
 
     function registerStrategy(
@@ -40,6 +40,14 @@ contract PrimaryMarketFacet is
         uint8 strategyType
     ) external onlyOwner {
         s.strategyRegistry[strategy] = strategyType;
+    }
+
+    function setRoyaltyInfo(
+        uint16 royaltyBps,
+        uint royaltyCap
+    ) external onlyOwner {
+        s.royaltyBps = royaltyBps;
+        s.royaltyCap = royaltyCap;
     }
 
     function registeredStrategyType(
@@ -128,14 +136,21 @@ contract PrimaryMarketFacet is
                 s.balances[ids[i]][from] = balance - amounts[i];
             }
             cs.totalCost += cs.tokenCost * amounts[i];
-            cs.totalPay += prices[i] * amounts[i];
+            cs.totalEarned += (prices[i] - cs.tokenCost) * amounts[i];
         }
         IERC20 payment = IERC20(s.paymentToken);
-        payment.safeTransferFrom(msg.sender, s.custodian, cs.totalCost);
-        payment.safeTransferFrom(msg.sender, from, cs.totalPay - cs.totalCost);
+        uint royalty = royaltyInfo(cs.totalEarned);
+        payment.safeTransferFrom(msg.sender, s.custodian, cs.totalCost + royalty);
+        payment.safeTransferFrom(msg.sender, from, cs.totalEarned - royalty);
         s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
         emit Claim(msg.sender, from, to);
         return amounts;
+    }
+
+    function royaltyInfo(uint totalEarned) public view returns(uint) {
+        uint royalty = (totalEarned * s.royaltyBps) / 10000;
+        uint royaltyCap = s.royaltyCap;
+        return royaltyCap > 0 && royalty > royaltyCap ? royaltyCap : royalty;
     }
 
     function priceOfBatch(
