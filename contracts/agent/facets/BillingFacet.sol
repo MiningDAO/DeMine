@@ -90,7 +90,6 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             s.chainlink,
             IERC20Metadata(address(earningToken)),
             IERC20Metadata(address(paymentToken)),
-            s.earningTokenSaleDiscount10000Based,
             debtToPay
         );
         // no enough surplus token to pay
@@ -108,16 +107,23 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         IERC20(earningToken).safeTransfer(msg.sender, sold);
     }
 
+    function discountInfo(uint value) public view returns(uint) {
+        return value * s.earningTokenSaleDiscount10000Based / 10000;
+    }
+
+    function setDiscountInfo(uint16 discount) external onlyOwner {
+        s.earningTokenSaleDiscount10000Based = discount > 10000 ? 10000 : discount;
+    }
+
     function swapTokens(
         AggregatorV3Interface chainlink,
         IERC20Metadata earningToken,
         IERC20Metadata paymentToken,
-        uint discount,
         uint amountIn // payment token
     ) private view returns(uint) {
         (,int price, , ,) = chainlink.latestRoundData();
         if (price <= 0) { return 0; }
-        uint discountedPrice = uint(price) * discount / 10000;
+        uint discountedPrice = discountInfo(uint(price));
 
         uint8 amountOutDecimals = earningToken.decimals();
         uint8 amountInDecimals = paymentToken.decimals();

@@ -32,18 +32,18 @@ contract MortgageFacet is
     using SafeERC20 for IERC20;
 
     function init(
-        address nft,
-        address paymentToken,
-        address custodian,
-        uint tokenCost,
+        address nftAddr,
+        address paymentTokenAddr,
+        address custodianAddr,
+        uint costPerToken,
         address[] calldata pricingStrategies,
         address[] calldata allowanceStrategies
     ) external onlyInitializing {
-        IERC1155Rewardable nftContract = IERC1155Rewardable(nft);
+        IERC1155Rewardable nftContract = IERC1155Rewardable(nftAddr);
         s.nft = nftContract;
-        s.paymentToken = paymentToken;
-        s.custodian = custodian;
-        s.tokenCost = tokenCost;
+        s.paymentToken = paymentTokenAddr;
+        s.custodian = custodianAddr;
+        s.tokenCost = costPerToken;
         for (uint i = 0; i < pricingStrategies.length; i++) {
             s.strategyRegistry[pricingStrategies[i]] = 1;
         }
@@ -65,11 +65,11 @@ contract MortgageFacet is
             ids.length == amounts.length,
             "DeMineAgent: array length mismatch"
         );
-        uint tokenCost = s.tokenCost;
+        uint costPerToken = s.tokenCost;
 
         uint totalCost;
         for (uint i = 0; i < ids.length; i++) {
-            totalCost += tokenCost * amounts[i] * daysInToken(ids[i]);
+            totalCost += costPerToken * amounts[i] * daysInToken(ids[i]);
             uint balance = s.balances[ids[i]][msg.sender];
             require(balance > 0 && balance > amounts[i], 'DeMineAgent: no sufficient balance');
             s.balances[ids[i]][msg.sender] = balance - amounts[i];
@@ -99,6 +99,22 @@ contract MortgageFacet is
             res[i] = s.statements[tokenIds[i]];
         }
         return res;
+    }
+
+    function nft() external view returns(address) {
+        return address(s.nft);
+    }
+
+    function custodian() external view returns(address) {
+        return s.custodian;
+    }
+
+    function paymentToken() external view returns(address) {
+        return s.paymentToken;
+    }
+
+    function tokenCost() external view returns(uint) {
+        return s.tokenCost;
     }
 
     function onERC1155Received(
