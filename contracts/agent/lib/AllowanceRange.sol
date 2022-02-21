@@ -3,10 +3,10 @@
 pragma solidity 0.8.11;
 pragma experimental ABIEncoderV2;
 
-import '../interfaces/IAllowance.sol';
+import '../interfaces/IAllowanceStrategy.sol';
 import './AllowanceRangeStorage.sol';
 
-contract AllowanceRange is IAllowance {
+contract AllowanceRange is IAllowanceStrategy {
     function set(
         address owner,
         address buyer,

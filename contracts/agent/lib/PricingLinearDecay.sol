@@ -4,11 +4,11 @@ pragma solidity 0.8.11;
 pragma experimental ABIEncoderV2;
 
 import '../../shared/lib/Util.sol';
-import '../interfaces/IPricing.sol';
+import '../interfaces/IPricingStrategy.sol';
 import './AppStorage.sol';
 import './PricingLinearDecayStorage.sol';
 
-contract PricingLinearDecay is IPricing {
+contract PricingLinearDecay is IPricingStrategy {
     function set(
         address owner,
         uint tokenCost,

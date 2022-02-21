@@ -45,10 +45,10 @@ contract MortgageFacet is
         s.custodian = custodian;
         s.tokenCost = tokenCost;
         for (uint i = 0; i < pricingStrategies.length; i++) {
-            s.supportedPricingStrategies[pricingStrategies[i]] = true;
+            s.strategyRegistry[pricingStrategies[i]] = 1;
         }
         for (uint i = 0; i < allowanceStrategies.length; i++) {
-            s.supportedAllowanceStrategies[allowanceStrategies[i]] = true;
+            s.strategyRegistry[allowanceStrategies[i]] = 2;
         }
     }
 

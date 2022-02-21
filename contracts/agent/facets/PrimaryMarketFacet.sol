@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import '../../shared/lib/LibPausable.sol';
 import '../lib/AppStorage.sol';
-import '../interfaces/IPricing.sol';
-import '../interfaces/IAllowance.sol';
+import '../interfaces/IPricingStrategy.sol';
+import '../interfaces/IAllowanceStrategy.sol';
 
 /**
  * @title PrimaryMarketFacet
@@ -32,46 +32,34 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
         uint totalPay;
     }
 
-    function setPricingStrategyImpl(
-        address impl,
-        bool valid
+    function registerStrategy(
+        address strategy,
+        uint8 strategyType
     ) external onlyOwner {
-        s.supportedPricingStrategies[impl] = valid;
+        s.strategyRegistry[strategy] = strategyType;
     }
 
-    function isSupportedPricingStrategy(
-        address impl
-    ) external view returns(bool) {
-        return s.supportedPricingStrategies[impl];
+    function registeredStrategyType(
+        address strategy
+    ) external view returns(uint8) {
+        return s.strategyRegistry[strategy];
     }
 
-    function setAllowanceStrategyImpl(
-        address impl,
-        bool valid
-    ) external onlyOwner {
-        s.supportedAllowanceStrategies[impl] = valid;
-    }
-
-    function isSupportedAllowanceStrategy(
-        address impl
-    ) external view returns(bool) {
-        return s.supportedAllowanceStrategies[impl];
-    }
-
-    function setPricingStrategy(address impl) external {
+    function setStrategy(address strategy) external {
+        uint8 strategyType = s.strategyRegistry[strategy];
         require(
-            s.supportedPricingStrategies[impl],
-            'Mining3Agent: not supported pricing'
+            strategyType > 0,
+            'Mining3Agent: strategy not registered'
         );
-        s.pricingStategy[msg.sender] = impl;
+        s.strategies[msg.sender][strategyType] = strategy;
     }
 
-    function getPricingStrategy() external view returns(address) {
-        return s.pricingStategy[msg.sender];
+    function getStrategy(uint8 strategyType) external view returns(address) {
+        return s.strategies[msg.sender][strategyType];
     }
 
     function setPricing(bytes memory args) external {
-        address pricing = s.pricingStategy[msg.sender];
+        address pricing = s.strategies[msg.sender][1];
         require(
             pricing != address(0),
             'Mining3Agent: pricing strategy not set'
@@ -81,7 +69,7 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
             bytes memory result
         ) = pricing.delegatecall(
             abi.encodeWithSelector(
-                IPricing.set.selector,
+                IPricingStrategy.set.selector,
                 msg.sender,
                 s.tokenCost,
                 args
@@ -90,20 +78,8 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
         require(success, string(result));
     }
 
-    function setAllowanceStrategy(address impl) external {
-        require(
-            s.supportedAllowanceStrategies[impl],
-            'Mining3Agent: not supported allowance strategy'
-        );
-        s.allowanceStrategy[msg.sender] = impl;
-    }
-
-    function getAllowanceStrategy() external view returns(address) {
-        return s.allowanceStrategy[msg.sender];
-    }
-
     function setAllowance(address buyer, bytes memory args) external {
-        address allowance = s.pricingStategy[msg.sender];
+        address allowance = s.strategies[msg.sender][2];
         require(
             allowance != address(0),
             'Mining3Agent: allowance strategy not set'
@@ -113,7 +89,7 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
             bytes memory result
         ) = allowance.delegatecall(
             abi.encodeWithSelector(
-                IAllowance.set.selector,
+                IAllowanceStrategy.set.selector,
                 msg.sender,
                 buyer,
                 args
@@ -166,14 +142,14 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
         address account,
         uint[] calldata ids
     ) public view returns(uint[] memory prices) {
-        address pricing = s.pricingStategy[account];
+        address pricing = s.strategies[account][1];
         require(pricing != address(0), 'Mining3Agent: pricing not set');
         (
             bool success,
             bytes memory result
         ) = pricing.staticcall(
             abi.encodeWithSelector(
-                IPricing.priceOfBatch.selector,
+                IPricingStrategy.priceOfBatch.selector,
                 msg.sender,
                 ids
             )
@@ -187,14 +163,14 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
         address buyer,
         uint[] calldata ids
     ) public view returns(uint[] memory allowances) {
-        address allowance = s.allowanceStrategy[owner];
+        address allowance = s.strategies[account][2];
         require(allowance != address(0), 'Mining3Agent: pricing not set');
         (
             bool success,
             bytes memory result
         ) = allowance.staticcall(
             abi.encodeWithSelector(
-                IAllowance.allowanceOfBatch.selector,
+                IAllowanceStrategy.allowanceOfBatch.selector,
                 owner,
                 buyer,
                 ids
