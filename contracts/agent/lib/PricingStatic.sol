@@ -4,10 +4,10 @@ pragma solidity 0.8.11;
 pragma experimental ABIEncoderV2;
 
 import '../../shared/lib/Util.sol';
-import '../interfaces/IPricing.sol';
+import '../interfaces/IPricingStrategy.sol';
 import './PricingStaticStorage.sol';
 
-contract PricingStatic is IPricing {
+contract PricingStatic is IPricingStrategy {
     function set(
         address owner,
         uint tokenCost,

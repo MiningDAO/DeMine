@@ -18,6 +18,9 @@ struct AppStorage {
     address incomeToken; // The target token to be mined (e.g. BTC)
     address paymentToken; // The type of token to pay off cost (e.g. USDT)
     address custodian; // payee account address, could be contract
+    uint16 royaltyBps;  // royalty bps, 10000 based
+    uint royaltyCap;  // max royalty value to accept
+
     mapping(uint => mapping(address => uint)) balances;  // owner => buyer => allowance
 
     // billing related
@@ -28,11 +31,9 @@ struct AppStorage {
     mapping(uint => uint) lockedUntil; // earning token sale
 
     // primary market sale related
-    mapping(address => bool) supportedPricingStrategies;
-    mapping(address => address) pricingStategy;
-
-    mapping(address => bool) supportedAllowanceStrategies;
-    mapping(address => address) allowanceStrategy;
+    // 0: unregistered, 1: pricing strategy, 2: allowance strategy
+    mapping(address => uint8) strategyRegistry;
+    mapping(address => mapping(uint8 => address)) strategies;
 }
 
 abstract contract StorageBase {
