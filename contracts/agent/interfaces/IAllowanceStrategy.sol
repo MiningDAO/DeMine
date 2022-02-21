@@ -9,6 +9,13 @@ interface IAllowanceStrategy {
         bytes memory args
     ) external;
 
+    function checkAllowances(
+        address owner,
+        address buyer,
+        uint[] memory ids,
+        uint[] memory amounts
+    ) external;
+
     function allowanceOfBatch(
         address owner,
         address buyer,

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.11;
 
-library AllowanceFixedStorage {
+library AllowanceFixedOneTimeStorage {
     struct Layout {
         mapping(address => mapping(address => uint)) allowances;
     }

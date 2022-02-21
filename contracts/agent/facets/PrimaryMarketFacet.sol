@@ -16,14 +16,17 @@ import '../interfaces/IAllowanceStrategy.sol';
  * @author Shu Dong
  * @notice Facet contract holding functions for primary market sale
  */
-contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
+contract PrimaryMarketFacet is
+    PausableModifier,
+    OwnableInternal,
+    StorageBase
+{
     using SafeERC20 for IERC20;
 
-    event SetAllowance(
-        address indexed,
-        address indexed,
-        uint[],
-        uint[]
+    event Claim(
+        address indexed operator,
+        address indexed from,
+        address indexed to
     );
 
     struct ClaimState {
@@ -112,14 +115,10 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
             ids.length == amounts.length,
             "TokenLocker: array length mismatch"
         );
+        checkAllowances(from, to, ids, amounts);
         uint[] memory prices = priceOfBatch(from, ids);
-        uint[] memory allowances = allowanceOfBatch(from, to, ids);
         ClaimState memory cs = ClaimState(s.tokenCost, 0, 0);
         for (uint i = 0; i < ids.length; i++) {
-            require(
-                amounts[i] <= allowances[i],
-                'Mining3Agent: insufficinet allowance'
-            );
             uint balance = s.balances[ids[i]][from];
             require(
                 amounts[i] <= balance,
@@ -135,6 +134,7 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
         payment.safeTransferFrom(msg.sender, s.custodian, cs.totalCost);
         payment.safeTransferFrom(msg.sender, from, cs.totalPay - cs.totalCost);
         s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
+        emit Claim(msg.sender, from, to);
         return amounts;
     }
 
@@ -162,9 +162,12 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
         address owner,
         address buyer,
         uint[] calldata ids
-    ) public view returns(uint[] memory allowances) {
-        address allowance = s.strategies[account][2];
-        require(allowance != address(0), 'Mining3Agent: pricing not set');
+    ) external view returns(uint[] memory allowances) {
+        address allowance = s.strategies[owner][2];
+        require(
+            allowance != address(0),
+            'Mining3Agent: allowance strategy not set'
+        );
         (
             bool success,
             bytes memory result
@@ -178,5 +181,31 @@ contract PrimaryMarketFacet is PausableModifier, OwnableInternal, StorageBase {
         );
         require(success, string(result));
         allowances = abi.decode(result, (uint[]));
+    }
+
+    function checkAllowances(
+        address owner,
+        address buyer,
+        uint[] calldata ids,
+        uint[] calldata amounts
+    ) private {
+        address allowance = s.strategies[owner][2];
+        require(
+            allowance != address(0),
+            'Mining3Agent: allowance strategy not set'
+        );
+        (
+            bool success,
+            bytes memory result
+        ) = allowance.delegatecall(
+            abi.encodeWithSelector(
+                IAllowanceStrategy.checkAllowances.selector,
+                owner,
+                buyer,
+                ids,
+                amounts
+            )
+        );
+        require(success, string(result));
     }
 }
