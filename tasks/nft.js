@@ -118,15 +118,16 @@ task('nft-inspect-token', 'check earning for token starting with date specified'
         const finalized = (await erc1155Facet.finalized()).toNumber();
         const earning = await erc1155Facet.earning(id);
         const supply = await erc1155Facet.supplyOf(id);
-        logger.info(JSON.stringify({
+        const info = {
             token: id.toHexString(),
             contract: nft,
-            earning: result.toString(),
+            earning: earning.toString(),
             supply: supply.toString(),
             lastestFinalized: finalized
-        }, null, 2));
+        };
+        logger.info(JSON.stringify(info, null, 2));
         logger.info("=========== nft-token end ===========");
-        return result;
+        return info;
     });
 
 task('nft-balance', 'check DeMineNFT balance for user')

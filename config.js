@@ -7,6 +7,8 @@ const config = {
     tokenUriPrefix: 'https://mining3.io/api/v1/token',
     royaltyBps: 100,
     earningTokenSaleDiscount10000Based: 9000,
+    primaryMarketSaleRoyaltyBps: 100, // 100 out of 10000
+    primaryMarketSaleRoyaltyCap: 100, // 100 USD
     accounts: [
         process.env.DEPLOYER,
         process.env.ADMIN,

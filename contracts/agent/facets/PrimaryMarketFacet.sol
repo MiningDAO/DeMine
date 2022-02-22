@@ -35,10 +35,13 @@ contract PrimaryMarketFacet is
         uint totalEarned;
     }
 
-    function batchRegisterStrategies(
+    function init(
+        uint16 royaltyBps,
+        uint royaltyCap,
         address[] calldata pricingStrategies,
         address[] calldata allowanceStrategies
     ) external onlyOwner {
+        setRoyaltyInfo(royaltyBps, royaltyCap);
         for (uint i = 0; i < pricingStrategies.length; i++) {
             s.strategyRegistry[pricingStrategies[i]] = 1;
         }
@@ -50,7 +53,8 @@ contract PrimaryMarketFacet is
     function setRoyaltyInfo(
         uint16 royaltyBps,
         uint royaltyCap
-    ) external onlyOwner {
+    ) public onlyOwner {
+        require(s.royaltyBps <= 10000, 'Mining3Agent: Invalid royalty bps');
         s.royaltyBps = royaltyBps;
         s.royaltyCap = royaltyCap;
     }

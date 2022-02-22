@@ -6,7 +6,52 @@ const logger = require('../lib/logger.js');
 const common = require("../lib/common.js");
 const state = require("../lib/state.js");
 const diamond = require("../lib/diamond.js");
-const ethers = require("ethers");
+
+async function getPaymentToken(ethers, agent) {
+    const mortgageFacet = await ethers.getContractAt('MortgageFacet', agent);
+    return await ethers.getContractAt(
+        '@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol:IERC20Metadata',
+        await mortgageFacet.paymentToken()
+    );
+}
+
+function agentKey(cost) {
+    return 'agent+' + cost;
+}
+
+async function genPrimaryMarketFacetCut(hre) {
+    return await diamond.genFacetCut(hre, 'PrimaryMarketFacet', [
+        [
+            'PrimaryMarketFacet',
+            [
+                'setRoyaltyInfo',
+                'royaltyInfo',
+                'registerStrategy',
+                'registeredStrategyType',
+                'setStrategy',
+                'getStrategy',
+                'setAllowance',
+                'claimFrom',
+                'priceOfBatch',
+                'allowanceOfBatch',
+            ]
+        ]
+    ]);
+}
+
+async function genBillingFacetCut(hre) {
+    return await diamond.genFacetCut(hre, 'BillingFacet', [
+        [
+            'BillingFacet',
+            [
+                'tryBilling',
+                'purchaseEarningTokenToPayDebt',
+                'discountInfo',
+                'setDiscountInfo',
+            ]
+        ]
+    ]);
+}
 
 task('agent-add-pm', 'Add primary market sale facet')
     .addParam('coin', 'coin that NFT the agent is mining for')
@@ -27,12 +72,20 @@ task('agent-add-pm', 'Add primary market sale facet')
             AllowanceFixedOneTime: allowanceFixedOneTime.address,
             AllowanceRangeOneTime: allowanceRangeOneTime.address,
         }
+
+        const paymentToken = await getPaymentToken(ethers, args.agent);
+        const decimals = await paymentToken.decimals();
+        const royaltyCap = ethers.BigNumber.from(10).pow(decimals).mul(
+            localConfig.primaryMarketSaleRoyaltyCap
+        );
         const iface = new hre.ethers.utils.Interface([
-            'function batchRegisterStrategies(address[], address[])'
+            'function init(uint16, uint, address[], address[])'
         ]);
         const calldata = iface.encodeFunctionData(
-            'batchRegisterStrategies',
+            'init',
             [
+                localConfig.primaryMarketSaleRoyaltyBps,
+                royaltyCap,
                 Object.values(pricingStrategies),
                 Object.values(allowanceStrategies)
             ]
@@ -40,6 +93,9 @@ task('agent-add-pm', 'Add primary market sale facet')
         const primaryMarketFacet = await deployments.get('PrimaryMarketFacet');
         const facetCut = await genPrimaryMarketFacetCut(hre);
         logger.info('Adding PrimaryMarketFacet: ' + JSON.stringify({
+            royaltyBps: localConfig.primaryMarketSaleRoyaltyBps,
+            royaltyCap: royaltyCap.toString(),
+            royaltyCapDecimal: localConfig.primaryMarketSaleRoyaltyCap,
             primaryMarketFacet: primaryMarketFacet.address,
             facetCut: facetCut,
             pricingStrategies: pricingStrategies,
@@ -122,7 +178,7 @@ task('agent-clone', 'Deploy clone of demine agent')
         logger.info("=========== MortgageFacet-clone start ===========");
         config.validateCoin(args.coin);
 
-        const key = 'agent+' + args.cost;
+        const key = agentKey(args.cost);
         const base = await config.getDeployment(hre, 'Diamond');
         const mortgageFacet = await config.getDeployment(hre, 'MortgageFacet');
         const contracts = state.tryLoadContracts(hre, args.coin);
@@ -168,7 +224,7 @@ task('agent-clone', 'Deploy clone of demine agent')
                 'init',
                 [
                     nftAddr,
-                    paymentTokenAddr,
+                    paymentToken.address,
                     admin.address,
                     ethers.BigNumber.from(normalizedCost.toFixed()),
                 ]
@@ -185,7 +241,7 @@ task('agent-clone', 'Deploy clone of demine agent')
                     name: await paymentToken.name(),
                     symbol: await paymentToken.symbol(),
                     decimals: decimals,
-                    address: paymentTokenAddr,
+                    address: paymentToken.address,
                 },
                 custodian: admin.address,
                 tokenCost: normalizedCost.toFixed(),
@@ -212,36 +268,68 @@ task('agent-clone', 'Deploy clone of demine agent')
         return cloned;
     });
 
-async function genPrimaryMarketFacetCut(hre) {
-    return await diamond.genFacetCut(hre, 'PrimaryMarketFacet', [
-        [
-            'PrimaryMarketFacet',
-            [
-                'setRoyaltyInfo',
-                'royaltyInfo',
-                'registerStrategy',
-                'registeredStrategyType',
-                'setStrategy',
-                'getStrategy',
-                'setAllowance',
-                'claimFrom',
-                'priceOfBatch',
-                'allowanceOfBatch',
-            ]
-        ]
-    ]);
-}
+task('agent-inspect', 'Inspect agent contract')
+    .addParam('coin', 'coin that NFT the agent is mining for')
+    .addParam('cost', 'Cost per NFT token in usd')
+    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
+        logger.info("=========== nft-inspect-nft start ===========");
+        const contracts = state.tryLoadContracts(hre, args.coin);
+        const key = agentKey(args.cost);
+        if (contracts[key] === undefined || contracts[key].target === undefined) {
+            logger.error('Contract not found');
+            logger.info("=========== nft-inspect-nft end ===========");
+            return;
+        }
+        const agent = contracts[key].target;
+        const diamond = await ethers.getContractAt('Diamond', agent);
+        const mortgageFacet = await ethers.getContractAt('MortgageFacet', agent);
+        const paymentToken = await getPaymentToken(ethers, agent);
+        const decimals = await paymentToken.decimals();
+        var tokenCost = await mortgageFacet.tokenCost();
+        tokenCost = new BN(tokenCost.toString());
+        tokenCostDecimal = tokenCost.div(new BN(10).pow(decimals));
 
-async function genBillingFacetCut(hre) {
-    return await diamond.genFacetCut(hre, 'BillingFacet', [
-        [
-            'BillingFacet',
-            [
-                'tryBilling',
-                'purchaseEarningTokenToPayDebt',
-                'discountInfo',
-                'setDiscountInfo',
-            ]
-        ]
-    ]);
-}
+        const primaryMarketFacet = await ethers.getContractAt('PrimaryMarketFacet', agent);
+        const pricingStatic = await deployments.get('PricingStatic');
+        const pricingLinearDecay = await deployments.get('PricingLinearDecay');
+        const allowanceFixedOneTime = await deployments.get('AllowanceFixedOneTime');
+        const allowanceRangeOneTime = await deployments.get('AllowanceRangeOneTime');
+        const pricingStaticType =
+            await primaryMarketFacet.registeredStrategyType(pricingStatic.address);
+        const pricingLinearDecayType =
+            await primaryMarketFacet.registeredStrategyType(pricingLinearDecay.address);
+        const allowanceFixedOneTimeType =
+            await primaryMarketFacet.registeredStrategyType(allowanceFixedOneTime.address);
+        const allowanceRangeOneTimeType =
+            await primaryMarketFacet.registeredStrategyType(allowanceRangeOneTime.address);
+        const royaltyBps = await primaryMarketFacet.royaltyInfo(10000);
+
+        const billingFacet = await ethers.getContractAt('BillingFacet', agent);
+        const discount10000Based = await billingFacet.discountInfo(10000);
+
+        const info = {
+            nft: await mortgageFacet.nft(),
+            custodian: await mortgageFacet.custodian(),
+            tokenCost: tokenCost.toFixed(),
+            tokenCostDecimal: tokenCostDecimal.toFixed(),
+            royaltyInfo: {
+                bps: royaltyBps,
+            },
+            strategiesSupported: {
+                pricingStatic: pricingStaticType == 1,
+                pricingLinearDecay: pricingLinearDecayType == 1,
+                allowanceFixedOneTimeType: allowanceFixedOneTimeType == 2,
+                allowanceRangeOneTime: allowanceRangeOneTimeType == 2,
+            },
+            paymentToken: {
+                address: paymentToken.address,
+                name: await paymentToken.name(),
+                symbol: await paymentToken.symbol(),
+                decimals: decimals,
+            },
+            discount10000Based: discount10000Based.toString(),
+        };
+        logger.info(JSON.stringify(info, null, 2));
+        logger.info("=========== nft-inspect-nft end ===========");
+        return info;
+    });
