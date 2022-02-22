@@ -8,6 +8,109 @@ const state = require("../lib/state.js");
 const diamond = require("../lib/diamond.js");
 const ethers = require("ethers");
 
+task('agent-add-pm', 'Add primary market sale facet')
+    .addParam('coin', 'coin that NFT the agent is mining for')
+    .addParam('agent', 'agent contract address')
+    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
+        config.validateCoin(args.coin);
+
+        const agent = await ethers.getContractAt('Diamond', args.agent);
+        const pricingStatic = await deployments.get('PricingStatic');
+        const pricingLinearDecay = await deployments.get('PricingLinearDecay');
+        const pricingStrategies = {
+            PricingStatic: pricingStatic.address,
+            PricingLinearDecay: pricingLinearDecay.address,
+        };
+        const allowanceFixedOneTime = await deployments.get('AllowanceFixedOneTime');
+        const allowanceRangeOneTime = await deployments.get('AllowanceRangeOneTime');
+        const allowanceStrategies = {
+            AllowanceFixedOneTime: allowanceFixedOneTime.address,
+            AllowanceRangeOneTime: allowanceRangeOneTime.address,
+        }
+        const iface = new hre.ethers.utils.Interface([
+            'function batchRegisterStrategies(address[], address[])'
+        ]);
+        const calldata = iface.encodeFunctionData(
+            'batchRegisterStrategies',
+            [
+                Object.values(pricingStrategies),
+                Object.values(allowanceStrategies)
+            ]
+        );
+        const primaryMarketFacet = await deployments.get('PrimaryMarketFacet');
+        const facetCut = await genPrimaryMarketFacetCut(hre);
+        logger.info('Adding PrimaryMarketFacet: ' + JSON.stringify({
+            primaryMarketFacet: primaryMarketFacet.address,
+            facetCut: facetCut,
+            pricingStrategies: pricingStrategies,
+            allowanceStrategies: allowanceStrategies,
+        }, null, 2));
+        const admin = await config.admin(hre);
+        await common.run(
+            hre,
+            admin,
+            agent,
+            'diamondCut',
+            [
+                ['facetCut[]', [facetCut]],
+                ['target', primaryMarketFacet.address],
+                ['calldata', ethers.utils.arrayify(calldata)],
+            ],
+            {}
+        );
+    });
+
+task('agent-add-billing', 'Add billing facet')
+    .addParam('coin', 'coin that NFT the agent is mining for')
+    .addParam('agent', 'agent contract address')
+    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
+        config.validateCoin(args.coin);
+
+        const agent = await ethers.getContractAt('Diamond', args.agent);
+        const chainlink = localConfig.chainlink[network.name][args.coin] ||
+            await config.getDeployement(hre, 'ChainlinkMock');
+        const swapRouterConfig = localConfig.swapRouter[network.name] || {};
+        const swapRouter = swapRouterConfig.address ||
+            await config.getDeployement(hre, 'SwapRouterV2Mock');
+        const swapRouterVersion =  swapRouterConfig.version || 2;
+        const earningTokenSaleDiscount10000Based = localConfig.earningTokenSaleDiscount10000Based;
+        const iface = new hre.ethers.utils.Interface([
+            'function setBillingMetadata(address, address, uint8, uint16)'
+        ]);
+        const calldata = iface.encodeFunctionData(
+            'setBillingMetadata',
+            [
+                chainlink,
+                swapRouter,
+                swapRouterVersion,
+                earningTokenSaleDiscount10000Based
+            ]
+        );
+        const billingFacet = await deployments.get('BillingFacet');
+        logger.info('Adding BillingFacet: ' + JSON.stringify({
+            billingFacet: billingFacet.address,
+            chainlink,
+            swapRouter,
+            swapRouterVersion,
+            earningTokenSaleDiscount10000Based,
+        }, null, 2));
+
+        const admin = await config.admin(hre);
+        await common.run(
+            hre,
+            admin,
+            agent,
+            'diamondCut',
+            [
+                ['facetCuts[]', [await genBillingFacetCut(hre)]],
+                ['target', billingFacet.address],
+                ['calldata', calldata],
+            ],
+            {}
+        );
+    });
+
+
 task('agent-clone', 'Deploy clone of demine agent')
     .addParam('coin', 'coin that NFT the agent is mining for')
     .addParam('cost', 'Cost per NFT token in usd')
@@ -51,7 +154,7 @@ task('agent-clone', 'Deploy clone of demine agent')
 
         const admin = await config.admin(hre);
         const iface = new hre.ethers.utils.Interface([
-            'function init(address, address, address, uint, address[], address[])'
+            'function init(address, address, address, uint)'
         ]);
 
         const initArgs = [
@@ -78,83 +181,21 @@ task('agent-clone', 'Deploy clone of demine agent')
             fallback: mortgageFacet.address,
             fallbackInitArgs: {
                 nft: nftAddr,
-                paymentToken: paymentTokenAddr,
+                paymentToken: {
+                    name: await paymentToken.name(),
+                    symbol: await paymentToken.symbol(),
+                    decimals: decimals,
+                    address: paymentTokenAddr,
+                },
                 custodian: admin.address,
                 tokenCost: normalizedCost.toFixed(),
                 tokenCostDecimal: args.cost,
-                pricingStrategies: pricingStrategies,
-                allowanceStrategies: allowanceStrategies,
             }
         }, null, 2));
         const {cloned, txReceipt} = await common.clone(
             hre, admin.signer, base, initArgs,
         );
         logger.info('Cloned contract DeMine MortgageFacet at ' + cloned);
-
-        const agent = await ethers.getContractAt('Diamond', cloned);
-        logger.info('Adding PrimaryMarketFacet');
-        const pricingStatic = await hre.deployments.get('PricingStatic');
-        const pricingLinearDecay = await hre.deployments.get('PricingLinearDecay');
-        const pricingStrategies = {
-            PricingStatic: pricingStatic.address,
-            PricingLinearDecay: pricingLinearDecay.address,
-        };
-        const allowanceFixedOneTime = await hre.deployments.get('AllowanceFixedOneTime');
-        const allowanceRangeOneTime = await hre.deployments.get('AllowanceRangeOneTime');
-        const allowanceStrategies = {
-            AllowanceFixedOneTime: allowanceFixedOneTime.address,
-            AllowanceRangeOneTime: allowanceRangeOneTime.address,
-        }
-        const ifacePM = new hre.ethers.utils.Interface([
-            'function batchRegisterStrategies(address[], address[])'
-        ]);
-        const calldata = ifacePM.encodeFunctionData(
-            'batchRegisterStrategies',
-            [
-                Object.values(pricingStrategies),
-                Object.values(allowanceStrategies)
-            ]
-        );
-        const primaryMarketFacet = await config.getDeployment('PrimaryMarketFacet');
-        await common.run(
-            hre,
-            admin,
-            agent,
-            'diamondCut',
-            [
-                [await genPrimaryMarketFacetCut(hre)],
-                primaryMarketFacet.address,
-                calldata
-            ],
-            {}
-        );
-
-        logger.info('Adding BillingFacet');
-        const ifaceBilling = new hre.ethers.utils.Interface([
-            'function setBillingMetadata(address, address, uint8, uint16)'
-        ]);
-
-        const chainlink = localConfig.chainlink[network.name][args.coin] ||
-            await config.getDeployement(hre, 'ChainlinkMock');
-        const swapRouter = localConfig.swapRouter[network.name] ||
-            await config.getDeployement(hre, 'SwapRouterV2Mock');
-        const billingCalldata = ifaceBilling.encodeFunctionData(
-            'setBillingMetadata',
-            [chainlink, swapRouter, 2, 10]
-        );
-        await common.run(
-            hre,
-            admin,
-            agent,
-            'diamondCut',
-            [
-                [await genBillingFacetCut(hre)],
-                billingFacet.address,
-                billingCalldata
-            ],
-            {}
-        );
-
         logger.info('Writing contract info to state file');
         state.updateContract(
             hre, args.coin, {
@@ -166,6 +207,8 @@ task('agent-clone', 'Deploy clone of demine agent')
                 }
             }
         );
+        await hre.run('agent-add-pm', {coin: args.coin, agent: cloned});
+        await hre.run('agent-add-billing', {coin: args.coin, agent: cloned});
         return cloned;
     });
 

@@ -6,6 +6,7 @@ const BigNumber = require('bignumber.js');
 const config = {
     tokenUriPrefix: 'https://mining3.io/api/v1/token',
     royaltyBps: 100,
+    earningTokenSaleDiscount10000Based: 9000,
     accounts: [
         process.env.DEPLOYER,
         process.env.ADMIN,
@@ -34,8 +35,14 @@ const config = {
         },
     },
     swapRouter: {
-        bsc: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
-        bscdev: '0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3',
+        bsc: {
+            address: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
+            version: 2,
+        },
+        bscdev: {
+            address: '0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3',
+            version: 2,
+        }
     },
     alchemy: {
         matic: process.env.ALCHEMY_MATIC,
