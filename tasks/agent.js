@@ -5,13 +5,19 @@ const logger = require('../lib/logger.js');
 const common = require("../lib/common.js");
 const state = require("../lib/state.js");
 const diamond = require("../lib/diamond.js");
+const ethers = require("ethers");
 const BN = require("bignumber.js");
 
 task('agent-clone', 'Deploy clone of demine agent')
     .addParam('miningCoin', 'coin that NFT the agent is mining for')
     .addParam('paymentCoin', 'coin used for paying mining cost')
+    .addParam('custodianAddr', 'the address of agent custodian')
     .addParam('cost', 'Cost per NFT token in paymentToken')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
+        if (!ethers.utils.isAddress(args.custodianAddr)) {
+            logger.warn("Invalid custodian address");
+            return ethers.utils.getAddress( "0x0000000000000000000000000000000000000000");
+        }
         let costNum = new BN.BigNumber(args.cost);
         if (isNaN(costNum)) {
             logger.warn("Invalid cost, which should be number.");
@@ -57,7 +63,7 @@ task('agent-clone', 'Deploy clone of demine agent')
                 ['MortgageFacet']
             ),
             mortgageFacet.address,
-            iface.encodeFunctionData('init', [nftAddr, paymentToken.address, await nftToken.custodian(), ethers.BigNumber.from(costNum.toFixed()), [], []])
+            iface.encodeFunctionData('init', [nftAddr, paymentToken.address, args.custodianAddr, ethers.BigNumber.from(costNum.toFixed()), [], []])
         ];
 
         logger.info('Cloning DeMine MortgageFacet: ' + JSON.stringify({
@@ -67,7 +73,7 @@ task('agent-clone', 'Deploy clone of demine agent')
             fallback: mortgageFacet.address,
             fallbackInitArgs: {
                 nft: nftAddr,
-                custodian: nftToken.custodian(),
+                custodian: args.custodianAddr,
                 paymentToken: paymentTokenAddr,
                 tokenCost: costNum.toFixed(),
                 pricingStrategies: [],

@@ -1,11 +1,13 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const utils = require("./demine-test-utils.js");
+const logger = require('../lib/logger.js');
 
 describe("DeMine Agent", function () {
     const miningCoin = 'btc';
     const paymentCoin = 'usd';
     const tokenCost = '100';
+    const testCustodianAddr = '0x8ba1f109551bD432803012645Ac136ddd64DBA72';
     var mortgageAgentAddr, deployer, admin;
 
     beforeEach(async function() {
@@ -16,6 +18,7 @@ describe("DeMine Agent", function () {
         mortgageAgentAddr = await hre.run('agent-clone', {
             miningCoin,
             paymentCoin,
+            custodianAddr: testCustodianAddr,
             cost: tokenCost
         });
     });
