@@ -84,7 +84,7 @@ module.exports = {
         admin: {
             default: 1
         },
-        gnosis: {
+        test: {
             default: 1
         }
     },

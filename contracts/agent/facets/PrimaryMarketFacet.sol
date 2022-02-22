@@ -35,19 +35,19 @@ contract PrimaryMarketFacet is
         uint totalEarned;
     }
 
-    function registerStrategy(
-        address strategy,
-        uint8 strategyType
-    ) external onlyOwner {
-        s.strategyRegistry[strategy] = strategyType;
-    }
-
     function setRoyaltyInfo(
         uint16 royaltyBps,
         uint royaltyCap
     ) external onlyOwner {
         s.royaltyBps = royaltyBps;
         s.royaltyCap = royaltyCap;
+    }
+
+    function registerStrategy(
+        address strategy,
+        uint8 strategyType
+    ) external onlyOwner {
+        s.strategyRegistry[strategy] = strategyType;
     }
 
     function registeredStrategyType(

@@ -15,7 +15,6 @@ struct AppStorage {
     uint tokenCost; // cost per nft in payment token
 
     IERC1155Rewardable nft; // DeMineNFT contract address
-    address incomeToken; // The target token to be mined (e.g. BTC)
     address paymentToken; // The type of token to pay off cost (e.g. USDT)
     address custodian; // payee account address, could be contract
     uint16 royaltyBps;  // royalty bps, 10000 based
@@ -28,7 +27,6 @@ struct AppStorage {
     AggregatorV3Interface chainlink;
     address swapRouter;
     uint16 earningTokenSaleDiscount10000Based; // 10000 based
-    mapping(uint => uint) lockedUntil; // earning token sale
 
     // primary market sale related
     // 0: unregistered, 1: pricing strategy, 2: allowance strategy
