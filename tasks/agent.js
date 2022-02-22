@@ -12,7 +12,7 @@ task('agent-clone', 'Deploy clone of demine agent')
     .addParam('paymentCoin', 'coin used for paying mining cost')
     .addParam('cost', 'Cost per NFT token in paymentToken')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        let costNum = BN.BigNumber(args.cost);
+        let costNum = new BN.BigNumber(args.cost);
         if (isNaN(costNum)) {
             logger.warn("Invalid cost, which should be number.");
             return ethers.utils.getAddress( "0x0000000000000000000000000000000000000000");
@@ -57,7 +57,7 @@ task('agent-clone', 'Deploy clone of demine agent')
                 ['MortgageFacet']
             ),
             mortgageFacet.address,
-            iface.encodeFunctionData('init', [nftAddr, paymentToken.address, nftToken.custodian(), costNum, [], []])
+            iface.encodeFunctionData('init', [nftAddr, paymentToken.address, await nftToken.custodian(), ethers.BigNumber.from(costNum.toFixed()), [], []])
         ];
 
         logger.info('Cloning DeMine MortgageFacet: ' + JSON.stringify({
@@ -69,7 +69,7 @@ task('agent-clone', 'Deploy clone of demine agent')
                 nft: nftAddr,
                 custodian: nftToken.custodian(),
                 paymentToken: paymentTokenAddr,
-                tokenCost: costNum,
+                tokenCost: costNum.toFixed(),
                 pricingStrategies: [],
                 allowanceStrategies: []
             }
@@ -89,6 +89,7 @@ task('agent-clone', 'Deploy clone of demine agent')
                 }
             }
         );
+        return cloned;
     });
 
 async function genMortgageFacetCut(hre) {
