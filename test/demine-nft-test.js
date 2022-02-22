@@ -26,17 +26,20 @@ function genTokenIds(startDate, endDate, type) {
 
 describe("DeMineNFT", function () {
     const coin = 'btc';
-    const {deployer, admin} = await hre.ethers.getNamedSigners();
     var nft, custodian, erc1155;
-
-    beforeAll(async function() {
-        await hre.deployments.fixture(['NFT']);
-    });
+    var deployer, admin;
 
     beforeEach(async function() {
+        const signers = await hre.ethers.getNamedSigners();
+        admin = signers.admin;
+        deployer = signers.deployer;
+        await hre.deployments.fixture(['NFT']);
         nft = await hre.run('nft-clone', {coin: coin});
         erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
-        custodian = await erc1155.custodian();
+        custodian = await ethers.getContractAt(
+            'ERC1155Custodian',
+            await erc1155.custodian()
+        );
         await hre.run('nft-admin-custody', {coin: coin, nft: nft});
     });
 

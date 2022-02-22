@@ -20,8 +20,8 @@ contract PricingLinearDecay is IPricingStrategy {
             args, (PricingLinearDecayStorage.LinearDecay)
         );
         require(
-            ld.minPrice >= tokenCost,
-            'PricingLinearDecay: min price smaller token cost'
+            ld.maxPrice >= ld.minPrice && ld.minPrice >= tokenCost,
+            'PricingLinearDecay: invalid max or min price'
         );
         l.linearDecay[owner] = ld;
     }
@@ -40,10 +40,12 @@ contract PricingLinearDecay is IPricingStrategy {
             if (middle < ld.anchor) {
                 prices[i] = ld.maxPrice;
             } else {
-                uint price = ld.maxPrice - (
-                    middle - ld.anchor
-                ) * ld.slope / ld.slopeBase;
-                prices[i] = Util.max2(price, ld.minPrice);
+                uint slope = (middle - ld.anchor) * ld.slope / ld.slopeBase;
+                if (ld.maxPrice - ld.minPrice < slope) {
+                    prices[i] = ld.minPrice;
+                } else {
+                    prices[i] = ld.maxPrice - slope;
+                }
             }
         }
         return prices;

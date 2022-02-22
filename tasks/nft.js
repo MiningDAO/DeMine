@@ -31,9 +31,9 @@ task('nft-clone', 'Deploy clone of demine nft')
         // wrapped has been renamed to wrapped${COIN}, e.g. wrappedBTC
         // but there are some not migrated so we have to check wrapped
         // if wrapped$COIN not exists
-        const wrapped = contracts[key] || contract.wrapped;
+        const wrapped = contracts[key] || contracts.wrapped;
         const earningTokenAddr = earningTokenConfig[args.coin.toLowerCase()]
-            || (contracts.wrapped && contracts.wrapped.target)
+            || (wrapped && wrapped.target)
             || await hre.run('wrapped-clone', { coin: args.coin });
         const earningToken = await ethers.getContractAt(
             '@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol:IERC20Metadata',

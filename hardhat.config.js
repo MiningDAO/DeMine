@@ -85,7 +85,7 @@ module.exports = {
             default: 1
         },
         test: {
-            default: 1
+            default: 2
         }
     },
     gasReporter: {

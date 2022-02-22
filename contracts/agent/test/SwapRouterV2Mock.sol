@@ -8,16 +8,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract SwapRouterV2Mock {
     using SafeERC20 for IERC20;
-
-    address tokenIn;
-    address tokenOut;
     uint price;
     bool fail;
-
-    constructor(address _tokenIn, address _tokenOut) {
-        tokenIn = _tokenIn;
-        tokenOut = _tokenOut;
-    }
 
     function setSuccess(uint _price) external {
         price = _price;
@@ -35,10 +27,8 @@ contract SwapRouterV2Mock {
         uint
     ) external returns(uint, uint) {
         require(!fail, 'set to fail');
-        require(
-            path[0] == tokenIn && path[1] == tokenOut,
-            'invalid path'
-        );
+        address tokenIn = path[0];
+        address tokenOut = path[1];
         uint amountIn = amountOut / price;
         require(
             amountIn <= amountInMax,

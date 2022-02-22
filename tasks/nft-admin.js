@@ -341,7 +341,10 @@ task('nft-admin-custody', 'approve admin for custodian contract at nft contract'
         const admin = await config.admin(hre);
         const nft = args.nft || state.loadNFTClone(hre, args.coin).target;
         const erc1155 = await config.getDeployment(hre, 'ERC1155Facet');
-        const custodian = await erc1155.custodian();
+        const custodian = await ethers.getContractAt(
+            'ERC1155Custodian',
+            await erc1155.custodian()
+        );
         logger.info('Setting up custody: ' + JSON.stringify({
             nft: nft,
             admin: admin.address,

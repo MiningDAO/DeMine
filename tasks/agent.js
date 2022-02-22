@@ -30,6 +30,7 @@ async function genPrimaryMarketFacetCut(hre) {
                 'registeredStrategyType',
                 'setStrategy',
                 'getStrategy',
+                'setPricing',
                 'setAllowance',
                 'claimFrom',
                 'priceOfBatch',
@@ -123,13 +124,16 @@ task('agent-add-billing', 'Add billing facet')
         config.validateCoin(args.coin);
 
         const agent = await ethers.getContractAt('Diamond', args.agent);
-        const chainlink = localConfig.chainlink[network.name][args.coin] ||
-            await config.getDeployement(hre, 'ChainlinkMock');
+        const chainlinkConfig = localConfig.chainlink[network.name] || {};
+        const chainlink = chainlinkConfig[args.coin] ||
+            (await config.getDeployment(hre, 'ChainlinkMock')).address;
+
         const swapRouterConfig = localConfig.swapRouter[network.name] || {};
         const swapRouter = swapRouterConfig.address ||
-            await config.getDeployement(hre, 'SwapRouterV2Mock');
+            (await config.getDeployment(hre, 'SwapRouterV2Mock')).address;
         const swapRouterVersion =  swapRouterConfig.version || 2;
-        const earningTokenSaleDiscount10000Based = localConfig.earningTokenSaleDiscount10000Based;
+        const earningTokenSaleDiscount10000Based =
+            localConfig.earningTokenSaleDiscount10000Based;
         const iface = new hre.ethers.utils.Interface([
             'function setBillingMetadata(address, address, uint8, uint16)'
         ]);
@@ -312,9 +316,8 @@ task('agent-inspect', 'Inspect agent contract')
             custodian: await mortgageFacet.custodian(),
             tokenCost: tokenCost.toFixed(),
             tokenCostDecimal: tokenCostDecimal.toFixed(),
-            royaltyInfo: {
-                bps: royaltyBps,
-            },
+            royaltyBps: royaltyBps.toString(),
+            discount10000Based: discount10000Based.toString(),
             strategiesSupported: {
                 pricingStatic: pricingStaticType == 1,
                 pricingLinearDecay: pricingLinearDecayType == 1,
@@ -327,7 +330,6 @@ task('agent-inspect', 'Inspect agent contract')
                 symbol: await paymentToken.symbol(),
                 decimals: decimals,
             },
-            discount10000Based: discount10000Based.toString(),
         };
         logger.info(JSON.stringify(info, null, 2));
         logger.info("=========== nft-inspect-nft end ===========");
