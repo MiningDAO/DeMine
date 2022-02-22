@@ -1,83 +1,100 @@
 const assert = require("assert");
 const { types } = require("hardhat/config");
+const BN = require('bignumber.js');
 const config = require("../lib/config.js");
 const logger = require('../lib/logger.js');
 const common = require("../lib/common.js");
 const state = require("../lib/state.js");
 const diamond = require("../lib/diamond.js");
 const ethers = require("ethers");
-const BN = require("bignumber.js");
 
 task('agent-clone', 'Deploy clone of demine agent')
-    .addParam('miningCoin', 'coin that NFT the agent is mining for')
-    .addParam('paymentCoin', 'coin used for paying mining cost')
-    .addParam('custodianAddr', 'the address of agent custodian')
-    .addParam('cost', 'Cost per NFT token in paymentToken')
+    .addParam('coin', 'coin that NFT the agent is mining for')
+    .addParam('cost', 'Cost per NFT token in usd')
     .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
-        if (!ethers.utils.isAddress(args.custodianAddr)) {
-            logger.warn("Invalid custodian address");
-            return ethers.utils.getAddress( "0x0000000000000000000000000000000000000000");
-        }
-        let costNum = new BN.BigNumber(args.cost);
-        if (isNaN(costNum)) {
+        if (isNaN(args.cost)) {
             logger.warn("Invalid cost, which should be number.");
             return ethers.utils.getAddress( "0x0000000000000000000000000000000000000000");
         }
         logger.info("=========== MortgageFacet-clone start ===========");
-        config.validateCoin(args.miningCoin);
-        config.validatePaymentCoin(args.paymentCoin);
+        config.validateCoin(args.coin);
 
+        const key = 'agent+' + args.cost;
         const base = await config.getDeployment(hre, 'Diamond');
         const mortgageFacet = await config.getDeployment(hre, 'MortgageFacet');
-        const contracts = state.tryLoadContracts(hre, args.miningCoin);
+        const contracts = state.tryLoadContracts(hre, args.coin);
         if (
-            contracts.mortgage &&
-            contracts.mortgage.target &&
-            contracts.mortgage.source == base.address &&
-            contracts.mortgage.fallback == mortgageFacet.address
+            contracts[key] &&
+            contracts[key].target &&
+            contracts[key].source == base.address &&
+            contracts[key].fallback == mortgageFacet.address
         ) {
             logger.warn("Nothing changed.");
             logger.info("=========== MortgageFacet-clone skipped ===========");
-            return contracts.mortgage.target;
+            return contracts[key].target;
         }
+
         const nftAddr = (contracts.nft && contracts.nft.target)
-            || await hre.run('nft-clone', { coin: args.miningCoin });
+            || await hre.run('nft-clone', { coin: args.coin });
         const nftToken = await ethers.getContractAt('ERC1155Facet', nftAddr);
 
-        const paymentTokenAddr = (contracts.payment && contracts.payment.target)
-            || await hre.run('wrapped-clone', { coin: args.paymentCoin });
+        const paymentContract = state.tryLoadContracts(hre, 'usd');
+        const paymentTokenAddr = localConfig.paymentToken[network.name]
+            || (paymentContract.wrappedUSD && paymentContract.wrappedUSD.target)
+            || await hre.run('wrapped-clone', { coin: 'usd' });
         const paymentToken = await ethers.getContractAt(
             '@solidstate/contracts/token/ERC20/metadata/IERC20Metadata.sol:IERC20Metadata',
             paymentTokenAddr
         );
+        const decimals = await paymentToken.decimals();
+        const normalizedCost = new BN(10).pow(decimals).times(args.cost);
 
         const admin = await config.admin(hre);
         const iface = new hre.ethers.utils.Interface([
-            'function init(address nft, address paymentToken, address custodian, uint tokenCost, address[] calldata pricingStrategies, address[] calldata allowanceStrategies)'
+            'function init(address, address, address, uint, address[], address[])'
         ]);
-        // TODO: populate pricingStrategies and allowanceStrategies in init.
+
+        const pricingStatic = await hre.deployments.get('PricingStatic');
+        const pricingLinearDecay = await hre.deployments.get('PricingLinearDecay');
+        const pricingStrategies = {
+            PricingStatic: pricingStatic.address,
+            PricingLinearDecay: pricingLinearDecay.address,
+        };
+        const allowanceFixedOneTime = await hre.deployments.get('AllowanceFixedOneTime');
+        const allowanceRangeOneTime = await hre.deployments.get('AllowanceRangeOneTime');
+        const allowanceStrategies = {
+            AllowanceFixedOneTime: allowanceFixedOneTime.address,
+            AllowanceRangeOneTime: allowanceRangeOneTime.address,
+        }
         const initArgs = [
             admin.address,
-            await diamond.genInterfaces(
-                hre,
-                ['MortgageFacet']
-            ),
+            [],
             mortgageFacet.address,
-            iface.encodeFunctionData('init', [nftAddr, paymentToken.address, args.custodianAddr, ethers.BigNumber.from(costNum.toFixed()), [], []])
+            iface.encodeFunctionData(
+                'init',
+                [
+                    nftAddr,
+                    paymentTokenAddr,
+                    admin.address,
+                    ethers.BigNumber.from(normalizedCost.toFixed()),
+                    Object.values(pricingStrategies),
+                    Object.values(allowanceStrategies),
+                ]
+            )
         ];
-
-        logger.info('Cloning DeMine MortgageFacet: ' + JSON.stringify({
+        logger.info('Cloning Mining3Agent: ' + JSON.stringify({
             network: network.name,
             source: base.address,
             owner: admin.address,
             fallback: mortgageFacet.address,
             fallbackInitArgs: {
                 nft: nftAddr,
-                custodian: args.custodianAddr,
                 paymentToken: paymentTokenAddr,
-                tokenCost: costNum.toFixed(),
-                pricingStrategies: [],
-                allowanceStrategies: []
+                custodian: admin.address,
+                tokenCost: normalizedCost.toFixed(),
+                tokenCostDecimal: args.cost,
+                pricingStrategies: pricingStrategies,
+                allowanceStrategies: allowanceStrategies,
             }
         }, null, 2));
         const {cloned, txReceipt} = await common.clone(
@@ -86,8 +103,8 @@ task('agent-clone', 'Deploy clone of demine agent')
         logger.info('Cloned contract DeMine MortgageFacet at ' + cloned);
         logger.info('Writing contract info to state file');
         state.updateContract(
-            hre, args.miningCoin, {
-                'mortgageFacet': {
+            hre, args.coin, {
+                [key]: {
                     source: base.address,
                     target: cloned,
                     fallback: mortgageFacet.address,

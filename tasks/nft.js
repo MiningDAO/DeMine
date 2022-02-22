@@ -27,6 +27,11 @@ task('nft-clone', 'Deploy clone of demine nft')
         }
 
         const earningTokenConfig = localConfig.earningToken[network.name] || {};
+        const key = 'wrapped' + args.coin.toUpperCase();
+        // wrapped has been renamed to wrapped${COIN}, e.g. wrappedBTC
+        // but there are some not migrated so we have to check wrapped
+        // if wrapped$COIN not exists
+        const wrapped = contracts[key] || contract.wrapped;
         const earningTokenAddr = earningTokenConfig[args.coin.toLowerCase()]
             || (contracts.wrapped && contracts.wrapped.target)
             || await hre.run('wrapped-clone', { coin: args.coin });

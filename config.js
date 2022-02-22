@@ -49,6 +49,9 @@ const config = {
             btc: '0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c'
         }
     },
+    paymentToken: {
+        bsc: '0x4fabb145d64652a948d72533023f6e7a623c7c53'
+    },
     binance: {
         prod: {
             key: process.env.BINANCE_KEY,
@@ -75,7 +78,7 @@ const config = {
         usd: {
             name: 'DeMine Wrapped USD',
             symbol: 'DPAY',
-            decimals: 6
+            decimals: 18
         },
         btc: {
             name: 'DeMine Wrapped BTC',

@@ -60,9 +60,10 @@ task("wrapped-clone", "clone wrapped token")
         );
         logger.info('Cloned DeMineERC20 at ' + cloned);
         logger.info('Writing contract info to state file');
+        const key = 'wrapped' + args.coin.toUpperCase();
         state.updateContract(
             hre, args.coin, {
-                'wrapped': {
+                [key]: {
                     source: base.address,
                     target: cloned,
                     fallback: fallback.address,
