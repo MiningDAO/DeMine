@@ -25,31 +25,22 @@ contract MortgageFacet is
     Initializable,
     PausableModifier,
     IERC1155Receiver,
+    StorageBase,
     ERC165
 {
-    AppStorage internal s;
-
     using SafeERC20 for IERC20;
 
     function init(
         address nftAddr,
         address paymentTokenAddr,
         address custodianAddr,
-        uint costPerToken,
-        address[] calldata pricingStrategies,
-        address[] calldata allowanceStrategies
+        uint costPerToken
     ) external onlyInitializing {
         IERC1155Rewardable nftContract = IERC1155Rewardable(nftAddr);
         s.nft = nftContract;
         s.paymentToken = paymentTokenAddr;
         s.custodian = custodianAddr;
         s.tokenCost = costPerToken;
-        for (uint i = 0; i < pricingStrategies.length; i++) {
-            s.strategyRegistry[pricingStrategies[i]] = 1;
-        }
-        for (uint i = 0; i < allowanceStrategies.length; i++) {
-            s.strategyRegistry[allowanceStrategies[i]] = 2;
-        }
     }
 
     /**

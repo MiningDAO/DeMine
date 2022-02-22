@@ -19,6 +19,24 @@ const config = {
         e2e_recipient_id: process.env.COURIER_E2E_RECIEPINET_ID,
         profile: process.env.COURIER_PROFILE
     },
+    chainlink: {
+        bsc: {
+            btc: '0x264990fbd0A4796A3E3d8E37C4d5F87a3aCa5Ebf',
+        },
+        bscdev: {
+            btc: '0x5741306c21795FdCBb9b265Ea0255F499DFe515C',
+        },
+        matic: {
+            btc: '0xc907E116054Ad103354f2D350FD2514433D57F6f',
+        },
+        maticdev: {
+            btc: '0x007A22900a3B98143368Bd5906f8E17e9867581b',
+        },
+    },
+    swapRouter: {
+        bsc: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
+        bscdev: '0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3',
+    },
     alchemy: {
         matic: process.env.ALCHEMY_MATIC,
         maticdev: process.env.ALCHEMY_MATIC_DEV,
@@ -50,7 +68,8 @@ const config = {
         }
     },
     paymentToken: {
-        bsc: '0x4fabb145d64652a948d72533023f6e7a623c7c53'
+        bsc: '0xe9e7cea3dedca5984780bafc599bd69add087d56', // BUSD
+        bscdev: '0x78867BbEeF44f2326bF8DDd1941a4439382EF2A7', // BUSD
     },
     binance: {
         prod: {

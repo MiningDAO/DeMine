@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.11;
 
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import '../../nft/interfaces/IERC1155Rewardable.sol';
 
 struct BillingStatement {
@@ -24,8 +23,9 @@ struct AppStorage {
 
     // billing related
     mapping(uint256 => BillingStatement) statements; // Billing statement for each NFT token.
-    AggregatorV3Interface chainlink;
+    address chainlink;
     address swapRouter;
+    uint8 swapRouterVersion; // 2 or 3 supported
     uint16 earningTokenSaleDiscount10000Based; // 10000 based
 
     // primary market sale related

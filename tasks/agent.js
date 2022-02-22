@@ -54,21 +54,12 @@ task('agent-clone', 'Deploy clone of demine agent')
             'function init(address, address, address, uint, address[], address[])'
         ]);
 
-        const pricingStatic = await hre.deployments.get('PricingStatic');
-        const pricingLinearDecay = await hre.deployments.get('PricingLinearDecay');
-        const pricingStrategies = {
-            PricingStatic: pricingStatic.address,
-            PricingLinearDecay: pricingLinearDecay.address,
-        };
-        const allowanceFixedOneTime = await hre.deployments.get('AllowanceFixedOneTime');
-        const allowanceRangeOneTime = await hre.deployments.get('AllowanceRangeOneTime');
-        const allowanceStrategies = {
-            AllowanceFixedOneTime: allowanceFixedOneTime.address,
-            AllowanceRangeOneTime: allowanceRangeOneTime.address,
-        }
         const initArgs = [
             admin.address,
-            [],
+            await diamond.genInterfaces(
+                hre,
+                ['@solidstate/contracts/token/ERC1155/IERC1155Receiver.sol:IERC1155Receiver']
+            ),
             mortgageFacet.address,
             iface.encodeFunctionData(
                 'init',
@@ -77,8 +68,6 @@ task('agent-clone', 'Deploy clone of demine agent')
                     paymentTokenAddr,
                     admin.address,
                     ethers.BigNumber.from(normalizedCost.toFixed()),
-                    Object.values(pricingStrategies),
-                    Object.values(allowanceStrategies),
                 ]
             )
         ];
@@ -101,6 +90,71 @@ task('agent-clone', 'Deploy clone of demine agent')
             hre, admin.signer, base, initArgs,
         );
         logger.info('Cloned contract DeMine MortgageFacet at ' + cloned);
+
+        const agent = await ethers.getContractAt('Diamond', cloned);
+        logger.info('Adding PrimaryMarketFacet');
+        const pricingStatic = await hre.deployments.get('PricingStatic');
+        const pricingLinearDecay = await hre.deployments.get('PricingLinearDecay');
+        const pricingStrategies = {
+            PricingStatic: pricingStatic.address,
+            PricingLinearDecay: pricingLinearDecay.address,
+        };
+        const allowanceFixedOneTime = await hre.deployments.get('AllowanceFixedOneTime');
+        const allowanceRangeOneTime = await hre.deployments.get('AllowanceRangeOneTime');
+        const allowanceStrategies = {
+            AllowanceFixedOneTime: allowanceFixedOneTime.address,
+            AllowanceRangeOneTime: allowanceRangeOneTime.address,
+        }
+        const ifacePM = new hre.ethers.utils.Interface([
+            'function batchRegisterStrategies(address[], address[])'
+        ]);
+        const calldata = ifacePM.encodeFunctionData(
+            'batchRegisterStrategies',
+            [
+                Object.values(pricingStrategies),
+                Object.values(allowanceStrategies)
+            ]
+        );
+        const primaryMarketFacet = await config.getDeployment('PrimaryMarketFacet');
+        await common.run(
+            hre,
+            admin,
+            agent,
+            'diamondCut',
+            [
+                [await genPrimaryMarketFacetCut(hre)],
+                primaryMarketFacet.address,
+                calldata
+            ],
+            {}
+        );
+
+        logger.info('Adding BillingFacet');
+        const ifaceBilling = new hre.ethers.utils.Interface([
+            'function setBillingMetadata(address, address, uint8, uint16)'
+        ]);
+
+        const chainlink = localConfig.chainlink[network.name][args.coin] ||
+            await config.getDeployement(hre, 'ChainlinkMock');
+        const swapRouter = localConfig.swapRouter[network.name] ||
+            await config.getDeployement(hre, 'SwapRouterV2Mock');
+        const billingCalldata = ifaceBilling.encodeFunctionData(
+            'setBillingMetadata',
+            [chainlink, swapRouter, 2, 10]
+        );
+        await common.run(
+            hre,
+            admin,
+            agent,
+            'diamondCut',
+            [
+                [await genBillingFacetCut(hre)],
+                billingFacet.address,
+                billingCalldata
+            ],
+            {}
+        );
+
         logger.info('Writing contract info to state file');
         state.updateContract(
             hre, args.coin, {
@@ -108,50 +162,42 @@ task('agent-clone', 'Deploy clone of demine agent')
                     source: base.address,
                     target: cloned,
                     fallback: mortgageFacet.address,
-                    txReceipt
+                    txReceipt,
                 }
             }
         );
         return cloned;
     });
 
-async function genMortgageFacetCut(hre) {
-    return await genFacetCut(hre, 'MortgageFacet', [
-        ['IERC1155Receiver', ['onERC1155Received', 'onERC1155BatchReceived']],
-        ['MortgageFacet', ['redeem', 'payoff', 'adjustDeposit', 'getAccountInfo', 'balanceOfBatch']]
-    ]);
-}
-
 async function genPrimaryMarketFacetCut(hre) {
-    return await genFacetCut(hre, 'PrimaryMarketFacet', [
+    return await diamond.genFacetCut(hre, 'PrimaryMarketFacet', [
         [
             'PrimaryMarketFacet',
             [
-                'setPricingStrategy',
-                'increaseAllowance',
-                'decreaseAllowance',
-                'claim',
-                'getListedPrices',
-                'getAllowances'
+                'setRoyaltyInfo',
+                'royaltyInfo',
+                'registerStrategy',
+                'registeredStrategyType',
+                'setStrategy',
+                'getStrategy',
+                'setAllowance',
+                'claimFrom',
+                'priceOfBatch',
+                'allowanceOfBatch',
             ]
-        ],
-        ['PricingStatic', ['setStaticBase', 'setStaticOverride']],
-        ['PricingLinearDecay', ['setLinearDecay']]
+        ]
     ]);
 }
 
 async function genBillingFacetCut(hre) {
-    return await genFacetCut(hre, 'BillingFacet', [
+    return await diamond.genFacetCut(hre, 'BillingFacet', [
         [
             'BillingFacet',
             [
                 'tryBilling',
-                'lockPrice',
-                'buyWithLockedPrice',
-                'closeBilling',
-                'collectResidue',
-                'resetShrink',
-                'getStatement'
+                'purchaseEarningTokenToPayDebt',
+                'discountInfo',
+                'setDiscountInfo',
             ]
         ]
     ]);

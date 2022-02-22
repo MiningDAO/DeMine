@@ -128,48 +128,5 @@
         }
       ]
     }
-  },
-  "agent+0.07": {
-    "source": "0x247B4b9FBE47fe804dC8C4d6bd923eE5d6A261e1",
-    "target": "0x5c2DB65E16305cFB9c08763e5772dBD24B09bf7a",
-    "fallback": "0x1D2832923e0dA8E476F74D3C760A556730c1db40",
-    "txReceipt": {
-      "to": "0x247B4b9FBE47fe804dC8C4d6bd923eE5d6A261e1",
-      "from": "0xa4b368e3a9D49Ff15b58f70Fb976724A98B6D149",
-      "contractAddress": null,
-      "transactionIndex": 9,
-      "gasUsed": {
-        "type": "BigNumber",
-        "hex": "0x04dec2"
-      },
-      "logsBloom": "0x00000200000000000000000000000000001000000000200000002000002010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000020000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000008000000000000000000",
-      "blockHash": "0xf2f27c6c8c9df31d65fb94651785adbc400afde5fcaac2775fea9353ba08fa3c",
-      "transactionHash": "0x831c18dc5e9a1663c1c3a24374247ae8d13bdb0ae978649f3c97ec29416a8b8e",
-      "logs": [
-        {
-          "transactionIndex": 9,
-          "blockNumber": 16968695,
-          "transactionHash": "0x831c18dc5e9a1663c1c3a24374247ae8d13bdb0ae978649f3c97ec29416a8b8e",
-          "address": "0x247B4b9FBE47fe804dC8C4d6bd923eE5d6A261e1",
-          "topics": [
-            "0xb557324045551eafb0789d69d5679a7017a31840124b2220df4b81dea45ec083",
-            "0x000000000000000000000000247b4b9fbe47fe804dc8c4d6bd923ee5d6a261e1",
-            "0x0000000000000000000000005c2db65e16305cfb9c08763e5772dbd24b09bf7a"
-          ],
-          "data": "0x",
-          "logIndex": 16,
-          "blockHash": "0xf2f27c6c8c9df31d65fb94651785adbc400afde5fcaac2775fea9353ba08fa3c"
-        }
-      ],
-      "blockNumber": 16968695,
-      "confirmations": 1,
-      "cumulativeGasUsed": {
-        "type": "BigNumber",
-        "hex": "0x1cbdbf"
-      },
-      "status": 1,
-      "type": 0,
-      "byzantium": true
-    }
   }
 }

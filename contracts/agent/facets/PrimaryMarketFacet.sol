@@ -3,8 +3,8 @@
 pragma solidity 0.8.11;
 
 import '@solidstate/contracts/access/OwnableInternal.sol';
-import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import '../../shared/lib/LibPausable.sol';
 import '../lib/AppStorage.sol';
@@ -33,6 +33,18 @@ contract PrimaryMarketFacet is
         uint tokenCost;
         uint totalCost;
         uint totalEarned;
+    }
+
+    function batchRegisterStrategies(
+        address[] calldata pricingStrategies,
+        address[] calldata allowanceStrategies
+    ) external onlyOwner {
+        for (uint i = 0; i < pricingStrategies.length; i++) {
+            s.strategyRegistry[pricingStrategies[i]] = 1;
+        }
+        for (uint i = 0; i < allowanceStrategies.length; i++) {
+            s.strategyRegistry[allowanceStrategies[i]] = 2;
+        }
     }
 
     function setRoyaltyInfo(

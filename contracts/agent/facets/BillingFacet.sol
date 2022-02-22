@@ -6,10 +6,12 @@ pragma experimental ABIEncoderV2;
 import '@solidstate/contracts/access/OwnableInternal.sol';
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
+import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
 import '../../nft/interfaces/IERC1155Rewardable.sol';
 import '../../shared/lib/LibPausable.sol';
@@ -20,10 +22,28 @@ import '../lib/AppStorage.sol';
  * @author Shu Dong
  * @notice billing related functions
  */
-contract BillingFacet is PausableModifier, OwnableInternal {
-    AppStorage internal s;
-
+contract BillingFacet is
+    PausableModifier,
+    OwnableInternal,
+    StorageBase
+{
     using SafeERC20 for IERC20;
+
+    function setBillingMetadata(
+        address chainlink,
+        address swapRouter,
+        uint8 swapRouterVersion,
+        uint16 discount10000Based
+    ) external onlyOwner {
+        s.chainlink = chainlink;
+        s.swapRouter = swapRouter;
+        require(
+            swapRouterVersion == 2 || swapRouterVersion == 3,
+            'Mining3Agent: swap router version not supported'
+        );
+        s.swapRouterVersion = swapRouterVersion;
+        s.earningTokenSaleDiscount10000Based = discount10000Based;
+    }
 
     /**
      * @notice It will try to sell earning token at Uniswap
@@ -47,7 +67,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
             s.statements[tokenId].debt = debt;
             return;
         }
-        (uint earningTokenLeft, uint paymentTokenReceived) = trySwap(
+        (uint earningTokenSold, uint paymentTokenReceived) = trySwap(
             s.swapRouter,
             address(earningToken),
             address(s.paymentToken),
@@ -56,11 +76,11 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         );
         if (paymentTokenReceived == debt) {
             s.statements[tokenId].balance = balance;
-            s.statements[tokenId].surplus = earningTokenLeft;
+            s.statements[tokenId].surplus = earning - earningTokenSold;
         } else {
             s.statements[tokenId] = BillingStatement(
                 balance,
-                earningTokenLeft,
+                earning - earningTokenSold,
                 debt - paymentTokenReceived
             );
         }
@@ -87,7 +107,7 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         IERC20 earningToken = IERC20(s.nft.earningToken());
         IERC20 paymentToken = IERC20(s.paymentToken);
         uint sold = swapTokens(
-            s.chainlink,
+            AggregatorV3Interface(s.chainlink),
             IERC20Metadata(address(earningToken)),
             IERC20Metadata(address(paymentToken)),
             debtToPay
@@ -143,19 +163,42 @@ contract BillingFacet is PausableModifier, OwnableInternal {
         address tokenOut,
         uint amountInMax,
         uint amountOut
-    ) internal returns(uint, uint) {
+    ) internal returns(uint sold, uint bought) {
         TransferHelper.safeApprove(tokenIn, swapRouter, amountInMax);
-        (bool success, bytes memory encoded) = swapRouter.call(
-            abi.encodeWithSignature(
-                'swapTokensForExactTokens(uint,uint,address[],address,uint)',
-                amountOut, amountInMax, [tokenIn, tokenOut], address(this), block.timestamp
-            )
-        );
-        TransferHelper.safeApprove(tokenIn, swapRouter, 0);
-        if (success) {
-            return abi.decode(encoded, (uint, uint));
-        } else {
-            return (amountInMax, 0);
+        uint8 version = s.swapRouterVersion;
+        if (version == 2) {
+            (bool success, bytes memory encoded) = swapRouter.call(
+                abi.encodeWithSignature(
+                    'swapTokensForExactTokens(uint,uint,address[],address,uint)',
+                    amountOut, amountInMax, [tokenIn, tokenOut], address(this), block.timestamp
+                )
+            );
+            if (success) {
+                (sold, bought) = abi.decode(encoded, (uint, uint));
+            }
+        } else if (version == 3) {
+            ISwapRouter.ExactOutputSingleParams memory param =
+            ISwapRouter.ExactOutputSingleParams({
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                fee: 3000, // 0.3%
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountOut: amountOut,
+                amountInMaximum: amountInMax,
+                sqrtPriceLimitX96: 0
+            });
+            (bool success, bytes memory encoded) = swapRouter.call(
+                abi.encodeWithSignature(
+                    'exactOutputSingle((address,address,uint24,address,uint,uiint256,uint,uint160))',
+                    param
+                )
+            );
+            if (success) {
+                sold = abi.decode(encoded, (uint));
+                bought = amountOut;
+            }
         }
+        TransferHelper.safeApprove(tokenIn, swapRouter, 0);
     }
 }
