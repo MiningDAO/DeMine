@@ -9,7 +9,7 @@ const config = {
     accounts: [
         process.env.DEPLOYER,
         process.env.ADMIN,
-        process.env.GNOSIS,
+        process.env.TEST,
     ],
     statePath: path.join(__dirname, './state/'),
     courier: {

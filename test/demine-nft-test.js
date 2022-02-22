@@ -26,20 +26,21 @@ function genTokenIds(startDate, endDate, type) {
 
 describe("DeMineNFT", function () {
     const coin = 'btc';
-    var nft, custodian, deployer, admin;
+    const {deployer, admin} = await hre.ethers.getNamedSigners();
+    var nft, custodian, erc1155;
+
+    beforeAll(async function() {
+        await hre.deployments.fixture(['NFT']);
+    });
 
     beforeEach(async function() {
-        const signers = await hre.ethers.getNamedSigners();
-        deployer = signers.deployer;
-        admin = signers.admin;
-        await hre.deployments.fixture(['NFT']);
         nft = await hre.run('nft-clone', {coin: coin});
-        custodian = await config.getDeployment(hre, 'ERC1155Custodian');
+        erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
+        custodian = await erc1155.custodian();
         await hre.run('nft-admin-custody', {coin: coin, nft: nft});
     });
 
     it("Initializable", async function() {
-        const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
         const erc20Addr = await erc1155.earningToken();
         const erc20 = await hre.ethers.getContractAt('Diamond', erc20Addr)
 
@@ -61,7 +62,6 @@ describe("DeMineNFT", function () {
     });
 
     it("TokenId", async function() {
-        const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
         var tokenIds = genTokenIds('2022-02-02', '2022-02-05', 'daily');
         expect(tokenIds.length).to.equal(4);
 
@@ -77,7 +77,6 @@ describe("DeMineNFT", function () {
     });
 
     it("Custody", async function() {
-        const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
         expect(await erc1155.custodian()).to.equal(custodian.address);
         expect(await custodian.owner()).to.equal(admin.address);
         expect(
@@ -106,7 +105,6 @@ describe("DeMineNFT", function () {
 
     it("DiamondAdmin", async function () {
         const main = await hre.ethers.getContractAt('Diamond', nft);
-        const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
         const earningToken = await erc1155.earningToken();
 
         // Pausable
@@ -321,7 +319,6 @@ describe("DeMineNFT", function () {
 
     it('Mining', async function() {
         // setup
-        const erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
         const incomeAddr = await erc1155.earningToken();
         expect(incomeAddr).to.be.not.equal(address0);
         const income = await hre.ethers.getContractAt('ERC20Facet', incomeAddr);

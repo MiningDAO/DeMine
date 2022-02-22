@@ -21,7 +21,7 @@ contract PricingStatic is IPricingStrategy {
         ) = abi.decode(args, (uint, uint[], uint[]));
         require(
             basePrice >= tokenCost,
-            'PricingStatic: price smaller than token cost'
+            'PricingStatic: base price smaller than token cost'
         );
         l.base[owner] = basePrice;
         require(
@@ -31,7 +31,7 @@ contract PricingStatic is IPricingStrategy {
         for (uint i = 0; i < ids.length; i++) {
             require(
                 prices[i] >= tokenCost,
-                'PricingStatic: price smaller than token cost'
+                'PricingStatic: override price smaller than token cost'
             );
             l.overrides[owner][ids[i]] = prices[i];
         }
