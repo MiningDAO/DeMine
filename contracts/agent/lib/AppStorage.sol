@@ -29,9 +29,9 @@ struct AppStorage {
     uint16 earningTokenSaleDiscount10000Based; // 10000 based
 
     // primary market sale related
-    // 0: unregistered, 1: pricing strategy, 2: allowance strategy
-    mapping(address => uint8) strategyRegistry;
-    mapping(address => mapping(uint8 => address)) strategies;
+    mapping(address => bool) registeredPricingStrategy;
+    mapping(address => address) pricingStrategy;
+    mapping(address => mapping(address => bool)) approved; // for allowance
 }
 
 abstract contract StorageBase {

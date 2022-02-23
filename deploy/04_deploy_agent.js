@@ -5,10 +5,6 @@ module.exports = async (hre) => {
     await common.confirmAndDeploy(hre, 'PricingStatic', []);
     await common.confirmAndDeploy(hre, 'PricingLinearDecay', []);
 
-    // deploy allowance strategy
-    await common.confirmAndDeploy(hre, 'AllowanceFixedOneTime', []);
-    await common.confirmAndDeploy(hre, 'AllowanceRangeOneTime', []);
-
     // deploy facets
     await common.confirmAndDeploy(hre, 'MortgageFacet', []);
     await common.confirmAndDeploy(hre, 'PrimaryMarketFacet', []);

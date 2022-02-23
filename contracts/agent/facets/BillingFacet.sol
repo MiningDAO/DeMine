@@ -127,12 +127,12 @@ contract BillingFacet is
         IERC20(earningToken).safeTransfer(msg.sender, sold);
     }
 
-    function discountInfo(uint value) public view returns(uint) {
-        return value * s.earningTokenSaleDiscount10000Based / 10000;
+    function setEarningTokenDiscountInfo(uint16 discount) external onlyOwner {
+        s.earningTokenSaleDiscount10000Based = discount > 10000 ? 10000 : discount;
     }
 
-    function setDiscountInfo(uint16 discount) external onlyOwner {
-        s.earningTokenSaleDiscount10000Based = discount > 10000 ? 10000 : discount;
+    function earningTokenDiscountInfo(uint value) public view returns(uint) {
+        return value * s.earningTokenSaleDiscount10000Based / 10000;
     }
 
     function swapTokens(
@@ -143,7 +143,7 @@ contract BillingFacet is
     ) private view returns(uint) {
         (,int price, , ,) = chainlink.latestRoundData();
         if (price <= 0) { return 0; }
-        uint discountedPrice = discountInfo(uint(price));
+        uint discountedPrice = earningTokenDiscountInfo(uint(price));
 
         uint8 amountOutDecimals = earningToken.decimals();
         uint8 amountInDecimals = paymentToken.decimals();

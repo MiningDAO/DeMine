@@ -24,17 +24,15 @@ async function genPrimaryMarketFacetCut(hre) {
         [
             'PrimaryMarketFacet',
             [
+                'registerPricingStrategy',
+                'isRegisteredPricingStrategy',
+                'approve',
+                'isApproved',
+                'setPricingStrategy',
+                'pricingStrategy',
                 'setRoyaltyInfo',
                 'royaltyInfo',
-                'registerStrategy',
-                'registeredStrategyType',
-                'setStrategy',
-                'getStrategy',
-                'setPricing',
-                'setAllowance',
                 'claimFrom',
-                'priceOfBatch',
-                'allowanceOfBatch',
             ]
         ]
     ]);
@@ -47,8 +45,8 @@ async function genBillingFacetCut(hre) {
             [
                 'tryBilling',
                 'purchaseEarningTokenToPayDebt',
-                'discountInfo',
-                'setDiscountInfo',
+                'setEarningTokenDiscountInfo',
+                'earningTokenDiscountInfo',
             ]
         ]
     ]);
@@ -67,12 +65,6 @@ task('agent-add-pm', 'Add primary market sale facet')
             PricingStatic: pricingStatic.address,
             PricingLinearDecay: pricingLinearDecay.address,
         };
-        const allowanceFixedOneTime = await deployments.get('AllowanceFixedOneTime');
-        const allowanceRangeOneTime = await deployments.get('AllowanceRangeOneTime');
-        const allowanceStrategies = {
-            AllowanceFixedOneTime: allowanceFixedOneTime.address,
-            AllowanceRangeOneTime: allowanceRangeOneTime.address,
-        }
 
         const paymentToken = await getPaymentToken(ethers, args.agent);
         const decimals = await paymentToken.decimals();
@@ -80,7 +72,7 @@ task('agent-add-pm', 'Add primary market sale facet')
             localConfig.primaryMarketSaleRoyaltyCap
         );
         const iface = new hre.ethers.utils.Interface([
-            'function init(uint16, uint, address[], address[])'
+            'function init(uint16, uint, address[])'
         ]);
         const calldata = iface.encodeFunctionData(
             'init',
@@ -88,7 +80,6 @@ task('agent-add-pm', 'Add primary market sale facet')
                 localConfig.primaryMarketSaleRoyaltyBps,
                 royaltyCap,
                 Object.values(pricingStrategies),
-                Object.values(allowanceStrategies)
             ]
         );
         const primaryMarketFacet = await deployments.get('PrimaryMarketFacet');
@@ -100,7 +91,6 @@ task('agent-add-pm', 'Add primary market sale facet')
             primaryMarketFacet: primaryMarketFacet.address,
             facetCut: facetCut,
             pricingStrategies: pricingStrategies,
-            allowanceStrategies: allowanceStrategies,
         }, null, 2));
         const admin = await config.admin(hre);
         await common.run(

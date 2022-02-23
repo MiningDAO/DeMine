@@ -3,50 +3,38 @@
 pragma solidity 0.8.11;
 pragma experimental ABIEncoderV2;
 
-import '../../shared/lib/Util.sol';
 import '../interfaces/IPricingStrategy.sol';
-import './PricingStaticStorage.sol';
 
 contract PricingStatic is IPricingStrategy {
-    function set(
-        address owner,
-        uint tokenCost,
-        bytes memory args
-    ) external override {
-        PricingStaticStorage.Layout storage l = PricingStaticStorage.layout();
-        (
-            uint basePrice,
-            uint[] memory ids,
-            uint[] memory prices
-        ) = abi.decode(args, (uint, uint[], uint[]));
-        require(
-            basePrice >= tokenCost,
-            'PricingStatic: base price smaller than token cost'
-        );
-        l.base[owner] = basePrice;
+    mapping(address => uint) base;
+    mapping(address => mapping(uint => uint)) overrides;
+
+    function setPrice(
+        uint basePrice,
+        uint[] memory ids,
+        uint[] memory prices
+    ) external {
         require(
             ids.length == prices.length,
             "PricingStatic: array length mismatch"
         );
+        base[msg.sender] = basePrice;
         for (uint i = 0; i < ids.length; i++) {
-            require(
-                prices[i] >= tokenCost,
-                'PricingStatic: override price smaller than token cost'
-            );
-            l.overrides[owner][ids[i]] = prices[i];
+            overrides[msg.sender][ids[i]] = prices[i];
         }
     }
 
     function priceOfBatch(
         address owner,
+        uint minPrice,
         uint[] memory ids
     ) external override view returns(uint[] memory) {
-        PricingStaticStorage.Layout storage l = PricingStaticStorage.layout();
-        uint base = l.base[owner];
+        uint basePrice = base[owner];
         uint[] memory prices = new uint[](ids.length);
         for (uint i = 0; i < ids.length; i++) {
-            uint tokenPrice = l.overrides[owner][ids[i]];
-            prices[i] = tokenPrice > 0 ? tokenPrice : base;
+            uint tokenPrice = overrides[owner][ids[i]];
+            uint price = tokenPrice > 0 ? tokenPrice : basePrice;
+            prices[i] = price > minPrice ? price : minPrice;
         }
         return prices;
     }

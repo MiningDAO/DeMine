@@ -62,7 +62,10 @@ contract MortgageFacet is
         for (uint i = 0; i < ids.length; i++) {
             totalCost += costPerToken * amounts[i] * daysInToken(ids[i]);
             uint balance = s.balances[ids[i]][msg.sender];
-            require(balance > 0 && balance > amounts[i], 'DeMineAgent: no sufficient balance');
+            require(
+                balance > 0 && balance > amounts[i],
+                'DeMineAgent: no sufficient balance'
+            );
             s.balances[ids[i]][msg.sender] = balance - amounts[i];
         }
         if (totalCost > 0) {

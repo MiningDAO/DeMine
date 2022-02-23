@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import '../../shared/lib/LibPausable.sol';
 import '../lib/AppStorage.sol';
 import '../interfaces/IPricingStrategy.sol';
-import '../interfaces/IAllowanceStrategy.sol';
 
 /**
  * @title PrimaryMarketFacet
@@ -38,91 +37,36 @@ contract PrimaryMarketFacet is
     function init(
         uint16 royaltyBps,
         uint royaltyCap,
-        address[] calldata pricingStrategies,
-        address[] calldata allowanceStrategies
+        address[] calldata pricingStrategies
     ) external onlyOwner {
         setRoyaltyInfo(royaltyBps, royaltyCap);
         for (uint i = 0; i < pricingStrategies.length; i++) {
-            s.strategyRegistry[pricingStrategies[i]] = 1;
-        }
-        for (uint i = 0; i < allowanceStrategies.length; i++) {
-            s.strategyRegistry[allowanceStrategies[i]] = 2;
+            s.registeredPricingStrategy[pricingStrategies[i]] = true;
         }
     }
 
-    function setRoyaltyInfo(
-        uint16 royaltyBps,
-        uint royaltyCap
-    ) public onlyOwner {
-        require(s.royaltyBps <= 10000, 'Mining3Agent: Invalid royalty bps');
-        s.royaltyBps = royaltyBps;
-        s.royaltyCap = royaltyCap;
+    function registerPricingStrategy(address strategy) external onlyOwner {
+        s.registeredPricingStrategy[strategy] = true;
     }
 
-    function registerStrategy(
-        address strategy,
-        uint8 strategyType
-    ) external onlyOwner {
-        s.strategyRegistry[strategy] = strategyType;
-    }
-
-    function registeredStrategyType(
+    function isRegisteredPricingStrategy(
         address strategy
-    ) external view returns(uint8) {
-        return s.strategyRegistry[strategy];
+    ) external view returns(bool) {
+        return s.registeredPricingStrategy[strategy];
     }
 
-    function setStrategy(address strategy) external {
-        uint8 strategyType = s.strategyRegistry[strategy];
+    function setPricingStrategy(
+        address strategy
+    ) external {
         require(
-            strategyType > 0,
-            'Mining3Agent: strategy not registered'
+            s.registeredPricingStrategy[strategy],
+            'Mining3Agent: pricing strategy not registered'
         );
-        s.strategies[msg.sender][strategyType] = strategy;
+        s.pricingStrategy[msg.sender] = strategy;
     }
 
-    function getStrategy(uint8 strategyType) external view returns(address) {
-        return s.strategies[msg.sender][strategyType];
-    }
-
-    function setPricing(bytes memory args) external {
-        address pricing = s.strategies[msg.sender][1];
-        require(
-            pricing != address(0),
-            'Mining3Agent: pricing strategy not set'
-        );
-        (
-            bool success,
-            bytes memory result
-        ) = pricing.delegatecall(
-            abi.encodeWithSelector(
-                IPricingStrategy.set.selector,
-                msg.sender,
-                s.tokenCost,
-                args
-            )
-        );
-        require(success, string(result));
-    }
-
-    function setAllowance(address buyer, bytes memory args) external {
-        address allowance = s.strategies[msg.sender][2];
-        require(
-            allowance != address(0),
-            'Mining3Agent: allowance strategy not set'
-        );
-        (
-            bool success,
-            bytes memory result
-        ) = allowance.delegatecall(
-            abi.encodeWithSelector(
-                IAllowanceStrategy.set.selector,
-                msg.sender,
-                buyer,
-                args
-            )
-        );
-        require(success, string(result));
+    function pricingStrategy(address account) external view returns(address) {
+        return s.pricingStrategy[account];
     }
 
     function claimFrom(
@@ -132,16 +76,12 @@ contract PrimaryMarketFacet is
         uint[] calldata amounts
     ) external whenNotPaused returns(uint[] memory) {
         require(
-            to == msg.sender || to == address(0),
-            'Mining3Agent: invalid operator'
-        );
-        require(
             ids.length == amounts.length,
             "TokenLocker: array length mismatch"
         );
-        checkAllowances(from, to, ids, amounts);
-        uint[] memory prices = priceOfBatch(from, ids);
+        require(s.approved[from][to], 'Mining3Agent: not approved');
         ClaimState memory cs = ClaimState(s.tokenCost, 0, 0);
+        uint[] memory prices = priceOfBatch(from, cs.tokenCost, ids);
         for (uint i = 0; i < ids.length; i++) {
             uint balance = s.balances[ids[i]][from];
             require(
@@ -163,80 +103,45 @@ contract PrimaryMarketFacet is
         return amounts;
     }
 
+    function setRoyaltyInfo(
+        uint16 royaltyBps,
+        uint royaltyCap
+    ) public onlyOwner {
+        require(
+            s.royaltyBps <= 10000 && royaltyCap > 0,
+            'Mining3Agent: Invalid royalty bps'
+        );
+        s.royaltyBps = royaltyBps;
+        s.royaltyCap = royaltyCap;
+    }
+
     function royaltyInfo(uint totalEarned) public view returns(uint) {
         uint royalty = (totalEarned * s.royaltyBps) / 10000;
         uint royaltyCap = s.royaltyCap;
-        return royaltyCap > 0 && royalty > royaltyCap ? royaltyCap : royalty;
+        return royalty > royaltyCap ? royaltyCap : royalty;
+    }
+
+    function approve(address buyer, bool approval) external {
+        s.approved[msg.sender][buyer] = approval;
+    }
+
+    function isApproved(
+        address owner,
+        address buyer
+    ) external view returns(bool) {
+        return s.approved[owner][buyer];
     }
 
     function priceOfBatch(
-        address account,
-        uint[] calldata ids
-    ) public view returns(uint[] memory prices) {
-        address pricing = s.strategies[account][1];
-        require(pricing != address(0), 'Mining3Agent: pricing not set');
-        (
-            bool success,
-            bytes memory result
-        ) = pricing.staticcall(
-            abi.encodeWithSelector(
-                IPricingStrategy.priceOfBatch.selector,
-                msg.sender,
-                ids
-            )
-        );
-        require(success, string(result));
-        prices = abi.decode(result, (uint[]));
-    }
-
-    function allowanceOfBatch(
         address owner,
-        address buyer,
+        uint tokenCost,
         uint[] calldata ids
-    ) external view returns(uint[] memory allowances) {
-        address allowance = s.strategies[owner][2];
+    ) private view returns(uint[] memory) {
+        address strategy = s.pricingStrategy[owner];
         require(
-            allowance != address(0),
-            'Mining3Agent: allowance strategy not set'
+            strategy != address(0),
+            'Mining3Agent: no strategy set'
         );
-        (
-            bool success,
-            bytes memory result
-        ) = allowance.staticcall(
-            abi.encodeWithSelector(
-                IAllowanceStrategy.allowanceOfBatch.selector,
-                owner,
-                buyer,
-                ids
-            )
-        );
-        require(success, string(result));
-        allowances = abi.decode(result, (uint[]));
-    }
-
-    function checkAllowances(
-        address owner,
-        address buyer,
-        uint[] calldata ids,
-        uint[] calldata amounts
-    ) private {
-        address allowance = s.strategies[owner][2];
-        require(
-            allowance != address(0),
-            'Mining3Agent: allowance strategy not set'
-        );
-        (
-            bool success,
-            bytes memory result
-        ) = allowance.delegatecall(
-            abi.encodeWithSelector(
-                IAllowanceStrategy.checkAllowances.selector,
-                owner,
-                buyer,
-                ids,
-                amounts
-            )
-        );
-        require(success, string(result));
+        return IPricingStrategy(strategy).priceOfBatch(owner, tokenCost, ids);
     }
 }

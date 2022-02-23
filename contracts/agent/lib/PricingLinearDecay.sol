@@ -3,50 +3,41 @@
 pragma solidity 0.8.11;
 pragma experimental ABIEncoderV2;
 
-import '../../shared/lib/Util.sol';
 import '../interfaces/IPricingStrategy.sol';
-import './AppStorage.sol';
-import './PricingLinearDecayStorage.sol';
 
 contract PricingLinearDecay is IPricingStrategy {
-    function set(
-        address owner,
-        uint tokenCost,
-        bytes memory args
-    ) external override {
-        PricingLinearDecayStorage.Layout storage l
-            = PricingLinearDecayStorage.layout();
-        PricingLinearDecayStorage.LinearDecay memory ld = abi.decode(
-            args, (PricingLinearDecayStorage.LinearDecay)
-        );
-        require(
-            ld.maxPrice >= ld.minPrice && ld.minPrice >= tokenCost,
-            'PricingLinearDecay: invalid max or min price'
-        );
-        l.linearDecay[owner] = ld;
+    struct LinearDecay {
+        uint maxPrice;
+        uint128 anchor;
+        uint64 slope;
+        uint64 slopeBase;
+    }
+
+    mapping(address => LinearDecay) linearDecay;
+
+    function setPrice(LinearDecay memory ld) external {
+        linearDecay[msg.sender] = ld;
     }
 
     function priceOfBatch(
         address owner,
+        uint minPrice,
         uint[] memory ids
     ) external override view returns(uint[] memory) {
+        LinearDecay memory ld = linearDecay[owner];
         uint[] memory prices = new uint[](ids.length);
-        PricingLinearDecayStorage.LinearDecay memory ld
-            = PricingLinearDecayStorage.layout().linearDecay[owner];
         for (uint i = 0; i < ids.length; i++) {
             uint128 end = uint128(ids[i]);
             uint128 start = uint128(ids[i] >> 128);
             uint128 middle = (end + start) / 2;
+            uint price;
             if (middle < ld.anchor) {
-                prices[i] = ld.maxPrice;
+                price = ld.maxPrice;
             } else {
                 uint slope = (middle - ld.anchor) * ld.slope / ld.slopeBase;
-                if (ld.maxPrice - ld.minPrice < slope) {
-                    prices[i] = ld.minPrice;
-                } else {
-                    prices[i] = ld.maxPrice - slope;
-                }
+                price = ld.maxPrice < slope ? 0 : ld.maxPrice - slope;
             }
+            prices[i] = price > minPrice ? price : minPrice;
         }
         return prices;
     }
