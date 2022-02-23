@@ -38,6 +38,19 @@ describe("DeMine Agent", function () {
         expect(await nftToken.custodian()).to.equal(nftCustodian.address);
     });
 
+    it("onERC1155BatchReceivedSuccessfully", async function () {
+        let tokenId1 = token.encodeOne(token.genTokenId(time.toEpoch(new Date('2022-02-03')), 'weekly'));
+        let balance = await mortgageAgent.balanceOfBatch(tester.address, [tokenId1]);
+        expect(balance["0"]).to.equal(BN(0).toFixed());
+
+        let abiCoder = ethers.utils.defaultAbiCoder;
+        let data = await abiCoder.encode(["address"], [tester.address]);
+        await mortgageAgent.onERC1155BatchReceived(admin.address, nftToken.custodian(), [tokenId1], [BN(5).toFixed()], data);
+        balance = await mortgageAgent.balanceOfBatch(tester.address, [tokenId1]);
+        expect(balance["0"]).to.equal(BN(5).toFixed());
+
+    });
+
     it("CannotRedeemInvalidInput", async function () {
         await expect(mortgageAgent.redeemNFT([BN(1).toFixed(), BN(2).toFixed()], [BN(3).toFixed()])
             ).to.be.revertedWith('DeMineAgent: array length mismatch');
@@ -65,7 +78,6 @@ describe("DeMine Agent", function () {
             ).to.be.revertedWith('ERC20: transfer amount exceeds allowance');
     });
 
-    /*
     it("SuccessfulRedeem", async function () {
         let tokenId1 = token.encodeOne(token.genTokenId(time.toEpoch(new Date('2022-02-03')), 'weekly'));
 
@@ -73,21 +85,20 @@ describe("DeMine Agent", function () {
         let data = await abiCoder.encode(["address"], [tester.address]);
         await mortgageAgent.onERC1155BatchReceived(admin.address, nftToken.custodian(), [tokenId1], [BN(5).toFixed()], data);
         await paymentCoin.connect(admin).mint(tester.address, BN(5000).toFixed());
-        await paymentCoin.connect(admin).approve(tester.address, BN(5000).toFixed());
-        logger.info("========");
-        logger.info(await paymentCoin.balanceOf(tester.address));
-        logger.info(await paymentCoin.allowance(tester.address, tester.address));
+        await paymentCoin.connect(tester).approve(mortgageAgent.address, BN(5000).toFixed());
         
+        logger.info("\n======== debugging start");
+        logger.info(await paymentCoin.balanceOf(tester.address));
+        logger.info(await paymentCoin.allowance(tester.address, mortgageAgent.address));
+        logger.info("======== debugging end");
 
-        //mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(3).toFixed()]);
-
-        await expect(mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(2).toFixed()])
+        await expect(mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(3).toFixed()])
             ).to.not.be.revertedWith('ERC20: transfer amount exceeds allowance');
 
         let balance = await mortgageAgent.balanceOfBatch(tester.address, [tokenId1]);
         expect(balance["0"]).to.equal(BN(2).toFixed());
     });
-    */
+
 
 
 

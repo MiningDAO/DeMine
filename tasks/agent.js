@@ -252,6 +252,7 @@ task('agent-clone', 'Deploy clone of demine agent')
                 tokenCostDecimal: args.cost,
             }
         }, null, 2));
+
         const {cloned, txReceipt} = await common.clone(
             hre, admin.signer, base, initArgs,
         );
@@ -267,8 +268,8 @@ task('agent-clone', 'Deploy clone of demine agent')
                 }
             }
         );
-        await hre.run('agent-add-pm', {coin: args.coin, agent: cloned});
-        await hre.run('agent-add-billing', {coin: args.coin, agent: cloned});
+        //await hre.run('agent-add-pm', {coin: args.coin, agent: cloned});
+        //await hre.run('agent-add-billing', {coin: args.coin, agent: cloned});
         return cloned;
     });
 
