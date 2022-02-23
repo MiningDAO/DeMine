@@ -62,7 +62,7 @@ contract MortgageFacet is
         for (uint i = 0; i < ids.length; i++) {
             totalCost += costPerToken * amounts[i] * daysInToken(ids[i]);
             uint balance = s.balances[ids[i]][msg.sender];
-            require(balance > 0 && balance > amounts[i], 'DeMineAgent: no sufficient balance');
+            require(balance > 0 && balance >= amounts[i], 'DeMineAgent: no sufficient balance');
             s.balances[ids[i]][msg.sender] = balance - amounts[i];
         }
         if (totalCost > 0) {
@@ -119,7 +119,7 @@ contract MortgageFacet is
     }
 
     // @dev the function should only be called by mint function of DeMineNFT
-    // @param from Must be address(0)
+    // @param from Must be the address of NFT custodian
     // @param data Must be encoded address of mortagager
     function onERC1155BatchReceived(
         address,
@@ -177,9 +177,5 @@ contract MortgageFacet is
 
     function daysInToken(uint256 tokenId) private pure returns(uint) {
         return (tokenIdToEnd(tokenId) - tokenIdToStart(tokenId)) / 86400;
-    }
-
-    function getTokenCost() external view returns(uint) {
-        return s.tokenCost;
     }
 }

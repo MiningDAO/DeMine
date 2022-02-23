@@ -1,33 +1,94 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const utils = require("./demine-test-utils.js");
+const config = require("../lib/config.js");
 const logger = require('../lib/logger.js');
+const token = require("../lib/token.js");
+const time = require("../lib/time.js");
+const BN = require('bignumber.js');
 
 describe("DeMine Agent", function () {
     const miningCoin = 'btc';
-    const paymentCoin = 'usd';
     const tokenCost = '100';
-    const testCustodianAddr = '0x8ba1f109551bD432803012645Ac136ddd64DBA72';
-    var mortgageAgentAddr, deployer, admin;
+    let deployer, admin, tester, mortgageAgent, nftToken, paymentCoin;
 
     beforeEach(async function() {
         const signers = await hre.ethers.getNamedSigners();
         deployer = signers.deployer;
         admin = signers.admin;
+        tester = signers.test;
         await hre.deployments.fixture(['NFT', 'Agent']);
         mortgageAgentAddr = await hre.run('agent-clone', {
-            miningCoin,
-            paymentCoin,
-            custodianAddr: testCustodianAddr,
+            coin: miningCoin,
             cost: tokenCost
         });
+        mortgageAgent = await hre.ethers.getContractAt('MortgageFacet', mortgageAgentAddr);
+        nftToken = await hre.ethers.getContractAt('ERC1155Facet', mortgageAgent.nft());
+        paymentCoin = await hre.ethers.getContractAt('ERC20Facet', mortgageAgent.paymentToken());
     });
 
-    it("Initializable", async function () {
-        const mortgageAgent = await hre.ethers.getContractAt('MortgageFacet', mortgageAgentAddr);
-        gotTokenCost = await mortgageAgent.getTokenCost();
-        expect(gotTokenCost).to.equal(tokenCost);
+    it("Initialized", async function () {
+        let normalizedTokenCost = new BN(10).pow(18).times(tokenCost).toFixed();
+        expect(await mortgageAgent.tokenCost()).to.equal(normalizedTokenCost);
+        expect(await mortgageAgent.custodian()).to.equal(admin.address);
+        let nftCustodian = await ethers.getContractAt(
+            'ERC1155Custodian',
+            await nftToken.custodian()
+        );
+        expect(await nftToken.custodian()).to.equal(nftCustodian.address);
     });
+
+    it("CannotRedeemInvalidInput", async function () {
+        await expect(mortgageAgent.redeemNFT([BN(1).toFixed(), BN(2).toFixed()], [BN(3).toFixed()])
+            ).to.be.revertedWith('DeMineAgent: array length mismatch');
+    });
+
+    it("CannotRedeemNotEnoughBalance", async function () {
+        let tokenId1 = token.encodeOne(token.genTokenId(time.toEpoch(new Date('2022-02-03')), 'weekly'));
+        await expect(mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(1).toFixed()])
+            ).to.be.revertedWith('DeMineAgent: no sufficient balance');
+
+        let abiCoder = ethers.utils.defaultAbiCoder;
+        let data = await abiCoder.encode(["address"], [tester.address]);
+        await mortgageAgent.onERC1155BatchReceived(admin.address, nftToken.custodian(), [tokenId1], [BN(2).toFixed()], data);
+        await expect(mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(3).toFixed()])
+            ).to.be.revertedWith('DeMineAgent: no sufficient balance');
+    });
+
+    it("CannotRedeemFailedPayment", async function () {
+        let tokenId1 = token.encodeOne(token.genTokenId(time.toEpoch(new Date('2022-02-03')), 'weekly'));
+
+        let abiCoder = ethers.utils.defaultAbiCoder;
+        let data = await abiCoder.encode(["address"], [tester.address]);
+        await mortgageAgent.onERC1155BatchReceived(admin.address, nftToken.custodian(), [tokenId1], [BN(5).toFixed()], data);
+        await expect(mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(3).toFixed()])
+            ).to.be.revertedWith('ERC20: transfer amount exceeds allowance');
+    });
+
+    /*
+    it("SuccessfulRedeem", async function () {
+        let tokenId1 = token.encodeOne(token.genTokenId(time.toEpoch(new Date('2022-02-03')), 'weekly'));
+
+        let abiCoder = ethers.utils.defaultAbiCoder;
+        let data = await abiCoder.encode(["address"], [tester.address]);
+        await mortgageAgent.onERC1155BatchReceived(admin.address, nftToken.custodian(), [tokenId1], [BN(5).toFixed()], data);
+        await paymentCoin.connect(admin).mint(tester.address, BN(5000).toFixed());
+        await paymentCoin.connect(admin).approve(tester.address, BN(5000).toFixed());
+        logger.info("========");
+        logger.info(await paymentCoin.balanceOf(tester.address));
+        logger.info(await paymentCoin.allowance(tester.address, tester.address));
+        
+
+        //mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(3).toFixed()]);
+
+        await expect(mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(2).toFixed()])
+            ).to.not.be.revertedWith('ERC20: transfer amount exceeds allowance');
+
+        let balance = await mortgageAgent.balanceOfBatch(tester.address, [tokenId1]);
+        expect(balance["0"]).to.equal(BN(2).toFixed());
+    });
+    */
+
 
 
         /*
