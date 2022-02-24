@@ -10,7 +10,7 @@ const BN = require('bignumber.js');
 describe("DeMine Agent", function () {
     const miningCoin = 'btc';
     const tokenCost = '100';
-    let deployer, admin, tester, mortgageAgent, nftToken, paymentCoin;
+    let deployer, admin, tester, mortgageAgent, nftToken, nftCustodian, paymentCoin;
 
     beforeEach(async function() {
         const signers = await hre.ethers.getNamedSigners();
@@ -23,15 +23,15 @@ describe("DeMine Agent", function () {
             cost: tokenCost
         });
         mortgageAgent = await hre.ethers.getContractAt('MortgageFacet', mortgageAgentAddr);
-        nftToken = await hre.ethers.getContractAt('ERC1155Facet', mortgageAgent.nft());
-        paymentCoin = await hre.ethers.getContractAt('ERC20Facet', mortgageAgent.paymentToken());
+        nftToken = await hre.ethers.getContractAt('ERC1155Facet', await mortgageAgent.nft());
+        paymentCoin = await hre.ethers.getContractAt('ERC20Facet', await mortgageAgent.paymentToken());
     });
-
+/*
     it("Initialized", async function () {
         let normalizedTokenCost = new BN(10).pow(18).times(tokenCost).toFixed();
         expect(await mortgageAgent.tokenCost()).to.equal(normalizedTokenCost);
         expect(await mortgageAgent.custodian()).to.equal(admin.address);
-        let nftCustodian = await ethers.getContractAt(
+        nftCustodian = await ethers.getContractAt(
             'ERC1155Custodian',
             await nftToken.custodian()
         );
@@ -76,27 +76,37 @@ describe("DeMine Agent", function () {
         await mortgageAgent.onERC1155BatchReceived(admin.address, nftToken.custodian(), [tokenId1], [BN(5).toFixed()], data);
         await expect(mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(3).toFixed()])
             ).to.be.revertedWith('ERC20: transfer amount exceeds allowance');
-    });
+    });*/
 
     it("SuccessfulRedeem", async function () {
         let tokenId1 = token.encodeOne(token.genTokenId(time.toEpoch(new Date('2022-02-03')), 'weekly'));
 
+        await hre.run('nft-admin-custody', {coin: miningCoin, nft: await mortgageAgent.nft()});
+        await nftToken.connect(admin).mint([tokenId1], [BN(10).toFixed()], []);
+        expect(await nftToken.balanceOf(await nftToken.custodian(), tokenId1)).to.equal(10);
+        logger.info("########");
+        logger.info(mortgageAgent.address);
+        await nftToken.connect(admin).safeTransferFrom(
+            await nftToken.custodian(), mortgageAgent.address, tokenId1, 10, []
+        );
+        expect(await nftToken.balanceOf(mortgageAgent.address, tokenId1)).to.equal(10);
+
+/*
         let abiCoder = ethers.utils.defaultAbiCoder;
         let data = await abiCoder.encode(["address"], [tester.address]);
         await mortgageAgent.onERC1155BatchReceived(admin.address, nftToken.custodian(), [tokenId1], [BN(5).toFixed()], data);
-        await paymentCoin.connect(admin).mint(tester.address, BN(5000).toFixed());
-        await paymentCoin.connect(tester).approve(mortgageAgent.address, BN(5000).toFixed());
-        
-        logger.info("\n======== debugging start");
-        logger.info(await paymentCoin.balanceOf(tester.address));
-        logger.info(await paymentCoin.allowance(tester.address, mortgageAgent.address));
-        logger.info("======== debugging end");
-
-        await expect(mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(3).toFixed()])
-            ).to.not.be.revertedWith('ERC20: transfer amount exceeds allowance');
-
         let balance = await mortgageAgent.balanceOfBatch(tester.address, [tokenId1]);
+        expect(balance["0"]).to.equal(BN(5).toFixed());
+      
+        await paymentCoin.connect(admin).mint(tester.address, BN(5000).pow(18).toFixed());
+        await paymentCoin.connect(tester).approve(mortgageAgent.address, BN(5000).pow(18).toFixed());
+mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(3).toFixed()]);
+        await expect(mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(3).toFixed()])
+            ).to.not.be.reverted;
+
+        balance = await mortgageAgent.balanceOfBatch(tester.address, [tokenId1]);
         expect(balance["0"]).to.equal(BN(2).toFixed());
+                */
     });
 
 
