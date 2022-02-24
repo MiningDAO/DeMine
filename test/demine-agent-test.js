@@ -26,7 +26,7 @@ describe("DeMine Agent", function () {
         nftToken = await hre.ethers.getContractAt('ERC1155Facet', await mortgageAgent.nft());
         paymentCoin = await hre.ethers.getContractAt('ERC20Facet', await mortgageAgent.paymentToken());
     });
-/*
+
     it("Initialized", async function () {
         let normalizedTokenCost = new BN(10).pow(18).times(tokenCost).toFixed();
         expect(await mortgageAgent.tokenCost()).to.equal(normalizedTokenCost);
@@ -76,7 +76,7 @@ describe("DeMine Agent", function () {
         await mortgageAgent.onERC1155BatchReceived(admin.address, nftToken.custodian(), [tokenId1], [BN(5).toFixed()], data);
         await expect(mortgageAgent.connect(tester).redeemNFT([tokenId1], [BN(3).toFixed()])
             ).to.be.revertedWith('ERC20: transfer amount exceeds allowance');
-    });*/
+    });
 
     it("SuccessfulRedeem", async function () {
         let tokenId1 = token.encodeOne(token.genTokenId(time.toEpoch(new Date('2022-02-03')), 'weekly'));
