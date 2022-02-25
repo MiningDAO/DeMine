@@ -68,8 +68,10 @@ task('agent-add-pm', 'Add primary market sale facet')
 
         const paymentToken = await getPaymentToken(ethers, args.agent);
         const decimals = await paymentToken.decimals();
-        const royaltyCap = ethers.BigNumber.from(10).pow(decimals).mul(
-            localConfig.primaryMarketSaleRoyaltyCap
+        const royaltyCap = ethers.BigNumber.from(
+            new BN(10).pow(decimals).times(
+                localConfig.primaryMarketSaleRoyaltyCap
+            ).toFixed()
         );
         const iface = new hre.ethers.utils.Interface([
             'function init(uint16, uint, address[])'
