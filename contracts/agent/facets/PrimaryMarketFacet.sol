@@ -22,12 +22,6 @@ contract PrimaryMarketFacet is
 {
     using SafeERC20 for IERC20;
 
-    event Claim(
-        address indexed operator,
-        address indexed from,
-        address indexed to
-    );
-
     struct ClaimState {
         uint tokenCost;
         uint totalCost;
@@ -71,15 +65,17 @@ contract PrimaryMarketFacet is
 
     function claimFrom(
         address from,
-        address to,
         uint[] calldata ids,
         uint[] calldata amounts
     ) external whenNotPaused returns(uint[] memory) {
         require(
             ids.length == amounts.length,
-            "TokenLocker: array length mismatch"
+            'TokenLocker: array length mismatch'
         );
-        require(s.approved[from][to], 'Mining3Agent: not approved');
+        require(
+            isApproved(from, msg.sender),
+            'Mining3Agent: operator not approved'
+        );
         ClaimState memory cs = ClaimState(s.tokenCost, 0, 0);
         uint[] memory prices = priceOfBatch(from, cs.tokenCost, ids);
         for (uint i = 0; i < ids.length; i++) {
@@ -99,7 +95,6 @@ contract PrimaryMarketFacet is
         payment.safeTransferFrom(msg.sender, s.custodian, cs.totalCost + royalty);
         payment.safeTransferFrom(msg.sender, from, cs.totalEarned - royalty);
         s.nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
-        emit Claim(msg.sender, from, to);
         return amounts;
     }
 
@@ -128,8 +123,8 @@ contract PrimaryMarketFacet is
     function isApproved(
         address owner,
         address buyer
-    ) external view returns(bool) {
-        return s.approved[owner][buyer];
+    ) public view returns(bool) {
+        return s.approved[owner][buyer] || s.approved[owner][address(0)];
     }
 
     function priceOfBatch(
