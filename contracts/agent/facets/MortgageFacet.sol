@@ -110,12 +110,18 @@ contract MortgageFacet is
 
     function onERC1155Received(
         address,
-        address,
-        uint256,
-        uint256,
-        bytes calldata
-    ) external pure override returns (bytes4) {
-        return 0; // reject
+        address from,
+        uint256 id,
+        uint256 amount,
+        bytes calldata data
+    ) external override returns (bytes4) {
+        require(
+            from == s.nft.custodian(),
+            'DeMineAgent: only tokens from custodian allowed'
+        );
+        (address mortgager) = abi.decode(data, (address));
+        s.balances[id][mortgager] += amount;
+        return IERC1155Receiver.onERC1155Received.selector;
     }
 
     // @dev the function should only be called by mint function of DeMineNFT
@@ -134,8 +140,7 @@ contract MortgageFacet is
         );
         (address mortgager) = abi.decode(data, (address));
         for (uint i = 0; i < ids.length; i++) {
-            uint balance = s.balances[ids[i]][mortgager] + amounts[i];
-            s.balances[ids[i]][mortgager] = balance;
+            s.balances[ids[i]][mortgager] += amounts[i];
         }
         return IERC1155Receiver.onERC1155BatchReceived.selector;
     }

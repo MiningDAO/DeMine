@@ -87,7 +87,11 @@ describe("DeMine Agent", function () {
         logger.info("########");
         logger.info(mortgageAgent.address);
         await nftToken.connect(admin).safeTransferFrom(
-            await nftToken.custodian(), mortgageAgent.address, tokenId1, 10, []
+            await nftToken.custodian(),
+            mortgageAgent.address,
+            tokenId1,
+            10,
+            ethers.utils.defaultAbiCoder.encode(['address'], [tester.address])
         );
         expect(await nftToken.balanceOf(mortgageAgent.address, tokenId1)).to.equal(10);
 
