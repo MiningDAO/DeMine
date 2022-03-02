@@ -3,6 +3,7 @@ const { types } = require("hardhat/config");
 const BN = require('bignumber.js');
 const config = require("../lib/config.js");
 const logger = require('../lib/logger.js');
+const token = require("../lib/token.js");
 const common = require("../lib/common.js");
 const state = require("../lib/state.js");
 const diamond = require("../lib/diamond.js");
@@ -268,8 +269,8 @@ task('agent-clone', 'Deploy clone of demine agent')
                 }
             }
         );
-        //await hre.run('agent-add-pm', {coin: args.coin, agent: cloned});
-        //await hre.run('agent-add-billing', {coin: args.coin, agent: cloned});
+        await hre.run('agent-add-pm', {coin: args.coin, agent: cloned});
+        await hre.run('agent-add-billing', {coin: args.coin, agent: cloned});
         return cloned;
     });
 
@@ -335,4 +336,28 @@ task('agent-inspect', 'Inspect agent contract')
         logger.info(JSON.stringify(info, null, 2));
         logger.info("=========== nft-inspect-nft end ===========");
         return info;
+    });
+
+task('try-billing', 'Trigger billing for a NFT token.')
+    .addParam('token', 'the NFT token being billed, format: 2022-02-02,2022-02-08,weekly')
+    .addOptionalParam('agent', 'agent contract address')
+    .setAction(async (args, { ethers, network, deployments, localConfig } = hre) => {
+        logger.info("=========== Try billing start ===========");
+        const tokenIds = token.parseTokenIds(args.token);
+        assert(tokenIds.length == 1, 'invalide number of tokens to bill.');
+        // TODO: store agent contract address in state.
+        const agent = await ethers.getContractAt('Diamond', args.agent);
+
+        const iface = new hre.ethers.utils.Interface([
+            'function tryBilling(uint tokenId)'
+        ]);
+        const calldata = iface.encodeFunctionData(
+            'tryBilling', [ token.encodeOne(tokenIds[0]) ]
+        );
+
+        const admin = await config.admin(hre);
+        const billingFacet = await deployments.get('BillingFacet');
+        const billingFacetContract = await hre.ethers.getContractAt('BillingFacet', await billingFacet.address);
+        await billingFacetContract.connect(admin.signer).tryBilling(token.encodeOne(tokenIds[0]));
+        logger.info("=========== Try billing end ===========");
     });

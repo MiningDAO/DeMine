@@ -17,7 +17,7 @@ describe("DeMine Agent", function () {
         deployer = signers.deployer;
         admin = signers.admin;
         tester = signers.test;
-        await hre.deployments.fixture(['NFT', 'Agent']);
+        await hre.deployments.fixture(['NFT', 'Agent', 'Mock']);
         mortgageAgentAddr = await hre.run('agent-clone', {
             coin: miningCoin,
             cost: tokenCost
@@ -110,7 +110,24 @@ describe("DeMine Agent", function () {
         expect(balance["0"]).to.equal(BN(7).toFixed());
     });
 
+    it("SuccessfulBilled", async function () {
+        let tokenId1 = token.encodeOne(token.genTokenId(time.toEpoch(new Date('2022-02-03')), 'weekly'));
+        let tokenId1Str = "2022-02-03,2022-02-09,weekly";
 
+        await hre.run('nft-admin-custody', {coin: miningCoin, nft: await mortgageAgent.nft()});
+        await nftToken.connect(admin).mint([tokenId1], [BN(10).toFixed()], []);
+        expect(await nftToken.balanceOf(await nftToken.custodian(), tokenId1)).to.equal(10);
+        await nftToken.connect(admin).safeTransferFrom(
+            await nftToken.custodian(),
+            mortgageAgent.address,
+            tokenId1,
+            10,
+            ethers.utils.defaultAbiCoder.encode(['address'], [tester.address])
+        );
+        expect(await nftToken.balanceOf(mortgageAgent.address, tokenId1)).to.equal(10);
+
+        await hre.run('try-billing', { token: tokenId1Str, agent: mortgageAgent.address });
+    });
 
         /*
         let { agent, payments: [p1, p2, _] } = contracts;
