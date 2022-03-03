@@ -5,9 +5,15 @@ import '@solidstate/contracts/access/OwnableInternal.sol';
 import '@solidstate/contracts/token/ERC20/ERC20.sol';
 import '@solidstate/contracts/token/ERC20/metadata/ERC20MetadataStorage.sol';
 
+import '../../shared/lib/LibPausable.sol';
 import '../../shared/lib/LibInitializable.sol';
 
-contract ERC20Facet is Initializable, OwnableInternal, ERC20 {
+contract ERC20Facet is
+    Initializable,
+    PausableModifier,
+    OwnableInternal,
+    ERC20
+{
     function init(
         string memory name,
         string memory symbol,
@@ -26,4 +32,10 @@ contract ERC20Facet is Initializable, OwnableInternal, ERC20 {
     function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);
     }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override whenNotPaused {}
 }

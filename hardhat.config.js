@@ -4,6 +4,7 @@ require('hardhat-gas-reporter');
 require('hardhat-deploy');
 require("@nomiclabs/hardhat-etherscan");
 require('hardhat-deploy-ethers');
+require('./tasks/erc20.js');
 require('./tasks/wrapped.js');
 require('./tasks/wrapped-admin.js');
 require('./tasks/nft.js');
@@ -74,7 +75,9 @@ module.exports = {
     etherscan: {
         apiKey: {
             bsc: config.scan.bsc.key,
-            bscTestnet: config.scan.bscdev.key
+            bscTestnet: config.scan.bscdev.key,
+            polygon: config.scan.matic.key,
+            polygonMumbai: config.scan.maticdev.key,
         }
     },
     namedAccounts: {

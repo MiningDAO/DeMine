@@ -102,7 +102,15 @@ const config = {
         bscdev: {
             api: "https://api-testnet.bscscan.com/api",
             key: process.env.BSC_SCAN_KEY
-        }
+        },
+        matic: {
+            api: "https://api.polygonscan.com/api",
+            key: process.env.POLY_SCAN_KEY,
+        },
+        maticdev: {
+            api: "https://api-testnet.polygonscan.com/api",
+            key: process.env.POLY_SCAN_KEY,
+        },
     },
     wrapped: {
         usd: {
