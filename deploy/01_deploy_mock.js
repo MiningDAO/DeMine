@@ -5,4 +5,4 @@ module.exports = async (hre) => {
     await common.confirmAndDeploy(hre, 'SwapRouterV2Mock', []);
 };
 
-module.exports.tags = ['Mock'];
+module.exports.tags = ['Local'];

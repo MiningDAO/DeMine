@@ -41,7 +41,7 @@ describe("DeMineNFT", function () {
         test = signers.test;
 
         // deploy
-        await hre.deployments.fixture(['NFT', 'Agent', 'Mock']);
+        await hre.deployments.fixture(['NFT', 'Agent', 'Local']);
         pricingStatic = await config.getDeployment(hre, 'PricingStatic');
         pricingLinearDecay = await config.getDeployment(hre, 'PricingLinearDecay');
 

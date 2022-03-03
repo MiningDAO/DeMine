@@ -33,7 +33,7 @@ describe("DeMineNFT", function () {
         const signers = await hre.ethers.getNamedSigners();
         admin = signers.admin;
         deployer = signers.deployer;
-        await hre.deployments.fixture(['NFT']);
+        await hre.deployments.fixture(['Local', 'NFT']);
         nft = await hre.run('nft-clone', {coin: coin});
         erc1155 = await hre.ethers.getContractAt('ERC1155Facet', nft);
         custodian = await ethers.getContractAt(

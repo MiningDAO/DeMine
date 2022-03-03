@@ -54,11 +54,13 @@ const config = {
     gnosisSafe: {
         api: {
             rinkeby: 'https://safe-transaction.rinkeby.gnosis.io',
-            bsc: 'https://safe-transaction.bsc.gnosis.io'
+            bsc: 'https://safe-transaction.bsc.gnosis.io',
+            matic: 'https://safe-transaction.polygon.gnosis.io/',
         },
         admin: {
             bsc: '0x782A6a9Bc11Fb6e8320b92f2217AfD80f813Bd05',
             rinkeby: '0xf24c00BafB6Cb10C5EA13Fa896526df604EE2B19',
+            matic: '0x8aD0d649B73FaA869EB658aA4AAeC44aaF9fB0a9',
         }
     },
     hashPerToken: {

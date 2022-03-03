@@ -14,7 +14,7 @@ describe("DeMine Agent", function () {
         const signers = await hre.ethers.getNamedSigners();
         deployer = signers.deployer;
         admin = signers.admin;
-        await hre.deployments.fixture(['NFT', 'Agent']);
+        await hre.deployments.fixture(['Local', 'NFT', 'Agent']);
         mortgageAgentAddr = await hre.run('agent-clone', {
             miningCoin,
             paymentCoin,
