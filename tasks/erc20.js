@@ -14,10 +14,20 @@ task("erc20-create", "create new erc20 token")
     .addParam('name', 'token name')
     .addParam('symbol', 'token symbol')
     .addOptionalParam('decimals', 'token decimals', 18, types.int)
+    .addOptionalParam('admin', 'admin address')
     .setAction(async function(args, { ethers, network } = hre) {
         logger.info("===========  ERC20 create start ===========");
 
-        const admin = await config.admin(hre);
+        var admin;
+        if (args.admin) {
+            const signers = await hre.ethers.getNamedSigners();
+            admin = {
+                address: args.admin,
+                signer: signers.admin,
+            }
+        } else {
+            admin = await config.admin(hre);
+        }
         const base = await config.getDeployment(hre, 'Diamond');
         const fallback = await config.getDeployment(hre, 'ERC20Facet');
         const path = contractPath(args.symbol, args.decimals);
