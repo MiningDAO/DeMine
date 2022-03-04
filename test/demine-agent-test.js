@@ -124,9 +124,55 @@ describe("DeMine Agent", function () {
             10,
             ethers.utils.defaultAbiCoder.encode(['address'], [tester.address])
         );
+
         expect(await nftToken.balanceOf(mortgageAgent.address, tokenId1)).to.equal(10);
 
+        // Setup SwapRouterV2Mock
+        const swapRouter = await config.getDeployment(hre, 'SwapRouterV2Mock');
+        const swapRouterContract = await hre.ethers.getContractAt('SwapRouterV2Mock', swapRouter.address);
+        swapRouterContract.setSuccess(100);
+        await paymentCoin.connect(admin).mint(swapRouter.address, BN('20000e+18').toFixed());
+        await paymentCoin.connect(tester).approve(swapRouter.address, BN('2000e+18').toFixed());
+
+        // Finalize NFT.
+        const earningToken = await hre.ethers.getContractAt('ERC20Facet', await nftToken.earningToken());
+        const earningTokenAmount = ethers.BigNumber.from(
+            (new BN(10).pow(await earningToken.decimals()).times(2200)).toFixed());
+
+        await earningToken.connect(admin).mint(admin.address, earningTokenAmount);
+        await earningToken.connect(admin).approve(nftToken.address, earningTokenAmount);
+
+        await nftToken.connect(admin).finalize(
+            time.toEpoch(new Date('2022-02-04')),
+            normalizedEarningToken(earningToken, 0.5),
+            admin.address, ethers.BigNumber.from((new BN(10).pow(18).times(300)).toFixed()));
+        await nftToken.connect(admin).finalize(
+            time.toEpoch(new Date('2022-02-05')),
+            normalizedEarningToken(earningToken, 0.5),
+            admin.address, ethers.BigNumber.from((new BN(10).pow(18).times(300)).toFixed()));
+        await nftToken.connect(admin).finalize(
+            time.toEpoch(new Date('2022-02-06')),
+            normalizedEarningToken(earningToken, 0.5),
+            admin.address, ethers.BigNumber.from((new BN(10).pow(18).times(300)).toFixed()));
+        await nftToken.connect(admin).finalize(
+            time.toEpoch(new Date('2022-02-07')),
+            normalizedEarningToken(earningToken, 0.5),
+            admin.address, ethers.BigNumber.from((new BN(10).pow(18).times(300)).toFixed()));
+        await nftToken.connect(admin).finalize(
+            time.toEpoch(new Date('2022-02-08')),
+            normalizedEarningToken(earningToken, 0.5),
+            admin.address, ethers.BigNumber.from((new BN(10).pow(18).times(300)).toFixed()));
+        await nftToken.connect(admin).finalize(
+            time.toEpoch(new Date('2022-02-09')),
+            normalizedEarningToken(earningToken, 0.5),
+            admin.address, ethers.BigNumber.from((new BN(10).pow(18).times(300)).toFixed()));
+        await nftToken.connect(admin).finalize(
+            time.toEpoch(new Date('2022-02-10')),
+            normalizedEarningToken(earningToken, 0.5),
+            admin.address, ethers.BigNumber.from((new BN(10).pow(18).times(300)).toFixed()));
+
         await hre.run('try-billing', { token: tokenId1Str, agent: mortgageAgent.address });
+
     });
 
         /*
@@ -683,3 +729,9 @@ describe("DeMine Agent", function () {
     });
     */
 });
+
+async function normalizedEarningToken(earningToken, tokens) {  
+    const decimals = await earningToken.decimals();
+    const normalizedToken = new BN(10).pow(decimals).times(tokens);
+    return ethers.BigNumber.from(normalizedToken.toFixed());
+}

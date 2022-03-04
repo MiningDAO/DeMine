@@ -3,7 +3,7 @@
 pragma solidity 0.8.11;
 pragma experimental ABIEncoderV2;
 
-import '@solidstate/contracts/access/OwnableInternal.sol';
+import '@solidstate/contracts/access/Ownable.sol';
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -12,10 +12,14 @@ import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
+import '@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol';
+
 
 import '../../nft/interfaces/IERC1155Rewardable.sol';
 import '../../shared/lib/LibPausable.sol';
 import '../lib/AppStorage.sol';
+
+import "hardhat/console.sol";
 
 /**
  * @title BillingFacet
@@ -24,7 +28,7 @@ import '../lib/AppStorage.sol';
  */
 contract BillingFacet is
     PausableModifier,
-    OwnableInternal,
+    Ownable,
     StorageBase
 {
     using SafeERC20 for IERC20;
@@ -49,7 +53,7 @@ contract BillingFacet is
      * @notice It will try to sell earning token at Uniswap
      * to pay bill and start earning token sale if it fails
      */
-    function tryBilling(uint tokenId) external onlyOwner {
+    function tryBilling(uint tokenId) external  {
         IERC1155Rewardable nft = s.nft;
         uint balance = nft.balanceOf(address(this), tokenId);
         if (balance == 0) {
@@ -58,6 +62,8 @@ contract BillingFacet is
         uint debt = s.tokenCost * balance;
         IERC20 earningToken = IERC20(s.nft.earningToken());
         uint prevBalance = earningToken.balanceOf(address(this));
+        console.log("#########111");
+        console.log(balance);
         nft.safeTransferFrom(
             address(this), nft.custodian(), tokenId, balance, ''
         );
@@ -67,6 +73,9 @@ contract BillingFacet is
             s.statements[tokenId].debt = debt;
             return;
         }
+        console.log("#########444");
+        console.log(earning);
+        console.log(debt);
         (uint earningTokenSold, uint paymentTokenReceived) = trySwap(
             s.swapRouter,
             address(earningToken),
@@ -74,10 +83,15 @@ contract BillingFacet is
             earning,
             debt
         );
+        console.log("#########555");
+        console.log(earningTokenSold);
+        console.log(paymentTokenReceived);
         if (paymentTokenReceived == debt) {
+        console.log("#########666");
             s.statements[tokenId].balance = balance;
             s.statements[tokenId].surplus = earning - earningTokenSold;
         } else {
+        console.log("#########777");
             s.statements[tokenId] = BillingStatement(
                 balance,
                 earning - earningTokenSold,
@@ -167,6 +181,13 @@ contract BillingFacet is
         TransferHelper.safeApprove(tokenIn, swapRouter, amountInMax);
         uint8 version = s.swapRouterVersion;
         if (version == 2) {
+            address[] memory tokens = new address[](2);
+            tokens[0] = tokenIn;
+            tokens[1] = tokenOut;
+            IUniswapV2Router02 uniswapRouter = IUniswapV2Router02(swapRouter);
+            uint256[] memory inOut = uniswapRouter.swapTokensForExactTokens(
+                amountOut, amountInMax, tokens, address(this), block.timestamp);
+            /*
             (bool success, bytes memory encoded) = swapRouter.call(
                 abi.encodeWithSignature(
                     'swapTokensForExactTokens(uint,uint,address[],address,uint)',
@@ -176,6 +197,7 @@ contract BillingFacet is
             if (success) {
                 (sold, bought) = abi.decode(encoded, (uint, uint));
             }
+            */
         } else if (version == 3) {
             ISwapRouter.ExactOutputSingleParams memory param =
             ISwapRouter.ExactOutputSingleParams({

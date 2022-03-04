@@ -338,6 +338,7 @@ task('agent-inspect', 'Inspect agent contract')
         return info;
     });
 
+// TODO: load agent address from state.
 task('try-billing', 'Trigger billing for a NFT token.')
     .addParam('token', 'the NFT token being billed, format: 2022-02-02,2022-02-08,weekly')
     .addOptionalParam('agent', 'agent contract address')
@@ -345,19 +346,10 @@ task('try-billing', 'Trigger billing for a NFT token.')
         logger.info("=========== Try billing start ===========");
         const tokenIds = token.parseTokenIds(args.token);
         assert(tokenIds.length == 1, 'invalide number of tokens to bill.');
-        // TODO: store agent contract address in state.
-        const agent = await ethers.getContractAt('Diamond', args.agent);
-
-        const iface = new hre.ethers.utils.Interface([
-            'function tryBilling(uint tokenId)'
-        ]);
-        const calldata = iface.encodeFunctionData(
-            'tryBilling', [ token.encodeOne(tokenIds[0]) ]
-        );
 
         const admin = await config.admin(hre);
-        const billingFacet = await deployments.get('BillingFacet');
-        const billingFacetContract = await hre.ethers.getContractAt('BillingFacet', await billingFacet.address);
-        await billingFacetContract.connect(admin.signer).tryBilling(token.encodeOne(tokenIds[0]));
+        const billingFacet = await hre.ethers.getContractAt('BillingFacet', await args.agent);
+        
+        await billingFacet.connect(admin.signer).tryBilling(token.encodeOne(tokenIds[0]));
         logger.info("=========== Try billing end ===========");
     });
