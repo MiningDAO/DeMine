@@ -3,24 +3,33 @@
 pragma solidity 0.8.11;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Arrays.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
+import "@openzeppelin/contracts/proxy/Clones.sol";
+import "@openzeppelin/contracts/utils/Arrays.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract Mining3 is ERC20, Ownable, Pausable {
+contract Mining3 is
+    Initializable,
+    ERC20Upgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable
+{
     using Arrays for uint256[];
     using SafeERC20 for IERC20;
+
+    event Clone(address source, address cloned);
 
     struct Withdrawal {
         uint256 snapshotId;
         uint256 index;
     }
 
-    address public immutable earningToken;
+    address private _earningToken;
     uint256 private _finalized;
     mapping(address => Withdrawal) _withdrawal;
     mapping(uint256 => uint256) _earningSum;
@@ -32,14 +41,30 @@ contract Mining3 is ERC20, Ownable, Pausable {
     mapping(address => Snapshots) private _accountBalanceSnapshots;
     Snapshots private _totalSupplySnapshots;
 
-    constructor(
+    function initialize(
         string memory name,
         string memory symbol,
         address earningTokenToSet,
-        uint finalized
-    ) ERC20(name, symbol) {
-        earningToken = earningTokenToSet;
-        _finalized = finalized;
+        uint startSnapshotId
+    ) external initializer {
+        __Ownable_init();
+        __Pausable_init();
+        __ERC20_init(name, symbol);
+        _earningToken = earningTokenToSet;
+        _finalized = startSnapshotId;
+    }
+
+    function clone(
+        string memory name,
+        string memory symbol,
+        address earningToken,
+        uint startSnapshotId
+    ) external returns(address) {
+        address cloned = Clones.clone(address(this));
+        Mining3(cloned).initialize(name, symbol, earningToken, startSnapshotId);
+        OwnableUpgradeable(cloned).transferOwnership(msg.sender);
+        emit Clone(address(this), cloned);
+        return cloned;
     }
 
     function burn(uint256 amount) external onlyOwner {
@@ -74,7 +99,7 @@ contract Mining3 is ERC20, Ownable, Pausable {
             supply = _totalSupplySnapshots.values[index];
         }
 
-        IERC20(earningToken).safeTransferFrom(
+        IERC20(_earningToken).safeTransferFrom(
             owner(),
             address(this),
             earningPerToken * supply
@@ -110,7 +135,7 @@ contract Mining3 is ERC20, Ownable, Pausable {
         }
         withdrawal.snapshotId = snapshotId;
         withdrawal.index = index;
-        IERC20(earningToken).safeTransfer(msg.sender, totalEarning);
+        IERC20(_earningToken).safeTransfer(msg.sender, totalEarning);
     }
 
     function balanceOfAt(
@@ -132,12 +157,16 @@ contract Mining3 is ERC20, Ownable, Pausable {
         return snapshotted ? value : totalSupply();
     }
 
-    function finalizedAt() external view returns(uint256) {
+    function lastFinalizedAt() external view returns(uint256) {
         return _finalized;
     }
 
-    function lastWithdrawalAt(address account) external view returns(uint256) {
+    function lastWithdrawAt(address account) external view returns(uint256) {
         return _withdrawal[account].snapshotId;
+    }
+
+    function earningToken() external view returns(address) {
+        return _earningToken;
     }
 
     function earningSumPerToken(uint256 from, uint256 to) public view returns(uint256) {
