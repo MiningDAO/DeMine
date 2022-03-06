@@ -20,10 +20,10 @@ contract Mining3 is ERC20, Ownable, Pausable {
         uint256 index;
     }
 
+    address public immutable earningToken;
     uint256 private _finalized;
-    address private _earningToken;
-    mapping(address => Withdrawal) _withdrawals;
-    mapping(uint256 => uint256) _earnings;
+    mapping(address => Withdrawal) _withdrawal;
+    mapping(uint256 => uint256) _earningSum;
 
     struct Snapshots {
         uint256[] ids;
@@ -35,10 +35,10 @@ contract Mining3 is ERC20, Ownable, Pausable {
     constructor(
         string memory name,
         string memory symbol,
-        address earningToken,
+        address earningTokenToSet,
         uint finalized
     ) ERC20(name, symbol) {
-        _earningToken = earningToken;
+        earningToken = earningTokenToSet;
         _finalized = finalized;
     }
 
@@ -59,61 +59,64 @@ contract Mining3 is ERC20, Ownable, Pausable {
             snapshotId <= currentSnapshotId && snapshotId == _finalized + 86400,
             'Mining3: invalid snapshot id'
         );
+        _earningSum[snapshotId] = _earningSum[snapshotId - 86400] + earningPerToken;
         _finalized = snapshotId;
-        _earnings[snapshotId] = earningPerToken;
-        IERC20(_earningToken).safeTransferFrom(
+
+        uint256 supply;
+        uint256 length = _totalSupplySnapshots.ids.length;
+        if (length == 0 || _totalSupplySnapshots.ids[length - 1] < snapshotId) {
+            supply = totalSupply();
+        } else {
+            uint256 index = length - 1;
+            while(index > 0 && _totalSupplySnapshots.ids[index - 1] >= snapshotId) {
+                index--;
+            }
+            supply = _totalSupplySnapshots.values[index];
+        }
+
+        IERC20(earningToken).safeTransferFrom(
             owner(),
             address(this),
-            earningPerToken * _totalSupplyAt(snapshotId)
+            earningPerToken * supply
         );
     }
 
-    function withdraw(uint256 endSnapshotId) external whenNotPaused {
-        require(
-            endSnapshotId <= _finalized,
-            'Mining3: snapshot not finalized yet'
-        );
-        Snapshots storage snapshots = _accountBalanceSnapshots[msg.sender];
-        Withdrawal storage withdrawal = _withdrawals[msg.sender];
-        uint256 length = snapshots.ids.length;
-        require(length > 0, 'Mining3: no balance to withdraw');
+    function withdraw(uint256 snapshotId) external whenNotPaused {
+        require(snapshotId % 86400 == 0, 'Mining3: invalid snapshot id');
+        require(snapshotId <= _finalized, 'Mining3: not finalized yet');
 
+        Withdrawal storage withdrawal = _withdrawal[msg.sender];
         uint256 prev = withdrawal.snapshotId;
-        uint256 index = withdrawal.index;
+        require(snapshotId > prev, 'Mining3: already withdrawed');
+
+        Snapshots storage snapshots = _accountBalanceSnapshots[msg.sender];
+        uint256 length = snapshots.ids.length;
+        require(length > 0, 'Mining3: no balance');
+
         uint256 totalEarning;
+        uint256 index = withdrawal.index;
         for (; index < length; index++) {
-            uint256 snapshotId = snapshots.ids[index];
-            if (snapshotId < endSnapshotId) {
-                totalEarning += _earning(snapshots.values[index], prev, snapshotId);
+            uint256 cur = snapshots.ids[index];
+            if (cur < snapshotId) {
+                totalEarning += _earning(snapshots.values[index], prev, cur);
             } else {
-                totalEarning += _earning(balanceOf(msg.sender), prev, endSnapshotId);
+                totalEarning += _earning(balanceOf(msg.sender), prev, snapshotId);
                 break;
             }
-            prev = snapshotId;
+            prev = cur;
         }
         if (index == length) {
-            totalEarning += _earning(balanceOf(msg.sender), prev, endSnapshotId);
+            totalEarning += _earning(balanceOf(msg.sender), prev, snapshotId);
         }
-        withdrawal.snapshotId = endSnapshotId;
+        withdrawal.snapshotId = snapshotId;
         withdrawal.index = index;
-        IERC20(_earningToken).safeTransfer(msg.sender, totalEarning);
-    }
-
-    function _earning(
-        uint256 balance,
-        uint256 startSnapshotId,
-        uint256 endSnapshotId
-    ) private returns(uint256) {
-        if (balance == 0) {
-            return 0;
-        }
-        return 0;
+        IERC20(earningToken).safeTransfer(msg.sender, totalEarning);
     }
 
     function balanceOfAt(
         address account,
         uint256 snapshotId
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         (bool snapshotted, uint256 value) = _valueAt(
             snapshotId,
             _accountBalanceSnapshots[account]
@@ -121,16 +124,28 @@ contract Mining3 is ERC20, Ownable, Pausable {
         return snapshotted ? value : balanceOf(account);
     }
 
-    function _totalSupplyAt(uint256 snapshotId) private view returns(uint) {
-        uint256 length = _totalSupplySnapshots.ids.length;
-        if (length == 0 || _totalSupplySnapshots.ids[length - 1] < snapshotId) {
-            return totalSupply();
-        }
-        uint256 index = length - 1;
-        while(index > 0 && _totalSupplySnapshots.ids[index - 1] >= snapshotId) {
-            index--;
-        }
-        return _totalSupplySnapshots.values[index];
+    function totalSupplyAt(uint256 snapshotId) external view returns (uint256) {
+        (bool snapshotted, uint256 value) = _valueAt(
+            snapshotId,
+            _totalSupplySnapshots
+        );
+        return snapshotted ? value : totalSupply();
+    }
+
+    function finalizedAt() external view returns(uint256) {
+        return _finalized;
+    }
+
+    function lastWithdrawalAt(address account) external view returns(uint256) {
+        return _withdrawal[account].snapshotId;
+    }
+
+    function earningSumPerToken(uint256 from, uint256 to) public view returns(uint256) {
+        return _earningSum[to] - _earningSum[from];
+    }
+
+    function _earning(uint256 balance, uint256 from, uint256 to) private view returns(uint256) {
+        return balance == 0 ? 0 : balance * earningSumPerToken(from ,to);
     }
 
     function _beforeTokenTransfer(
