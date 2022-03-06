@@ -15,9 +15,14 @@ contract Mining3 is ERC20, Ownable, Pausable {
     using Arrays for uint256[];
     using SafeERC20 for IERC20;
 
+    struct Withdrawal {
+        uint256 snapshotId;
+        uint256 index;
+    }
+
     uint256 private _finalized;
     address private _earningToken;
-    mapping(address => uint256) _withdrawal;
+    mapping(address => Withdrawal) _withdrawals;
     mapping(uint256 => uint256) _earnings;
 
     struct Snapshots {
@@ -63,25 +68,52 @@ contract Mining3 is ERC20, Ownable, Pausable {
         );
     }
 
-    function withdraw(
-        address account,
-        uint256 endSnapshotId
-    ) external whenNotPaused {
-        uint length = _accountBalanceSnapshots[account].ids.length;
+    function withdraw(uint256 endSnapshotId) external whenNotPaused {
+        require(
+            endSnapshotId <= _finalized,
+            'Mining3: snapshot not finalized yet'
+        );
+        Snapshots storage snapshots = _accountBalanceSnapshots[msg.sender];
+        Withdrawal storage withdrawal = _withdrawals[msg.sender];
+        uint256 length = snapshots.ids.length;
         require(length > 0, 'Mining3: no balance to withdraw');
 
-        uint256 start = _withdrawal[account];
-        if (start == 0) {
-            start = _accountBalanceSnapshots[account].ids[0];
+        uint256 prev = withdrawal.snapshotId;
+        uint256 index = withdrawal.index;
+        uint256 totalEarning;
+        for (; index < length; index++) {
+            uint256 snapshotId = snapshots.ids[index];
+            if (snapshotId < endSnapshotId) {
+                totalEarning += _earning(snapshots.values[index], prev, snapshotId);
+            } else {
+                totalEarning += _earning(balanceOf(msg.sender), prev, endSnapshotId);
+                break;
+            }
+            prev = snapshotId;
         }
-        require(
-            start < endSnapshotId && endSnapshotId <= _finalized,
-            'Mining3: Already withdrawed'
-        );
-        _withdrawal[account] = endSnapshotId;
+        if (index == length) {
+            totalEarning += _earning(balanceOf(msg.sender), prev, endSnapshotId);
+        }
+        withdrawal.snapshotId = endSnapshotId;
+        withdrawal.index = index;
+        IERC20(_earningToken).safeTransfer(msg.sender, totalEarning);
     }
 
-    function balanceOfAt(address account, uint256 snapshotId) public view returns (uint256) {
+    function _earning(
+        uint256 balance,
+        uint256 startSnapshotId,
+        uint256 endSnapshotId
+    ) private returns(uint256) {
+        if (balance == 0) {
+            return 0;
+        }
+        return 0;
+    }
+
+    function balanceOfAt(
+        address account,
+        uint256 snapshotId
+    ) public view returns (uint256) {
         (bool snapshotted, uint256 value) = _valueAt(
             snapshotId,
             _accountBalanceSnapshots[account]
