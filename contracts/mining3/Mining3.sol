@@ -8,10 +8,50 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/Arrays.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
+import "@openzeppelin/contracts/proxy/Proxy.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
+
+contract Mining3Proxy is Proxy {
+    event Clone(address source, address cloned);
+
+    address public immutable beacon;
+
+    constructor(address _beacon) {
+        beacon = _beacon;
+    }
+
+    function clone(
+        string memory name,
+        string memory symbol,
+        address earningToken,
+        uint startSnapshotId,
+        address owner
+    ) external returns(address) {
+        address cloned = Clones.clone(address(this));
+        emit Clone(address(this), cloned);
+        Mining3(cloned).initialize(
+            name,
+            symbol,
+            earningToken,
+            startSnapshotId
+        );
+        OwnableUpgradeable(cloned).transferOwnership(owner);
+        return cloned;
+    }
+
+    function implementation() external view returns (address) {
+        return _implementation();
+    }
+
+    function _implementation() internal view override returns (address) {
+        return IBeacon(beacon).implementation();
+    }
+}
 
 contract Mining3 is
     Initializable,
@@ -21,8 +61,6 @@ contract Mining3 is
 {
     using Arrays for uint256[];
     using SafeERC20 for IERC20;
-
-    event Clone(address source, address cloned);
 
     struct Withdrawal {
         uint256 snapshotId;
@@ -54,19 +92,6 @@ contract Mining3 is
         _finalized = startSnapshotId;
     }
 
-    function clone(
-        string memory name,
-        string memory symbol,
-        address earningToken,
-        uint startSnapshotId
-    ) external returns(address) {
-        address cloned = Clones.clone(address(this));
-        Mining3(cloned).initialize(name, symbol, earningToken, startSnapshotId);
-        OwnableUpgradeable(cloned).transferOwnership(msg.sender);
-        emit Clone(address(this), cloned);
-        return cloned;
-    }
-
     function burn(uint256 amount) external onlyOwner {
         _burn(msg.sender, amount);
     }
@@ -75,14 +100,12 @@ contract Mining3 is
         _mint(to, amount);
     }
 
-    function finalize(
-        uint256 snapshotId,
-        uint256 earningPerToken
-    ) external onlyOwner {
+    function finalize(uint256 earningPerToken) external onlyOwner {
+        uint256 snapshotId = _finalized + 86400;
         uint256 currentSnapshotId = _getCurrentSnapshotId();
         require(
-            snapshotId <= currentSnapshotId && snapshotId == _finalized + 86400,
-            'Mining3: invalid snapshot id'
+            snapshotId <= currentSnapshotId,
+            'Mining3: future snapshot id'
         );
         _earningSum[snapshotId] = _earningSum[snapshotId - 86400] + earningPerToken;
         _finalized = snapshotId;
