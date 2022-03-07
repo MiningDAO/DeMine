@@ -11,6 +11,7 @@ require('./tasks/nft.js');
 require('./tasks/nft-admin.js');
 require('./tasks/e2e.js');
 require('./tasks/agent.js');
+require('./tasks/mining3.js');
 
 const config = require('./config');
 extendEnvironment((hre) => {
