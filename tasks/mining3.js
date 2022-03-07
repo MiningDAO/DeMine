@@ -175,7 +175,6 @@ task('mining3-clone', 'finalize cycle for DeMineNFT contract')
     .addOptionalParam('snapshot', 'initial snapshot id', DEFAULT_SNAPSHOT, types.int)
     .setAction(async (args, { ethers } = hre) => {
         logger.info("=========== nft-admin-finalize start ===========");
-        logger.info("=========== nft-admin-finalize start ===========");
         config.validateCoin(args.coin);
 
         const admin = await config.admin(hre);
@@ -193,6 +192,7 @@ task('mining3-clone', 'finalize cycle for DeMineNFT contract')
             beacon: beacon.address,
             implementation: await beacon.implementation(),
             startSnapshotId: formatTs(args.snapshot),
+            owner: admin.address,
             metadata: {
                 name,
                 symbol,
@@ -204,7 +204,7 @@ task('mining3-clone', 'finalize cycle for DeMineNFT contract')
                 symbol: await earningToken.symbol(),
                 decimals: await earningToken.decimals()
             },
-        }));
+        }, null, 2));
         const populatedTx = await proxy.connect(
            admin.signer
         ).populateTransaction.clone(
