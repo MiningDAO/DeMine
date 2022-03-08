@@ -134,7 +134,7 @@ const config = {
             decimals: 18
         }
     },
-    enableGasReporter: false
+    enableGasReporter: true
 };
 
 module.exports = config;

@@ -9,6 +9,11 @@ const transport = logger.transports.find(
 );
 transport.level = 'warn';
 
+const mine = async function(timestamp) {
+    await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp]);
+    await network.provider.send("evm_mine");
+};
+
 describe("Mining3", function () {
     const coin = 'btc';
     var mining3, earningToken;
@@ -23,8 +28,8 @@ describe("Mining3", function () {
         mining3 = await ethers.getContractAt('Mining3', mining3);
         beacon = await config.getDeployment(hre, 'UpgradeableBeacon');
 
-        earningToken = ethers.getContractAt(
-            '@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20',
+        earningToken = await ethers.getContractAt(
+            'ERC20Facet',
             await mining3.earningToken()
         );
     });
@@ -91,13 +96,9 @@ describe("Mining3", function () {
     it("mining3 snapshot", async function() {
         const date = new Date();
         const timestamp = time.toEpoch(date);
-        const mine = async function(n) {
-            await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp + 86400 * n]);
-            await network.provider.send("evm_mine");
-        };
         await mining3.connect(admin.signer).mint(admin.address, 10000);
         for (let i = 0; i < 50; i++) {
-            await mine(i + 1);
+            await mine(timestamp + 86400 * (i + 1));
             await mining3.connect(admin.signer).transfer(test.address, 100);
             await mining3.connect(admin.signer).burn(100);
         }
@@ -113,6 +114,100 @@ describe("Mining3", function () {
                 await mining3.balanceOfAt(test.address, snapshot)
             ).to.equal(100 * i);
         }
+    });
+
+    it("mining3 finalize", async function() {
+        await expect(
+            mining3.connect(test).finalize(100)
+        ).to.be.revertedWith('Ownable: caller is not the owner');
+
+        await expect(
+            mining3.connect(admin.signer).finalize(100)
+        ).to.be.revertedWith('Mining3: all snapshots finalized');
+
+        const date = new Date();
+        const timestamp = time.toEpoch(date);
+        const finalized = await mining3.lastFinalizedAt();
+
+        const startSnapshot = time.startOfDay(date);
+        var earningSum = 0;
+        for (let i = 0; i < 50; i++) {
+            const snapshot = startSnapshot + 86400 * (i + 1);
+            await mine(timestamp + 86400 * (i + 1));
+
+            const toFinalize = finalized.add(86400 * (i + 1));
+            const supply = await mining3.totalSupplyAt(toFinalize);
+
+            await earningToken.connect(admin.signer).mint(admin.address, supply * i);
+            expect(await earningToken.balanceOf(admin.address)).to.equal(supply * i);
+
+            await earningToken.connect(admin.signer).approve(mining3.address, supply * i);
+            await mining3.connect(admin.signer).finalize(i);
+
+            expect(await earningToken.balanceOf(admin.address)).to.equal(0);
+            expect(await mining3.lastFinalizedAt()).to.equal(toFinalize);
+
+            earningSum += i;
+            expect(await mining3.earningSum(snapshot)).to.equal(earningSum);
+
+            if (Math.random() > 0.5) {
+                await mining3.connect(admin.signer).mint(test.address, 1000);
+            }
+        }
+    });
+
+    it.only("mining3 withdraw", async function() {
+        const date = new Date();
+        const timestamp = time.toEpoch(date);
+        const finalized = await mining3.lastFinalizedAt();
+
+        await mining3.connect(admin.signer).mint(test.address, 10000);
+
+        const startSnapshot = time.startOfDay(date);
+        for (let i = 0; i < 50; i++) {
+            const delta = 86400 * (i + 1);
+            const snapshot = startSnapshot + delta;
+            await mine(timestamp + delta);
+
+            const toFinalize = finalized.add(delta);
+            const supply = await mining3.totalSupplyAt(toFinalize);
+            await earningToken.connect(admin.signer).mint(admin.address, supply * i);
+            await earningToken.connect(admin.signer).approve(mining3.address, supply * i);
+            await mining3.connect(admin.signer).finalize(i);
+
+            if (i % 10 == 0) {
+                await mining3.connect(test).transfer(admin.address, 500);
+            }
+        }
+
+        await expect(
+            mining3.connect(test).withdraw(10000)
+        ).to.be.revertedWith('Mining3: malformed snapshot id');
+
+        await expect(
+            mining3.connect(test).withdraw(
+                await mining3.lastFinalizedAt() + 86400
+            )
+        ).to.be.revertedWith('Mining3: not finalized');
+
+        const withdraw = async function(delta, earning) {
+            const snapshot = startSnapshot + delta;
+
+            const balance = await earningToken.balanceOf(mining3.address);
+            await mining3.connect(test).withdraw(finalized.add(delta));
+            expect(
+                await mining3.lastWithdrawAt(test.address)
+            ).to.equal(finalized.add(delta));
+
+            expect(
+                await earningToken.balanceOf(mining3.address)
+            ).to.equal(balance.sub(earning));
+        }
+
+        await withdraw(0, 0);
+        await withdraw(86400 * 5, 75000);
+        await withdraw(86400 * 15, 802500);
+        await withdraw(86400 * 50, 8990000);
     });
 });
 

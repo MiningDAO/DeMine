@@ -102,8 +102,9 @@ contract Mining3 is
         uint256 currentSnapshotId = _getCurrentSnapshotId();
         require(
             snapshotId <= currentSnapshotId,
-            'Mining3: future snapshot id'
+            'Mining3: all snapshots finalized'
         );
+
         _earningSum[snapshotId] = _earningSum[snapshotId - 86400] + earningPerToken;
         _finalized = snapshotId;
 
@@ -127,8 +128,8 @@ contract Mining3 is
     }
 
     function withdraw(uint256 snapshotId) external whenNotPaused {
-        require(snapshotId % 86400 == 0, 'Mining3: invalid snapshot id');
-        require(snapshotId <= _finalized, 'Mining3: not finalized yet');
+        require(snapshotId % 86400 == 0, 'Mining3: malformed snapshot id');
+        require(snapshotId <= _finalized, 'Mining3: not finalized');
 
         Withdrawal storage withdrawal = _withdrawal[msg.sender];
         uint256 prev = withdrawal.snapshotId;
@@ -136,7 +137,6 @@ contract Mining3 is
 
         Snapshots storage snapshots = _accountBalanceSnapshots[msg.sender];
         uint256 length = snapshots.ids.length;
-        require(length > 0, 'Mining3: no balance');
 
         uint256 totalEarning;
         uint256 index = withdrawal.index;
@@ -155,6 +155,7 @@ contract Mining3 is
         }
         withdrawal.snapshotId = snapshotId;
         withdrawal.index = index;
+
         IERC20(_earningToken).safeTransfer(msg.sender, totalEarning);
     }
 
@@ -189,12 +190,14 @@ contract Mining3 is
         return _earningToken;
     }
 
-    function earningSumPerToken(uint256 from, uint256 to) public view returns(uint256) {
-        return _earningSum[to] - _earningSum[from];
+    function earningSum(uint256 snapshotId) public view returns(uint256) {
+        return _earningSum[snapshotId];
     }
 
     function _earning(uint256 balance, uint256 from, uint256 to) private view returns(uint256) {
-        return balance == 0 ? 0 : balance * earningSumPerToken(from ,to);
+        return balance == 0 ? 0 : balance * (
+            _earningSum[to] - _earningSum[from]
+        );
     }
 
     function _beforeTokenTransfer(
