@@ -11,8 +11,8 @@ const binance = require("../lib/binance.js");
 const config = require("../lib/config.js");
 const lodash = require('lodash');
 
-// 3 days ago
-const DEFAULT_SNAPSHOT = time.startOfDay(new Date()) - 86400 * 3;
+// 1 days ago so you can finalize yesterday
+const DEFAULT_SNAPSHOT = time.startOfDay(new Date());
 
 const formatTs = function(ts) {
     return `${ts}(${new Date(ts * 1000).toISOString()})`;
@@ -132,11 +132,9 @@ async function genAppendix(admin, mining3, earningToken) {
 task('mining3-finalize', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'earning token symbol')
     .addOptionalParam('mining3', 'mining3 contract address')
-    .addOptionalParam('snapshotId', 'snapshotId to finalize', undefined, types.int)
     .addFlag('nosupplycheck', 'do not check supply with hashrate online')
     .addFlag('dryrun', 'do not run but just simulate the process')
     .setAction(async (args, { ethers } = hre) => {
-        logger.info("=========== nft-admin-finalize start ===========");
         logger.info("=========== nft-admin-finalize start ===========");
         config.validateCoin(args.coin);
 
@@ -172,7 +170,6 @@ task('mining3-finalize', 'finalize cycle for DeMineNFT contract')
 
 task('mining3-clone', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'earning token symbol')
-    .addOptionalParam('snapshot', 'initial snapshot id', DEFAULT_SNAPSHOT, types.int)
     .setAction(async (args, { ethers } = hre) => {
         logger.info("=========== nft-admin-finalize start ===========");
         config.validateCoin(args.coin);
@@ -185,13 +182,12 @@ task('mining3-clone', 'finalize cycle for DeMineNFT contract')
         const name = 'Mining3 token for ' + args.coin.toUpperCase();
         const symbol = 'm3' + args.coin.toUpperCase();
         const earningToken = await loadEarningToken(hre, args.coin);
-        const snapshot = args.snapshot;
 
         logger.info('Cloning Mining3: ' + JSON.stringify({
             source: proxy.address,
             beacon: beacon.address,
             implementation: await beacon.implementation(),
-            startSnapshotId: formatTs(args.snapshot),
+            startSnapshotId: formatTs(DEFAULT_SNAPSHOT),
             owner: admin.address,
             metadata: {
                 name,
@@ -208,10 +204,21 @@ task('mining3-clone', 'finalize cycle for DeMineNFT contract')
         const populatedTx = await proxy.connect(
            admin.signer
         ).populateTransaction.clone(
-            name, symbol, earningToken.address, snapshot, admin.address
+            name,
+            symbol,
+            earningToken.address,
+            DEFAULT_SNAPSHOT,
+            admin.address
         );
-        const txReceipt = await common.execTx(hre, admin.signer, populatedTx);
-        const events = common.getTransactionEvents([proxy, mining3], txReceipt);
+        const txReceipt = await common.execTx(
+            hre,
+            admin.signer,
+            populatedTx
+        );
+        const events = common.getTransactionEvents(
+            [proxy, mining3],
+            txReceipt
+        );
         const cloned = events['Clone'].args.cloned;
         logger.info('Writing contract info to state file');
         state.updateContract(
@@ -219,6 +226,7 @@ task('mining3-clone', 'finalize cycle for DeMineNFT contract')
                 'mining3': {
                     source: proxy.address,
                     target: cloned,
+                    beacon: beacon.address,
                     txReceipt
                 }
             }
