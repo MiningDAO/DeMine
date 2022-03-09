@@ -45,7 +45,7 @@ async function getFinalizing(mining3, args) {
     const nowAsDate = new Date(now * 1000).toISOString();
     if (finalizing > now) {
         throw `Error: cannot finalize future tokens, ` +
-            `now=${now}(${nowAsDate}), ${errMsg}`;
+            `now is ${now}(${nowAsDate}), finalizing ${finalizing}(${finalizingAsDate})`;
     }
     return {
         finalizing,
@@ -139,7 +139,7 @@ task('mining3-finalize', 'finalize cycle for DeMineNFT contract')
         config.validateCoin(args.coin);
 
         const admin = await config.admin(hre);
-        const mining3Addr = args.mining3 || state.loadMining3(hre, args.coin).address;
+        const mining3Addr = args.mining3 || state.loadMining3(hre, args.coin).target;
         const mining3 = await ethers.getContractAt('Mining3', mining3Addr);
         logger.info(`Mining3 contract ${mining3Addr} loaded`);
 
@@ -149,7 +149,7 @@ task('mining3-finalize', 'finalize cycle for DeMineNFT contract')
         );
         logger.info(`Earning token ${earningToken.address} loaded`);
 
-        var context = await getFinalizing(mining, args);
+        var context = await getFinalizing(mining3, args);
         lodash.merge(context, await getPoolStatsAndTokenRelease(
             hre, args, mining3, context
         ));

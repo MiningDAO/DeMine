@@ -156,3 +156,56 @@ task('nft-finalize-e2e', 'withdraw and finalize')
             );
         }
     });
+
+task('mining3-finalize-e2e', 'finalize token earnings')
+    .addParam('coin', 'Coin of DeMineNFT')
+    .addFlag('skipprompts', 'if to skip prompts')
+    .addFlag('nosupplycheck', 'do not check supply with hashrate online')
+    .setAction(async (args, { ethers, localConfig } = hre) => {
+        try {
+            const admin = await config.admin(hre);
+            if (hre.network.name == 'bsc') {
+                logger.info("Will withdraw balance from binance to admin")
+                await binance.withdrawAll(hre, args.coin, admin.address, args.skipprompts);
+            }
+            if (admin.type == 'GNOSIS') {
+                hre.shared.gnosis = await gnosis.getSafe(hre, admin);
+            }
+
+            const mining3Addr = state.loadMining3(hre, args.coin).target;
+            const mining3 = await ethers.getContractAt('Mining3', mining3Addr);
+            const earningToken = await ethers.getContractAt(
+                '@solidstate/contracts/token/ERC20/ERC20.sol:ERC20',
+                await mining3.earningToken()
+            );
+
+            var finalized = (await mining3.lastFinalizedAt()).toNumber();
+            const endTs = time.startOfDay(new Date());
+            if (finalized == endTs) {
+                const finalizedAsDate = new Date(finalized * 1000).toISOString();
+                logger.info(`No need to finalize, lastest finalized is ${finalizedAsDate}`);
+                return;
+            }
+
+            var requests = [
+                await run(
+                    'mining3-finalize',
+                    {
+                        coin: args.coin,
+                        nosupplycheck: args.nosupplycheck,
+                        dryrun: true,
+                    }
+                )
+            ];
+            return await exec(
+                hre, args.coin, admin, requests, {skipPrompts: args.skipprompts}
+            );
+        } catch(err) {
+            await courier.notifyE2EFailure(
+                hre,
+                args.coin,
+                workflow,
+                err.toString()
+            );
+        }
+    });
