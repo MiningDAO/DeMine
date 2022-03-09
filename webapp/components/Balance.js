@@ -190,7 +190,7 @@ function Balance(props) {
     const fetchData = async () => {
         setStatus(Status.LOADING_DATA);
 
-        var contractMeta = await fetch(`/api/v1/nftcontract/${props.chain}/${tabKey}`);
+        var contractMeta = await fetch(`/api/v1/contract/${props.chain}/${tabKey}`);
         contractMeta = await contractMeta.json();
 
         const contract = new ethers.Contract(
