@@ -12,7 +12,7 @@ export default async (req, res) => {
     const network = param[0].toLowerCase();
     const coin = param[1].toLowerCase();
 
-    const contractKey = key(network, coin, 'contract');
+    const contractKey = key(network, coin, 'nftcontract');
     const contractStored = await redis.get(contractKey);
     if (contractStored === null || contractStored === undefined) {
         console.log(`invalid request: network=${network}, coin=${coin}`);

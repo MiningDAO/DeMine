@@ -33,15 +33,15 @@ a {
   margin-right: 15px;
 }
 
-.finalized {
+.withdrawed {
    background-color: #A9A9A9;
 }
 
-.finalizing {
+.not-withdrawed {
    background-color: #DCDCDC;
 }
 
-.pending-transfer {
+.pending-withdraw {
    background-color: #fdb44b;
 }
 

@@ -170,24 +170,40 @@ task('mining3-finalize', 'finalize cycle for DeMineNFT contract')
 
 task('mining3-clone', 'finalize cycle for DeMineNFT contract')
     .addParam('coin', 'earning token symbol')
+    .addOptionalParam('snapshot', 'start snapshot id', DEFAULT_SNAPSHOT, types.int)
     .setAction(async (args, { ethers } = hre) => {
         logger.info("=========== nft-admin-finalize start ===========");
         config.validateCoin(args.coin);
 
-        const admin = await config.admin(hre);
         const mining3 = await config.getDeployment(hre, 'Mining3');
         const beacon = await config.getDeployment(hre, 'UpgradeableBeacon');
         const proxy = await config.getDeployment(hre, 'Mining3Proxy');
+
+        const contracts = state.tryLoadContracts(hre, args.coin);
+        if (contracts.mining3 && contracts.mining3.source == proxy.address) {
+            logger.warn("Nothing changed.");
+            logger.info("=========== nft-clone skipped ===========");
+            return contracts.mining3.target;
+        }
 
         const name = 'Mining3 token for ' + args.coin.toUpperCase();
         const symbol = 'm3' + args.coin.toUpperCase();
         const earningToken = await loadEarningToken(hre, args.coin);
 
+        const iface = new ethers.utils.Interface([
+            'function initialize(string, string, address, uint)'
+        ]);
+        const data = iface.encodeFunctionData(
+            'initialize',
+            [name, symbol, earningToken.address, args.snapshot]
+        );
+        const admin = await config.admin(hre);
+
         logger.info('Cloning Mining3: ' + JSON.stringify({
             source: proxy.address,
             beacon: beacon.address,
             implementation: await beacon.implementation(),
-            startSnapshotId: formatTs(DEFAULT_SNAPSHOT),
+            startSnapshotId: formatTs(args.snapshot),
             owner: admin.address,
             metadata: {
                 name,
@@ -203,13 +219,7 @@ task('mining3-clone', 'finalize cycle for DeMineNFT contract')
         }, null, 2));
         const populatedTx = await proxy.connect(
            admin.signer
-        ).populateTransaction.clone(
-            name,
-            symbol,
-            earningToken.address,
-            DEFAULT_SNAPSHOT,
-            admin.address
-        );
+        ).populateTransaction.clone(data, admin.address);
         const txReceipt = await common.execTx(
             hre,
             admin.signer,

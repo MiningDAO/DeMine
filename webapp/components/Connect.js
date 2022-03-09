@@ -44,9 +44,9 @@ function Connect(props) {
 
   const onChange = (from, chainId, accounts) => {
     if (isBSC(chainId)) {
-      props.onChange("bsc", accounts);
+      props.onChange(chainId, accounts);
     } else if (isBSCTest(chainId)) {
-      props.onChange("bscdev", accounts);
+      props.onChange(chainId, accounts);
     } else {
       props.onChange(null, []);
     }

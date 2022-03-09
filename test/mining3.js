@@ -104,6 +104,12 @@ describe("Mining3", function () {
         }
 
         const startSnapshot = time.startOfDay(date);
+        const [ids, values] = await mining3.balanceSnapshots(test.address);
+        let snapshots = {};
+        for (let i = 0; i < ids.length; i++) {
+            snapshots[ids[i]] = values[i];
+        }
+
         for (let i = 0; i < 50; i++) {
             const snapshot = startSnapshot + 86400 * (i + 1);
             expect(await mining3.totalSupplyAt(snapshot)).to.equal(10000 - 100 * i);
@@ -113,6 +119,12 @@ describe("Mining3", function () {
             expect(
                 await mining3.balanceOfAt(test.address, snapshot)
             ).to.equal(100 * i);
+
+            if (snapshots[snapshot] !== undefined) {
+                expect(
+                    await mining3.balanceOfAt(test.address, snapshot)
+                ).to.equal(snapshots[snapshot]);
+            }
         }
     });
 
@@ -130,7 +142,7 @@ describe("Mining3", function () {
         const finalized = await mining3.lastFinalizedAt();
 
         const startSnapshot = time.startOfDay(date);
-        var earningSum = 0;
+        var expectedEarningSum = 0;
         for (let i = 0; i < 50; i++) {
             const snapshot = startSnapshot + 86400 * (i + 1);
             await mine(timestamp + 86400 * (i + 1));
@@ -147,8 +159,9 @@ describe("Mining3", function () {
             expect(await earningToken.balanceOf(admin.address)).to.equal(0);
             expect(await mining3.lastFinalizedAt()).to.equal(toFinalize);
 
-            earningSum += i;
-            expect(await mining3.earningSum(snapshot)).to.equal(earningSum);
+            expectedEarningSum += i;
+            const [earningSum] = await mining3.batchEarningSum([snapshot]);
+            expect(earningSum).to.equal(expectedEarningSum);
 
             if (Math.random() > 0.5) {
                 await mining3.connect(admin.signer).mint(test.address, 1000);
@@ -156,7 +169,7 @@ describe("Mining3", function () {
         }
     });
 
-    it.only("mining3 withdraw", async function() {
+    it("mining3 withdraw", async function() {
         const date = new Date();
         const timestamp = time.toEpoch(date);
         const finalized = await mining3.lastFinalizedAt();

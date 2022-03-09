@@ -12,44 +12,6 @@ import "@openzeppelin/contracts/utils/Arrays.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
-import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
-import "@openzeppelin/contracts/proxy/Proxy.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
-
-contract Mining3Proxy is Proxy {
-    event Clone(address indexed source, address indexed cloned);
-
-    address public immutable beacon;
-
-    constructor(address _beacon) {
-        beacon = _beacon;
-    }
-
-    function clone(
-        string memory name,
-        string memory symbol,
-        address earningToken,
-        uint startSnapshotId,
-        address owner
-    ) external returns(address) {
-        address cloned = Clones.clone(address(this));
-        emit Clone(address(this), cloned);
-        Mining3(cloned).initialize(
-            name,
-            symbol,
-            earningToken,
-            startSnapshotId
-        );
-        OwnableUpgradeable(cloned).transferOwnership(owner);
-        return cloned;
-    }
-
-    function _implementation() internal view override returns (address) {
-        return IBeacon(beacon).implementation();
-    }
-}
-
 contract Mining3 is
     Initializable,
     ERC20Upgradeable,
@@ -97,6 +59,14 @@ contract Mining3 is
         _mint(to, amount);
     }
 
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     function finalize(uint256 earningPerToken) external onlyOwner {
         uint256 snapshotId = _finalized + 86400;
         uint256 currentSnapshotId = _getCurrentSnapshotId();
@@ -127,7 +97,8 @@ contract Mining3 is
         );
     }
 
-    function withdraw(uint256 snapshotId) external whenNotPaused {
+    function withdraw() external whenNotPaused {
+        uint256 snapshotId = _finalized;
         require(snapshotId % 86400 == 0, 'Mining3: malformed snapshot id');
         require(snapshotId <= _finalized, 'Mining3: not finalized');
 
@@ -178,6 +149,12 @@ contract Mining3 is
         return snapshotted ? value : totalSupply();
     }
 
+    function balanceSnapshots(
+        address account
+    ) external view returns(Snapshots memory snapshots) {
+        return _accountBalanceSnapshots[account];
+    }
+
     function lastFinalizedAt() external view returns(uint256) {
         return _finalized;
     }
@@ -190,8 +167,14 @@ contract Mining3 is
         return _earningToken;
     }
 
-    function earningSum(uint256 snapshotId) public view returns(uint256) {
-        return _earningSum[snapshotId];
+    function batchEarningSum(
+        uint256[] calldata snapshotIds
+    ) external view returns(uint256[] memory) {
+        uint256[] memory result = new uint256[](snapshotIds.length);
+        for(uint256 i = 0; i < snapshotIds.length; i++) {
+            result[i] = _earningSum[snapshotIds[i]];
+        }
+        return result;
     }
 
     function _earning(uint256 balance, uint256 from, uint256 to) private view returns(uint256) {
